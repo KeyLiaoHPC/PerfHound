@@ -1,0 +1,11 @@
+#!/bin/sh
+CC=mpiicc
+CFLAGS=-O2 -xHost -std=gnu11
+DEF=-DNTIMES=1000  -DUSE_MPI
+SIZE=-DKIB_SIZE=32768
+
+bench_mpi.x: bench_var.h main.c kernels.c utils.c
+	$(CC) $(CFLAGS) $(DEF) $(SIZE) -o $@ $^
+
+clean:
+	rm -f *.x *.o

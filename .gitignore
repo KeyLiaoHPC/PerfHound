@@ -1,0 +1,15 @@
+*.o
+*.ko
+*.x
+*.symvers
+*.order
+*.mod.c
+*.csv
+*.swp
+.vscode
+./*.sh
+.vscode/
+data/
+bin/
+lib/
+include/
