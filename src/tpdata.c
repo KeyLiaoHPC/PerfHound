@@ -47,7 +47,6 @@ calc_quant(double *data, int nitem, __ovl_t *res) {
 
     for(int i = 0; i < nitem; i ++) {
         sum += data[i];
-        // printf("%f\n", data[i]);
     }
     qsort((void *)data, nitem, sizeof(double), qsort_ascend);
 
