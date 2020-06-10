@@ -27,7 +27,7 @@
 #include "tpio.h"
 #include "stdio.h"
 
-#define  OVL_QUANT_HEADER "        MEAN        MIN         1/4         1/2         3/4         MAX\n"
+#define  OVL_QUANT_HEADER "        MEAN        MIN         1/20         1/10         1/4         1/2         3/4         MAX\n"
 
 int qsort_ascend(const void * a, const void * b) {
     if( *(double *)a < *(double *)b ) {
@@ -40,7 +40,7 @@ int qsort_ascend(const void * a, const void * b) {
 // calculate mean, min, max, quantile in a n-item 1d fp64 array
 int
 calc_quant(double *data, int nitem, __ovl_t *res) {
-    int i25, i50, i75;
+    int i05, i10, i25, i50, i75;
     size_t ndata;
     double sum = 0;
     double ovl_byte, mind, maxd, meand, d25, d50, d75;
@@ -50,12 +50,16 @@ calc_quant(double *data, int nitem, __ovl_t *res) {
     }
     qsort((void *)data, nitem, sizeof(double), qsort_ascend);
 
+    i05 = 0.05 * nitem;
+    i10 = 0.10 * nitem;
     i25 = 0.25 * nitem;
     i50 = 0.50 * nitem;
     i75 = 0.75 * nitem;
     res->mintp = data[0];
     res->maxtp = data[nitem-1];
     res->meantp = sum / nitem;
+    res->tp05 = data[i05];
+    res->tp10 = data[i10];
     res->tp25 = data[i25];
     res->tp50 = data[i50];
     res->tp75 = data[i75];
@@ -97,12 +101,12 @@ dpipe_k0(uint64_t *ns, uint64_t *cy, int nskip, int ntest, int freq, size_t bpi,
     tpprintf(0, 0, 0, OVL_QUANT_HEADER);
     // MB/s
     calc_rate_quant(&ns[nskip], ntest - nskip, niter * bpi, 1e3, &res);
-    tpprintf(0, 0, 0, "MB/s    %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
-           res.meantp, res.mintp, res.tp25, res.tp50, res.tp75, res.maxtp);
+    tpprintf(0, 0, 0, "MB/s    %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
+           res.meantp, res.mintp, res.tp05, res.tp10, res.tp25, res.tp50, res.tp75, res.maxtp);
     // Byte/cy
     calc_rate_quant(&cy[nskip], ntest - nskip, niter * bpi, 1, &res);
-    tpprintf(0, 0, 0, "B/c     %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
-           res.meantp, res.mintp, res.tp25, res.tp50, res.tp75, res.maxtp);
+    tpprintf(0, 0, 0, "B/c    %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
+           res.meantp, res.mintp, res.tp05, res.tp10, res.tp25, res.tp50, res.tp75, res.maxtp);
     if(freq) {
         double *freqs =  (double *)malloc(sizeof(double) * ntest);
         for(int i = nskip; i < ntest; i ++) {
@@ -110,8 +114,8 @@ dpipe_k0(uint64_t *ns, uint64_t *cy, int nskip, int ntest, int freq, size_t bpi,
             // printf("%d, %f", i, freqs[i]);
         }
         calc_quant(&freqs[nskip], ntest - nskip, &res);
-        tpprintf(0, 0, 0, "GHz     %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
-               res.meantp, res.mintp, res.tp25, res.tp50, res.tp75, res.maxtp);
+        tpprintf(0, 0, 0, "GHz    %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
+               res.meantp, res.mintp, res.tp05, res.tp10, res.tp25, res.tp50, res.tp75, res.maxtp);
         free(freqs);
     }
 
