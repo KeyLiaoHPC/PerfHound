@@ -1,0 +1,112 @@
+/*
+ * =================================================================================
+ * VarTect - Detecting and analyzing performance variation in parallel program
+ * 
+ * Copyright (C) 2020 Key Liao (Liao Qiucheng)
+ * 
+ * This program is free software: you can redistribute it and/or modify it under the
+ *  terms of the GNU General Public License as published by the Free Software 
+ * Foundation, either version 3 of the License, or (at your option) any later 
+ * version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
+ * PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License along with 
+ * this program. If not, see https://www.gnu.org/licenses/.
+ * 
+ * =================================================================================
+ * varapi.h
+ * Description: API for vartect
+ * Author: Key Liao
+ * Modified: May. 28th, 2020
+ * Email: keyliaohpc@gmail.com
+ * =================================================================================
+ */
+//==================================================================================
+
+/* Comment Syntax */
+/*
+ * Long block document.
+ */
+/* Beginning remark for functioning block/procedure. */
+// Short comment for variables, short explanation.
+
+//==================================================================================
+
+#ifndef __VARAPI_H__
+#define __VARAPI_H__
+
+/* CTAG: Counter tag*/
+#ifdef  __x86_64__
+
+#define VT_CYCLE        0
+#define VT_NANOSEC      1
+
+#elif   __aarch64__
+
+#define VT_CYCLE        0
+#define VT_NANOSEC      1
+
+#endif
+
+/* VT_TYPE*/
+#define VT_INT      0
+#define VT_INT8     1
+#define VT_INT16    2
+#define VT_INT32    3
+#define VT_INT64    4
+#define VT_UINT     5
+#define VT_UINT8    6
+#define VT_UINT16   7
+#define VT_UINT32   8
+#define VT_UINT64   9
+#define VT_FLOAT    10
+#define VT_DOUBLE   11
+
+/* API: Varapi application interfaces */
+/**
+ * @brief Initialise vartect api. This function must be called exactly once before the 
+ * variation detection.
+ * @param data_dir  Root dir for output data.
+ * @param proj_name Project name, for intra-project data comparison.
+ * @return int 
+ */
+int vt_init(char *data_dir, char *proj_name);
+
+/**
+ * @brief Append one or more new count point tags.
+ * @param ctag 
+ * @return int 
+ */
+int vt_set_ctag(char *ctag);
+
+/**
+ * @brief Append one or more new event tags.
+ * @param etag 
+ * @return int 
+ */
+int vt_set_etag(char *etag, int vt_type);
+
+/**
+ * @brief Read cycle and nanosec (timestamp).
+ * @param ctag 
+ * @return int 
+ */
+int vt_read_ts(char *ctag);
+
+/**
+ * @brief Get a reading of a checkpoint. 
+ * @param ctag Code tag, a descriptive word tag for the counting point.
+ * @param etag Event tag, an exsited event name in varapi.h.
+ * @return int Return error code.
+ */
+int vt_rec(char *ctag, char *etag);
+
+/**
+ * @brief Exit vartect api.
+ * @return int 
+ */
+int vt_finalize();
+
+#endif

@@ -105,7 +105,7 @@ dpipe_k0(uint64_t *ns, uint64_t *cy, int nskip, int ntest, int freq, size_t bpi,
            res.meantp, res.mintp, res.tp05, res.tp10, res.tp25, res.tp50, res.tp75, res.maxtp);
     // Byte/cy
     calc_rate_quant(&cy[nskip], ntest - nskip, niter * bpi, 1, &res);
-    tpprintf(0, 0, 0, "B/c    %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
+    tpprintf(0, 0, 0, "B/c     %-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f%-12.3f\n", 
            res.meantp, res.mintp, res.tp05, res.tp10, res.tp25, res.tp50, res.tp75, res.maxtp);
     if(freq) {
         double *freqs =  (double *)malloc(sizeof(double) * ntest);
