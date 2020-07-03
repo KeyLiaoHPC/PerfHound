@@ -35,11 +35,16 @@
 //==================================================================================
 
 #include <stdint.h>
+#include <time.h>
 
 #ifndef __VARAPI_CORE_H__
 #define __VARAPI_CORE_H__
 
 #include "vt_counter.h"
+
+#define PATH_MAX    4096
+#define HOST_MAX    253
+#define PROJ_MAX    64
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 #define _MSG_BUF_BYTE   4096    // 4 KiB
@@ -77,5 +82,10 @@ typedef struct {
     uint64_t val;
 } data_t;
 
+typedef struct {
+    int rank;
+    int cpu;
+    int hostid;
+} rank_t;
 
 #endif

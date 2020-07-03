@@ -72,7 +72,7 @@
  * @param proj_name Project name, for intra-project data comparison.
  * @return int 
  */
-int vt_init(char *data_dir, char *proj_name);
+int vt_init(char *u_data_root, char *u_proj_name);
 
 /**
  * @brief Append one or more new count point tags.

@@ -49,8 +49,8 @@
 
 /* Read virtual timer */
 #ifdef UES_CNTVCT
-#define _vt_read_ns(_ns)     asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); _ns *= nspt;
+#define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); _ns *= nspt;
 #else
-#define _vt_read_ns(_ns)     clock_gettime(CLOCK_MONOTONIC, &ts);    \
+#define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
 #endif
