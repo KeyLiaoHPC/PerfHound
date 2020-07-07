@@ -54,61 +54,19 @@
  * @return int 
  */
 int
-vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
-    int len, err;
-    char droot[_PATH_MAX], dpath[_PATH_MAX], pname[_PROJ_MAX];
-
-    if(u_data_root == NULL) {
-        sprintf(droot, "./vartect_data");
-    } 
-    else {
-        len = 0;
-        while(1) {
-            if(u_data_root[len] == '\0')
-                break;
-            if(len >= _PATH_MAX)
-                break;
-            len ++;
-        }
-        if(len >= _PATH_MAX) {
-            return -1;
-        }
-        strcpy(droot, u_data_root);
-    } // END: if(u_data_root == NULL)
-
-    if(u_proj_name == NULL) {
-        sprintf(pname, "test");
-    } 
-    else {
-        len = 0;
-        while(1) {
-            if(u_proj_name[len] == '\0')
-                break;
-            if(len >= _PROJ_MAX)
-                break;
-            len ++;
-        }
-        if(len >= _PROJ_MAX) {
-            return -1;
-        }
-        strcpy(pname, u_proj_name);
-    } // END: if(u_proj_name == NULL)
-
-    // combine path components together
-    sprintf(dpath, "%s/%s/%s", droot, pname, hostname);
-
-    err = mkdir(dpath, S_IRWXU);
-    if (err == EEXIST) {
-        realpath(dpath, hostpath);
-        return 0;
-    }
+vt_mkdir(char *path){
+    int err;
+    char tmp_path[_PATH_MAX];
+    char *p;
 
     // walk through path
-    char *p;
-    for (p = dpath; *p != '\0'; p++) {
+    strcpy(tmp_path, path);
+    memset(path, 0, _PATH_MAX * sizeof(char));
+
+    for (p = tmp_path; *p != '\0'; p++) {
         if (*p == '/') {
             *p = '\0';
-            err = mkdir(dpath, S_IRWXU);
+            err = mkdir(tmp_path, S_IRWXU);
             if(err != 0) {
                 if(errno != EEXIST)
                     return -1;
@@ -117,13 +75,13 @@ vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
         }
     }
 
-    if (mkdir(dpath, S_IRWXU) != 0){
+    if (mkdir(tmp_path, S_IRWXU) != 0){
         if(errno != EEXIST)
             return -1;
     }
 
     // expand relative path into absolute path to avoid runtime path changing 
-    realpath(dpath, hostpath);
+    realpath(tmp_path, path);
     
     return 0;
 }
@@ -159,7 +117,9 @@ vt_getstamp(char *hostpath, char *timestr, int *run_id) {
     if(fp == NULL) {
         return -1;
     }
-    tstamp_size = fseek(fp, 0, SEEK_END);
+    fseek(fp, 0, SEEK_SET);
+    fseek(fp, 0, SEEK_END);
+    tstamp_size = ftell(fp);
     *run_id = tstamp_size / 16;
     fclose(fp);
 
@@ -170,12 +130,12 @@ vt_getstamp(char *hostpath, char *timestr, int *run_id) {
 void
 vt_putstamp(char *hostpath, char *timestr) {
     FILE *fp;
-    char *tstampfile;
+    char tstampfile[_PATH_MAX];
     
-    sprintf(tstampfile, "%s/tstamp.log");
+    sprintf(tstampfile, "%s/tstamp.log", hostpath);
     fp = fopen(tstampfile, "a+");
     fseek(fp, 0, SEEK_END);
-    fprintf(fp, "%s", timestr);
+    fprintf(fp, "%s\n", timestr);
     fclose(fp);
 }
 

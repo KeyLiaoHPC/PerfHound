@@ -59,6 +59,7 @@ int vt_run_id;
 char vt_data[_MSG_BUF_N][_MSG_LEN];
 int next_id, vt_nmsg;                           // Next data id.
 char hostpath[_PATH_MAX];                       // Data path for the host.
+char projpath[_PATH_MAX];                       // Data path for the host.
 char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
 char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
 char timestr[16];                               // Timestamp records. One stamp per line.
@@ -79,7 +80,7 @@ struct timespec ts;
 #endif
 
 /* Extern file-operating functions in file_op.c*/
-extern int vt_mkdir(char *data_root, char *proj_name, char *hame, char *hpath);
+extern int vt_mkdir(char *path);
 extern int vt_touch(char *path, char *mode);
 extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
 extern void vt_putstamp(char *hostpath, char *timestr);
@@ -88,6 +89,7 @@ extern void vt_log(FILE *fp, char *fmt, ...);
 /* Initializing varapi */
 int
 vt_init(char *u_data_root, char *u_proj_name) {
+    char udroot[_PATH_MAX], upname[_PATH_MAX];
     int vterr = 0;
     next_id = 0;
     vt_nmsg = 0;
@@ -113,22 +115,49 @@ vt_init(char *u_data_root, char *u_proj_name) {
      * 
      * data path: <Data_Root>/<Proj_Name>/<Host_Name>/<files>
      * data file:
-     * run#_ctag.csv                    CSV file for ctag. One copy per host.
-     * run#_etag.csv                    CSV file for etag. One copy per host.
      * run#_procmap.csv                 CSV file for process map. One copy per host.
      * run#_r#_c#_all.csv               CSV file for raw tracing data. One per rank.
      * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
      * 
      */ 
-    vterr = vt_mkdir(u_data_root, u_proj_name, vt_myhost, hostpath);
+    if (u_data_root == NULL) {
+        sprintf(udroot, "./vartect_data");
+    }
+    else {
+        // TODO: for now, no path syntax check here.
+        sprintf(udroot, "%s", u_data_root);
+    }
+    if (u_proj_name == NULL) {
+        sprintf(upname, "vartect_test");
+    }
+    else {
+        // TODO: for now no syntax check here.
+        sprintf(upname, u_proj_name);
+    }
+    // Full path for project directory and host drectory
+    sprintf(projpath, "%s/%s", udroot, upname);
+    sprintf(hostpath, "%s/%s", projpath, vt_myhost);
+
+    if (vt_myrank == 0) {
+        vt_mkdir(projpath);
+    }
+    if (vt_is_hmaster) {
+        vterr = vt_mkdir(hostpath);
+    }
+
     if (vterr) {
         printf("*** EXIT. ERROR: VARAPI init failed. ***\n");
         exit(1);
     }
 
-    if (vt_is_hmaster) {
+    if (vt_myrank == 0) {
         vt_getstamp(hostpath, timestr, &vt_run_id);
     }
+#ifdef USE_MPI
+    else {
+
+    }
+#endif
     sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
     // TODO: only 1 process now.
     if(vt_is_iorank) {
@@ -140,18 +169,6 @@ vt_init(char *u_data_root, char *u_proj_name) {
             exit(1);
         }
         vt_log(fp_log, "[vt_init] Varapi is started.\n");
-        // counting tag
-        sprintf(cfile, "%s/run%d_ctag.csv", hostpath, vt_run_id);
-        if (vt_touch(cfile, "w")) {
-            printf("*** EXIT. ERROR: VARAPI ctag file init failed. ***\n");
-            exit(1);
-        }
-        // event tag
-        sprintf(efile, "%s/run%d_etag.csv", hostpath, vt_run_id);
-        if (vt_touch(efile, "w")) {
-            printf("*** EXIT. ERROR: VARAPI etag file init failed. ***\n");
-            exit(1);
-        }
     }   // END: if(vt_is_iorank)
     // Each process maintains its own data tracing file.
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
@@ -240,6 +257,7 @@ void
 vt_finalize() {
     vt_read("VT_END", 6, 0, 0, 0);
     vt_write();
+    vt_putstamp(hostpath, timestr);
     vt_log(fp_log, "[vt_end] Varapi is finished.\n");
     fclose(fp_log);
     fclose(fp_data);
