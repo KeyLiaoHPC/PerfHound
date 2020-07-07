@@ -216,13 +216,9 @@ main()
     STREAM_TYPE		scalar;
     double		t, times[4][NTIMES];
 
-#ifdef USE_VARTECT
     /* Vartect: Init varapi */
     vt_init("./data", "varapi_test");
-    /* Vartect: Set tags for counting points. */
-    vt_set_ctag("copy,scale,add,triad");
     /* --- SETUP --- determine precision and check timing --- */
-#endif
 
     printf(HLINE);
     printf("STREAM version $Revision: 5.10 $\n");
@@ -314,10 +310,8 @@ main()
     scalar = 3.0;
     for (k=0; k<NTIMES; k++)
 	{
-#ifdef USE_VARTECT
     /* Vartect: Tag: copy, get timestamp. */
-    vt_read_ts("copy");
-#endif
+    vt_read("copy", 4, 0, 0, 0);
 	times[0][k] = mysecond();
 #ifdef TUNED
         tuned_STREAM_Copy();
@@ -328,10 +322,8 @@ main()
 #endif
 	times[0][k] = mysecond() - times[0][k];
 	
-#ifdef USE_VARTECT
     /* Vartect: Tag: scale, get timestamp. */
-    vt_read_ts("scale");
-#endif
+    vt_read("scale", 5, 0, 0, 0);
 	times[1][k] = mysecond();
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
@@ -342,10 +334,8 @@ main()
 #endif
 	times[1][k] = mysecond() - times[1][k];
 
-#ifdef USE_VARTECT
 	/* Vartect: Tag: add, get timestamp. */
-    vt_read_ts("add");
-#endif
+    vt_read("add", 3, 0, 0, 0);
 	times[2][k] = mysecond();
 #ifdef TUNED
         tuned_STREAM_Add();
@@ -356,10 +346,8 @@ main()
 #endif
 	times[2][k] = mysecond() - times[2][k];
 	
-#ifdef USE_VARTECT
 	/* Vartect: Tag: triad, get timestamp. */
-    vt_read_ts("triad");
-#endif
+    vt_read("triad", 5, 0, 0, 0);
 	times[3][k] = mysecond();
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
@@ -399,10 +387,8 @@ main()
     checkSTREAMresults();
     printf(HLINE);
 
-#ifdef USE_VARTECT
     /* Vartect: varapi finalize */
     vt_finalize();
-#endif
     return 0;
 }
 

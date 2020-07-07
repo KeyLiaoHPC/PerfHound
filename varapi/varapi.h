@@ -36,6 +36,7 @@
 
 #ifndef __VARAPI_H__
 #define __VARAPI_H__
+#include <stdint.h>
 
 /* CTAG: Counter tag*/
 #ifdef  __x86_64__
@@ -51,6 +52,9 @@
 #endif
 
 /* VT_TYPE*/
+#ifndef __VT_TYPE__
+#define __VT_TYPE__
+
 #define VT_INT      0
 #define VT_INT8     1
 #define VT_INT16    2
@@ -64,6 +68,8 @@
 #define VT_FLOAT    10
 #define VT_DOUBLE   11
 
+#endif // END #ifndef __VT_TYPE__
+
 /* API: Varapi application interfaces */
 /**
  * @brief Initialise vartect api. This function must be called exactly once before the 
@@ -75,38 +81,29 @@
 int vt_init(char *u_data_root, char *u_proj_name);
 
 /**
- * @brief Append one or more new count point tags.
- * @param ctag 
- * @return int 
- */
-int vt_set_ctag(char *ctag);
-
-/**
- * @brief Append one or more new event tags.
- * @param etag 
- * @return int 
- */
-int vt_set_etag(char *etag, int vt_type);
-
-/**
- * @brief Read cycle and nanosec (timestamp).
- * @param ctag 
- * @return int 
- */
-int vt_read_ts(char *ctag);
-
-/**
- * @brief Get a reading of a checkpoint. 
+ * @brief Get and record an pre-defined event reading.
  * @param ctag Code tag, a descriptive word tag for the counting point.
  * @param etag Event tag, an exsited event name in varapi.h.
  * @return int Return error code.
  */
-int vt_rec(char *ctag, char *etag);
+void vt_read(char *ctag, int clen, uint32_t etag1, uint32_t etag2, uint32_t etag3);
+
+/**
+ * @brief Record a self-defined event value.
+ * 
+ * @param ctag 
+ * @param etag 
+ * @param vt_type 
+ * @param val 
+ */
+void vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val);
+
+void vt_write();
 
 /**
  * @brief Exit vartect api.
  * @return int 
  */
-int vt_finalize();
+void vt_finalize();
 
 #endif

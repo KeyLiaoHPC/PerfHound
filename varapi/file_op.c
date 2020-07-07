@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -55,7 +56,7 @@
 int
 vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
     int len, err;
-    char droot[PATH_MAX], dpath[PATH_MAX], pname[PROJ_MAX];
+    char droot[_PATH_MAX], dpath[_PATH_MAX], pname[_PROJ_MAX];
 
     if(u_data_root == NULL) {
         sprintf(droot, "./vartect_data");
@@ -65,11 +66,11 @@ vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
         while(1) {
             if(u_data_root[len] == '\0')
                 break;
-            if(len >= PATH_MAX)
+            if(len >= _PATH_MAX)
                 break;
             len ++;
         }
-        if(len >= PATH_MAX) {
+        if(len >= _PATH_MAX) {
             return -1;
         }
         strcpy(droot, u_data_root);
@@ -83,11 +84,11 @@ vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
         while(1) {
             if(u_proj_name[len] == '\0')
                 break;
-            if(len >= PROJ_MAX)
+            if(len >= _PROJ_MAX)
                 break;
             len ++;
         }
-        if(len >= PROJ_MAX) {
+        if(len >= _PROJ_MAX) {
             return -1;
         }
         strcpy(pname, u_proj_name);
@@ -108,7 +109,6 @@ vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
         if (*p == '/') {
             *p = '\0';
             err = mkdir(dpath, S_IRWXU);
-            printf("%s\n", dpath);
             if(err != 0) {
                 if(errno != EEXIST)
                     return -1;
@@ -130,10 +130,10 @@ vt_mkdir(char *u_data_root, char *u_proj_name, char *hostname, char *hostpath){
 
 /* Create files. */
 int
-vt_touch(char *filepath){
+vt_touch(char *path, char *mode){
     FILE *fp;
     
-    fp = open(filepath, O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+    fp = fopen(path, mode);
     if (fp == NULL)
         return -1;
     fclose(fp);
@@ -145,13 +145,15 @@ vt_touch(char *filepath){
 int
 vt_getstamp(char *hostpath, char *timestr, int *run_id) {
     long int tstamp_size;
-    char stampfile[PATH_MAX];
+    char stampfile[_PATH_MAX];
     time_t t = time(0);
     struct tm *lt = localtime(&t);
     FILE *fp;
 
-    sprintf(timestr, "%04d%02d%02dT%02d%02d%02d\n", lt->tm_year + 1900, 
+    sprintf(timestr, "%04d%02d%02dT%02d%02d%02d", lt->tm_year + 1900, 
             lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec); 
+    
+    /* Create a time stamp remark file to record times of running.*/
     sprintf(stampfile, "%s/tstamp.log", hostpath);
     fp = fopen(stampfile, "a+");
     if(fp == NULL) {
@@ -165,7 +167,7 @@ vt_getstamp(char *hostpath, char *timestr, int *run_id) {
 }
 
 /* When varapi ends successfully, put tstamp in tstamp.log in every host directory.*/
-int
+void
 vt_putstamp(char *hostpath, char *timestr) {
     FILE *fp;
     char *tstampfile;
@@ -175,12 +177,24 @@ vt_putstamp(char *hostpath, char *timestr) {
     fseek(fp, 0, SEEK_END);
     fprintf(fp, "%s", timestr);
     fclose(fp);
-    
-    return 0;
 }
 
 /* Logging */
 void
-vt_printf() {
+vt_log(FILE *fp, char *fmt, ...) {
+    /* Generate natural timestamp. */
+    time_t t = time(0);
+    struct tm *lt = localtime(&t);
+    char msg[1024];
+    va_list args;
     
+    // <YYYY><MM><DD>T<hh><mm><ss>,<msg>
+    sprintf(msg, "%04d%02d%02dT%02d%02d%02d,", lt->tm_year + 1900, lt->tm_mon + 1, 
+            lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    va_start(args, fmt);
+    vsprintf(&msg[16], fmt, args);
+    va_end(args);
+
+    fprintf(fp, msg);
+    memset(msg, '\0', 1024 * sizeof(char));
 }

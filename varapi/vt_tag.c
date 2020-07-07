@@ -1,5 +1,4 @@
-/*
- * =================================================================================
+/* =================================================================================
  * VarTect - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
@@ -16,10 +15,10 @@
  * this program. If not, see https://www.gnu.org/licenses/.
  * 
  * =================================================================================
- * rec_ts_aarch64.h
- * Description: Macros for timer on aarch64.
+ * vt_tag.c
+ * Description: Processing tags in Vartect.
  * Author: Key Liao
- * Modified: Jul. 2nd, 2020
+ * Modified: May. 28th, 2020
  * Email: keyliaohpc@gmail.com
  * =================================================================================
  */
@@ -32,26 +31,5 @@
 /* Beginning remark for functioning block/procedure. */
 // Short comment for variables, short explanation.
 
-//==================================================================================
+//=================================================================================
 
-/* Init timer */
-#ifdef USE_CNTVCT
-#define _vt_init_ns     uint32_t freq;  \
-                        uint64_t nspt;  \
-                        asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
-                        nspt = 1 / (freq * 1e-9);
-#else
-#define _vt_init_ns     asm volatile("NOP"  "\n\t":::);
-#endif
-
-/* Read cycle */
-#define _vt_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
-
-/* Read virtual timer */
-#ifdef UES_CNTVCT
-#define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); \
-                            _ns *= nspt;
-#else
-#define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
-                            (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
-#endif

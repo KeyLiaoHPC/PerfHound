@@ -16,10 +16,10 @@
  * this program. If not, see https://www.gnu.org/licenses/.
  * 
  * =================================================================================
- * rec_ts_aarch64.h
- * Description: Macros for timer on aarch64.
+ * vt_etag.h
+ * Description: Predefined event tag.
  * Author: Key Liao
- * Modified: Jul. 2nd, 2020
+ * Modified: Jul. 6th, 2020
  * Email: keyliaohpc@gmail.com
  * =================================================================================
  */
@@ -34,24 +34,21 @@
 
 //==================================================================================
 
-/* Init timer */
-#ifdef USE_CNTVCT
-#define _vt_init_ns     uint32_t freq;  \
-                        uint64_t nspt;  \
-                        asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
-                        nspt = 1 / (freq * 1e-9);
-#else
-#define _vt_init_ns     asm volatile("NOP"  "\n\t":::);
-#endif
+/* Number of etags */
+#define _N_ETAG_AARCH64     2
+#define _N_ETAG_X64         2
 
-/* Read cycle */
-#define _vt_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
+/* Etag ID */
 
-/* Read virtual timer */
-#ifdef UES_CNTVCT
-#define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); \
-                            _ns *= nspt;
-#else
-#define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
-                            (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
-#endif
+/* Etag name string. */
+// Aarch64 etag
+char vt_etags_arm[2][32] = {
+    "0",
+    "VT_NANOSEC"
+};
+
+// x86_64 etag
+char vt_etags_x64[2][32] = {
+    "0",
+    "VT_NANOSEC"
+};

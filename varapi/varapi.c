@@ -33,33 +33,43 @@
 // Short comment for variables, short explanation.
 
 //==================================================================================
+
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
-#include <linux/getcpu.h>
+#include <sched.h>
+#include <string.h>
+#include <stdint.h>
+#include "varapi.h"
 #include "varapi_core.h"
+#include "vt_etag.h"
 
 #ifdef USE_MPI
 #include <mpi.h>
 #endif
 
 /* Variables for Varapi's control */
-int vt_not_ready;
-int vr_run_id;
+int vt_run_id;
 
 /* Variables for files and information */
-data_t vt_data[_MSG_BUF_N];                 // Varapi raw data.
-int next_id;                                // Next data id.
-char hostpath[PATH_MAX];                    // Data path for the host.
-char cfile[PATH_MAX], efile[PATH_MAX];      // Full path of ctag and etag.
-char logfile[PATH_MAX], datafile[PATH_MAX]; // Full path of log and data.
-char timestr[16];                         // Timestamp records. One stamp per line.
+//data_t vt_data[_MSG_BUF_N];                 // Varapi raw data.
+char vt_data[_MSG_BUF_N][_MSG_LEN];
+int next_id, vt_nmsg;                           // Next data id.
+char hostpath[_PATH_MAX];                       // Data path for the host.
+char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
+char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
+char timestr[16];                               // Timestamp records. One stamp per line.
+FILE *fp_log, *fp_data;
 
-/* Process info*/
+/* MPI and process info*/
 int vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;   // # of mpi ranks, rank id, core id.
-int vt_is_iorank;           // IO rank flag
-char vt_myhost[HOST_MAX];   // My host name
-rank_t *vt_rinfo;           // Rank information list
+int vt_is_iorank;                               // IO rank flag
+int vt_is_hmaster;                              // Flag for the head rank of a host.
+char vt_myhost[_HOST_MAX];                      // My host name
+rank_t *vt_rinfo;                               // Rank information list
 
 /* Var for nanosec reading */
 #if defined(__aarch64__) && defined(USE_CNTVCT)
@@ -69,23 +79,22 @@ struct timespec ts;
 #endif
 
 /* Extern file-operating functions in file_op.c*/
-extern int vt_mkdir(char *data_root, char *proj_name, char *host_name);
-extern int vt_touch(char *cfile, char *efile, char *logfile, char *datafile);
-
+extern int vt_mkdir(char *data_root, char *proj_name, char *hame, char *hpath);
+extern int vt_touch(char *path, char *mode);
+extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
+extern void vt_putstamp(char *hostpath, char *timestr);
+extern void vt_log(FILE *fp, char *fmt, ...);
 
 /* Initializing varapi */
 int
 vt_init(char *u_data_root, char *u_proj_name) {
     int vterr = 0;
-    unsigned int cpuid, numanode;
-    vt_not_ready = 1;
     next_id = 0;
+    vt_nmsg = 0;
 
     /* Get host and process info */
-    getcpu(&cpuid, &numanode);
-    gethostname(vt_myhost, HOST_MAX);
-    vt_mycpu = cpuid;
-    vt_mynuma = numanode;
+    gethostname(vt_myhost, _HOST_MAX);
+    vt_mycpu = sched_getcpu();
     vt_is_iorank = 0;
 
 #ifdef USE_MPI
@@ -95,6 +104,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
 #else
     vt_nrank = 1;
     vt_myrank = 0;
+    vt_is_hmaster = 1;
     vt_is_iorank = 1;
 #endif
 
@@ -105,111 +115,132 @@ vt_init(char *u_data_root, char *u_proj_name) {
      * data file:
      * run#_ctag.csv                    CSV file for ctag. One copy per host.
      * run#_etag.csv                    CSV file for etag. One copy per host.
+     * run#_procmap.csv                 CSV file for process map. One copy per host.
      * run#_r#_c#_all.csv               CSV file for raw tracing data. One per rank.
      * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
      * 
      */ 
-    vterr = vt_mkdir(u_data_root, u_proj_name, hostpath);
-    if(vterr) {
-        vt_not_ready = 1;
-        return -1;
+    vterr = vt_mkdir(u_data_root, u_proj_name, vt_myhost, hostpath);
+    if (vterr) {
+        printf("*** EXIT. ERROR: VARAPI init failed. ***\n");
+        exit(1);
     }
+
+    if (vt_is_hmaster) {
+        vt_getstamp(hostpath, timestr, &vt_run_id);
+    }
+    sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
     // TODO: only 1 process now.
-    vt_getstamp(hostpath, timestr, &vt_run_id);
     if(vt_is_iorank) {
+        // Initialize logging, get current run id in the project
+        fp_log = NULL;
+        fp_log = fopen(logfile, "w");
+        if(fp_log == NULL) {
+            printf("*** EXIT. ERROR: VARAPI log file init failed. ***\n");
+            exit(1);
+        }
+        vt_log(fp_log, "[vt_init] Varapi is started.\n");
+        // counting tag
         sprintf(cfile, "%s/run%d_ctag.csv", hostpath, vt_run_id);
+        if (vt_touch(cfile, "w")) {
+            printf("*** EXIT. ERROR: VARAPI ctag file init failed. ***\n");
+            exit(1);
+        }
+        // event tag
         sprintf(efile, "%s/run%d_etag.csv", hostpath, vt_run_id);
-        sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
-    }
+        if (vt_touch(efile, "w")) {
+            printf("*** EXIT. ERROR: VARAPI etag file init failed. ***\n");
+            exit(1);
+        }
+    }   // END: if(vt_is_iorank)
+    // Each process maintains its own data tracing file.
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
-    vterr = vt_touch(&p_vtlog, &p_vtdata, data_dir, proj_name);
-    if(vterr) {
-        vt_not_ready = 1;
-        return -1;
-    }
+    fp_data = NULL;
+    fp_data = fopen(datafile, "w");
+    if (vt_touch(datafile, "w")) {
+#ifdef USE_MPI
+        // When using MPI, gathering all ready flag, kick start if every process is ready.
+#else
+        exit(1);
+#endif        
+    } 
+    else {
+        vt_log(fp_log, "[vt_init] Rank %d on CPU # %d creates data file %s.\n", 
+               vt_myrank, vt_mycpu, datafile);
+    }// END: if (vt_touch(datafile, "w"))
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
     _vt_init_ns;
 
     /* Initial time reading. */
-
+    vt_read("VT_START", 8, 0, 0, 0);
+    vt_write();
+    return 0;
 }
 
-/* Set counting point tag */
-void
-vt_set_ctag(char *ctag) {
-    if(vt_not_ready) return; // Nothing will be executed.
 
-    int vterr = 0;
-
-    return vterr;
-}
-
-/* Set event tag */
-void
-vt_set_etag(char *etag, int vt_type) {
-    if(vt_not_ready) return;
-
-    int vterr = 0;
-
-    return vterr;
-}
 
 /* Read cycle and nanosec */
-int
-vt_read_ts(char *ctag) {
-    if(vt_not_ready) return; // Nothing will be executed.
+void
+vt_read_ts(uint64_t *cy, uint64_t *ns) {
 
-    int ctag_id;
-    register uint64_t cy, ns;
+    _vt_read_cy(*cy);
+    _vt_read_ns(*ns);
 
-    _vtread_cy(cy);
-    _vtread_ns(ns);
-    
-    /* Save to data struct arary */
-    vt_data[next_id].ctag = ctag_id;
-    vt_data[next_id].etag = VT_CYCLE;
-    vt_data[next_id].val = cy;
-    vt_data[next_id+1].ctag = ctag_id;
-    vt_data[next_id+1].etag = VT_CYCLE;
-    vt_data[next_id+1].val = ns;
+    return;
+
+}
+
+
+/* Get and record an event reading */
+void
+vt_read(char *ctag, int clen, uint32_t etag1, uint32_t etag2, uint32_t etag3) {
+    uint64_t cy = 0, ns = 0, pmu1 = 0, pmu2 = 0, pmu3 = 0;
+
+    vt_read_ts(&cy, &ns);
+    //vt_read_pmu(etag, &pmu);
+#ifdef __aarch64__
+    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
+        ctag, cy, ns, vt_etags_arm[etag1], pmu1, vt_etags_arm[etag2],
+        pmu2, vt_etags_arm[etag3], pmu3);
+#else
+    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
+        ctag, cy, ns, vt_etags_x64[etag1], pmu1, vt_etags_x64[etag2],
+        pmu2, vt_etags_x64[etag3], pmu3);
+#endif
     next_id ++;
-
-    /* Check overflow */
-    if(next_id >= _MSG_BUF_N - 2) {
-        // Writing to data file
-        vt_fopen(&p_vtdata);
-        fprintf(p_vtdata, "%u,%u,%llu", ctag_id, VT_CYCLE, cy);
-        fprintf(p_vtdata, "%u,%u,%llu", ctag_id, VT_NANOSEC, ns);
-        vt_fclose(&p_vtdata);
+    /* Check buffer health after reading */
+    if (next_id >= _MSG_BUF_N - 2) {
+        vt_write();
     }
 }
 
 
-/* Getting an event reading */
-int
-vt_rec(char *ctag, char *etag) {
-    if(vt_not_ready) return; // Nothing will be executed.
+/* Record a self-defined event value. */
+void
+vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val) {
 
-    int vterr = 0, eid;
+}
 
-    vt_read_ts(ctag);
-    vt_geteid(etag);
-
-    /* Check buffer health after reading */
-    if (next_id >= _MSG_BUF_N - 2) {
-        vterr = vt_dump(next_id);
-        vt_printf(vterr, "Dumping %d records to disk.", next_id);
+/* Write data to file. */
+void
+vt_write() {
+    int i;
+    vt_nmsg += next_id;
+    vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
+    for(i = 0; i < next_id; i ++) {
+        fprintf(fp_data, "%s\n", vt_data[i]);
     }
-    return vterr;
+    memset(vt_data, '\0', _MSG_BUF_N * _MSG_LEN * sizeof(char));
+    next_id = 0;
 }
 
 /* Exiting varapi */
-int
+void
 vt_finalize() {
-    if(vt_not_ready) return; // Nothing will be executed.
-
-    int vterr = 0; 
-
-    return vterr;
+    vt_read("VT_END", 6, 0, 0, 0);
+    vt_write();
+    vt_log(fp_log, "[vt_end] Varapi is finished.\n");
+    fclose(fp_log);
+    fclose(fp_data);
 }

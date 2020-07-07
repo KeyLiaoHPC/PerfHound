@@ -42,13 +42,32 @@
 
 #include "vt_counter.h"
 
-#define PATH_MAX    4096
-#define HOST_MAX    253
-#define PROJ_MAX    64
+#ifdef __x86_64__
+#include "rec_ts_x86_64.h"
+#include "rec_event_x86_64.h"
+
+#elif  defined(__aarch64__)
+#include "rec_ts_aarch64.h"
+#include "rec_event_aarch64.h"
+
+#endif
+
+/* Limits for Varapi tracing. */
+#define _PATH_MAX    4096    // Path max length.
+#define _HOST_MAX    253     // Hostname max length.
+#define _PROJ_MAX    64      // Project name max length.
+#define _TAG_MAX     16      // Tag max length.
+#define _NCTAG_MAX   32      // Max number of ctag.
+#define _NETAG_MAX   8       // Max number of self-defined etag.
+
+/* MPI and IO settings. */
+#define _RANK_PER_IO    64
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
-#define _MSG_BUF_BYTE   4096    // 4 KiB
-#define _MSG_BUF_N      256     // 256 records
+//#define _MSG_BUF_BYTE   4096    // 4 KiB
+#define _MSG_BUF_N      512      // 256 records
+#define _MSG_LEN        256
+#define _TAG_LEN        20
 
 /* CTAG: Counter tag*/
 #ifdef  __x86_64__
@@ -64,22 +83,27 @@
 #endif
 
 /* VT_TYPE*/
-#define VT_INT      0
-#define VT_INT8     1
-#define VT_INT16    2
-#define VT_INT32    3
-#define VT_INT64    4
-#define VT_UINT     5
-#define VT_UINT8    6
-#define VT_UINT16   7
-#define VT_UINT32   8
-#define VT_UINT64   9
-#define VT_FLOAT    10
-#define VT_DOUBLE   11
+#ifndef __VT_TYPE__
+#define __VT_TYPE__
+
+#define VT_INT      1
+#define VT_INT8     2
+#define VT_INT16    3
+#define VT_INT32    4
+#define VT_INT64    5
+#define VT_UINT     6
+#define VT_UINT8    7
+#define VT_UINT16   8
+#define VT_UINT32   9
+#define VT_UINT64   10
+#define VT_FLOAT    11
+#define VT_DOUBLE   12
+
+#endif
 
 typedef struct {
-    uint32_t ctag, etag; // ctag is the remark of counting position, etag is event tag.
-    uint64_t val;
+    char ctag[32], etag[32]; // ctag is the remark of counting position, etag is event tag.
+    u_int64_t val;
 } data_t;
 
 typedef struct {
