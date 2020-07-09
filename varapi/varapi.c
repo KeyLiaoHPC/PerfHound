@@ -55,7 +55,7 @@
 int vt_run_id;
 
 /* Variables for files and information */
-//data_t vt_data[_MSG_BUF_N];                 // Varapi raw data.
+//data_t vt_data[_MSG_BUF_N];                   // Varapi raw data.
 char vt_data[_MSG_BUF_N][_MSG_LEN];
 int next_id, vt_nmsg;                           // Next data id.
 char hostpath[_PATH_MAX];                       // Data path for the host.
@@ -67,11 +67,10 @@ char timestr[16];                               // Timestamp records. One stamp 
 FILE *fp_log, *fp_data;
 
 /* MPI and process info*/
-uint32_t vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;   // # of mpi ranks, rank id, core id.
-uint32_t vt_iorank;                               // IO rank flag
-uint32_t vt_headrank;                              // Flag for the head rank of a host.
-char vt_myhost[_HOST_MAX];                      // My host name
-rank_t *vt_rinfo;                               // Rank information list
+uint32_t vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;  // # of mpi ranks, rank id, core id.
+uint32_t vt_iorank;                                 // IO rank flag
+uint32_t vt_headrank;                               // Flag for the head rank of a host.
+char vt_myhost[_HOST_MAX];                          // My host name
 
 /* Var for nanosec reading */
 #if defined(__aarch64__) && defined(USE_CNTVCT)
@@ -86,11 +85,13 @@ extern int vt_touch(char *path, char *mode);
 extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
 extern void vt_putstamp(char *hostpath, char *timestr);
 extern void vt_log(FILE *fp, char *fmt, ...);
+
 #ifdef USE_MPI
 /* Extern MPI functions */
 extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
 extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
                             uint32_t *head, int *iorank, char *projpath, int run_id);
+extern void vt_bcast_tstamp(char *timestr);
 #endif
  
 
@@ -138,16 +139,19 @@ vt_init(char *u_data_root, char *u_proj_name) {
     if (vt_myrank == 0) {
         vt_mkdir(projpath);
     }
-
+    if (vterr) {
+        printf("*** EXIT. ERROR: VARAPI init failed. [%d] ***\n", vt_myrank);
+        exit(1);
+    }
 #ifdef USE_MPI
     // Get process information.
     vt_sync_mpi_info(vt_myhost, vt_nrank, vt_myrank, vt_mycpu, &vt_headrank, &vt_iorank, 
                      projpath, vt_run_id);
-    exit(0);
 #else
     vt_headrank = 0;
     vt_iorank = 0;
 #endif
+    exit(1);
 
     /* Initialization of output directory and file*/
     /*
@@ -159,8 +163,6 @@ vt_init(char *u_data_root, char *u_proj_name) {
      * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
      * 
      */ 
-
-
     if (vt_myrank == vt_headrank) {
         vterr = vt_mkdir(hostpath);
     }
@@ -174,9 +176,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
         vt_getstamp(hostpath, timestr, &vt_run_id);
     }
 #ifdef USE_MPI
-    else {
-
-    }
+        vt_bcast_tstamp(timestr);
 #endif
     sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
     // TODO: only 1 process now.
@@ -216,18 +216,14 @@ vt_init(char *u_data_root, char *u_proj_name) {
 }
 
 
-
 /* Read cycle and nanosec */
 void
 vt_read_ts(uint64_t *cy, uint64_t *ns) {
-
     _vt_read_cy(*cy);
     _vt_read_ns(*ns);
 
     return;
-
 }
-
 
 /* Get and record an event reading */
 void
@@ -251,7 +247,6 @@ vt_read(char *ctag, int clen, uint32_t etag1, uint32_t etag2, uint32_t etag3) {
         vt_write();
     }
 }
-
 
 /* Record a self-defined event value. */
 void

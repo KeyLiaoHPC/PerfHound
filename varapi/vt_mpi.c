@@ -41,6 +41,11 @@
 #include <mpi.h>
 #include "varapi_core.h"
 
+/* Vars for IO group communicator. */
+MPI_Comm comm_iogrp;
+uint32_t iogrp_size, iogrp_rank;
+uint32_t *iogrp_grank;              // IO group world rank.
+
 void
 vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
     /* Init */
@@ -155,6 +160,30 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         }
     } // END: if (myrank == 0)
 
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Scatter host main rank and io rank to all ranks. */
+    MPI_Scatter(head_all, 1, MPI_UINT32_T, head, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    MPI_Scatter(iorank_all, 1, MPI_UINT32_T, iorank, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+    /* Create new communicator. */
+    MPI_Comm_split(MPI_COMM_WORLD, *iorank, myrank, &comm_iogrp);
+    MPI_Comm_rank(comm_iogrp, &iogrp_rank);
+    MPI_Comm_rank(comm_iogrp, &iogrp_size);
+
+    iogrp_grank = (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
+    MPI_Gather(&myrank, 1, MPI_UINT32_T, iogrp_grank, 1, MPI_UINT32_T, 0, comm_iogrp);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Gather and record group rank. */
+    uint32_t *iogrp_rank_all;
+
+    if (myrank == 0) { 
+        iogrp_rank_all = (uint32_t *)malloc(nrank * sizeof(uint32_t));
+    }
+    MPI_Gather(&iogrp_rank, 1, MPI_UINT32_T, iogrp_rank_all, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
     /* Write to run?_rankmap.csv */
     if (myrank == 0) {
         char map_file[_PATH_MAX];
@@ -164,27 +193,36 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         // TODO: Debug info
         fp = fopen(map_file, "w");
         printf("Mapping: %s, address: %x\n", map_file, fp);
-        fprintf(fp, "rank,hostname,cpu,hostmain,iorank\n");
+        fprintf(fp, "rank,hostname,cpu,hostmain,iohead,grp_rank\n");
         for (i = 0; i < nrank; i ++) {
-            fprintf(fp, "%d,%s,%u,%u,%u\n", 
-                    i, hname_all + i * _HOST_MAX, cpu_all[i], head_all[i], iorank_all[i]);
+            fprintf(fp, "%d,%s,%u,%u,%u,%u\n", 
+                    i, hname_all + i * _HOST_MAX, cpu_all[i], head_all[i], 
+                    iorank_all[i], iogrp_rank_all[i]);
         } 
         fclose(fp);
-    }
 
+        free(iogrp_rank_all);
+        free(cpu_all);
+        free(hname_all);
+        free(head_all);
+        free(iorank_all);
+    }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    /* Scatter host main rank and io rank to all ranks. */
-    MPI_Scatter(head_all, 1, MPI_UINT32_T, head, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-    MPI_Scatter(iorank_all, 1, MPI_UINT32_T, iorank, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
-
-    // TODO: Debug info.
-    if (myrank == 0) {
-        for (i = 0; i < nrank; i ++) {
-            printf("Rank: %d, Host: %s, CPU: %u, Head: %u, IO_Rank: %u\n",
-                   i, hname_all + i * _HOST_MAX, cpu_all[i], head_all[i], iorank_all[i]);
-        }
-    }
-
     return 0;
+}
+
+/* Broadcast rank 0's timestamp */
+void
+vt_bcast_tstamp(char *timestr) {
+    MPI_Bcast(timestr, 16, MPI_CHAR, 0, MPI_COMM_WORLD);
+    return;
+}
+
+void 
+vt_mpi_finalize() {
+    MPI_Comm_free(&comm_iogrp);
+    free(iogrp_grank);
+
+    return;
 }

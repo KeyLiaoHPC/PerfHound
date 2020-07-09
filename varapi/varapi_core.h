@@ -61,7 +61,7 @@
 #define _NETAG_MAX   8       // Max number of self-defined etag.
 
 /* MPI and IO settings. */
-#define _RANK_PER_IO    1
+#define _RANK_PER_IO    64
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 //#define _MSG_BUF_BYTE   4096    // 4 KiB
@@ -105,11 +105,5 @@ typedef struct {
     char ctag[32], etag[32]; // ctag is the remark of counting position, etag is event tag.
     u_int64_t val;
 } data_t;
-
-typedef struct {
-    int rank;
-    int cpu;
-    int hostid;
-} rank_t;
 
 #endif
