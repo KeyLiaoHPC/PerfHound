@@ -62,13 +62,14 @@ char hostpath[_PATH_MAX];                       // Data path for the host.
 char projpath[_PATH_MAX];                       // Data path for the host.
 char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
 char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
+// This timestamp is only for project records.
 char timestr[16];                               // Timestamp records. One stamp per line.
 FILE *fp_log, *fp_data;
 
 /* MPI and process info*/
-int vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;   // # of mpi ranks, rank id, core id.
-int vt_is_iorank;                               // IO rank flag
-int vt_is_hmaster;                              // Flag for the head rank of a host.
+uint32_t vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;   // # of mpi ranks, rank id, core id.
+uint32_t vt_iorank;                               // IO rank flag
+uint32_t vt_headrank;                              // Flag for the head rank of a host.
 char vt_myhost[_HOST_MAX];                      // My host name
 rank_t *vt_rinfo;                               // Rank information list
 
@@ -85,41 +86,36 @@ extern int vt_touch(char *path, char *mode);
 extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
 extern void vt_putstamp(char *hostpath, char *timestr);
 extern void vt_log(FILE *fp, char *fmt, ...);
+#ifdef USE_MPI
+/* Extern MPI functions */
+extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
+extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
+                            uint32_t *head, int *iorank, char *projpath, int run_id);
+#endif
+ 
 
 /* Initializing varapi */
 int
 vt_init(char *u_data_root, char *u_proj_name) {
+    // User-defined data root and project name.
     char udroot[_PATH_MAX], upname[_PATH_MAX];
     int vterr = 0;
     next_id = 0;
     vt_nmsg = 0;
 
-    /* Get host and process info */
-    gethostname(vt_myhost, _HOST_MAX);
-    vt_mycpu = sched_getcpu();
-    vt_is_iorank = 0;
-
 #ifdef USE_MPI
-    MPI_Comm_size(MPI_COMM_WORLD, &vt_nrank);
-    MPI_Comm_rank(MPI_COMM_WORLD, &vt_myrank);
-    // All-to-all gathering process information.
+    // Get process information.
+    vt_get_rank(&vt_nrank, &vt_myrank);
 #else
     vt_nrank = 1;
     vt_myrank = 0;
-    vt_is_hmaster = 1;
-    vt_is_iorank = 1;
 #endif
 
-    /* Initialization of output directory and file*/
-    /*
-     * 
-     * data path: <Data_Root>/<Proj_Name>/<Host_Name>/<files>
-     * data file:
-     * run#_procmap.csv                 CSV file for process map. One copy per host.
-     * run#_r#_c#_all.csv               CSV file for raw tracing data. One per rank.
-     * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
-     * 
-     */ 
+    /* Get host and process info */
+    gethostname(vt_myhost, _HOST_MAX);
+    vt_mycpu = sched_getcpu();
+
+    /* Gnerate path. */
     if (u_data_root == NULL) {
         sprintf(udroot, "./vartect_data");
     }
@@ -134,14 +130,38 @@ vt_init(char *u_data_root, char *u_proj_name) {
         // TODO: for now no syntax check here.
         sprintf(upname, u_proj_name);
     }
-    // Full path for project directory and host drectory
+    // Path for project directory and host drectory which can be relative path for now.
     sprintf(projpath, "%s/%s", udroot, upname);
     sprintf(hostpath, "%s/%s", projpath, vt_myhost);
 
+    // Create directory
     if (vt_myrank == 0) {
         vt_mkdir(projpath);
     }
-    if (vt_is_hmaster) {
+
+#ifdef USE_MPI
+    // Get process information.
+    vt_sync_mpi_info(vt_myhost, vt_nrank, vt_myrank, vt_mycpu, &vt_headrank, &vt_iorank, 
+                     projpath, vt_run_id);
+    exit(0);
+#else
+    vt_headrank = 0;
+    vt_iorank = 0;
+#endif
+
+    /* Initialization of output directory and file*/
+    /*
+     * 
+     * data path: <Data_Root>/<Proj_Name>/<Host_Name>/<files>
+     * data file:
+     * run#_procmap.csv                 CSV file for process map. One copy per host.
+     * run#_r#_c#_all.csv               CSV file for raw tracing data. One per rank.
+     * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
+     * 
+     */ 
+
+
+    if (vt_myrank == vt_headrank) {
         vterr = vt_mkdir(hostpath);
     }
 
@@ -160,7 +180,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
 #endif
     sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
     // TODO: only 1 process now.
-    if(vt_is_iorank) {
+    if(vt_iorank) {
         // Initialize logging, get current run id in the project
         fp_log = NULL;
         fp_log = fopen(logfile, "w");
@@ -242,6 +262,8 @@ vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val) {
 /* Write data to file. */
 void
 vt_write() {
+#ifdef USE_MPI
+#else
     int i;
     vt_nmsg += next_id;
     vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
@@ -250,6 +272,7 @@ vt_write() {
     }
     memset(vt_data, '\0', _MSG_BUF_N * _MSG_LEN * sizeof(char));
     next_id = 0;
+#endif
 }
 
 /* Exiting varapi */

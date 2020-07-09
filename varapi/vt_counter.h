@@ -39,7 +39,7 @@
 
 #ifdef __x86_64__
 #include "rec_ts_x86_64.h"
-#elif  __aarc64__
+#elif  defined(__aarc64__)
 #include "rec_ts_aarch64.h"
 #endif
 

@@ -61,7 +61,7 @@
 #define _NETAG_MAX   8       // Max number of self-defined etag.
 
 /* MPI and IO settings. */
-#define _RANK_PER_IO    64
+#define _RANK_PER_IO    1
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 //#define _MSG_BUF_BYTE   4096    // 4 KiB

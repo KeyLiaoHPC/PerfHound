@@ -1,8 +1,9 @@
 #!/bin/sh
-CC = gcc
-CFLAGS = -O3 -fno-builtin
+CC = mpicc
+CFLAGS = -O3 -fno-builtin -DUSE_MPI
 # 
-VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
+#VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
+VARAPI = $(PWD)/..
 #
 STREAM_FLAGS = -DSTREAM_ARRAY_SIZE=16777216 -DNTIMES=50
 VARAPI_FLAGS = -DUSE_VARAPI
@@ -17,6 +18,12 @@ stream.x: stream.c
 
 stream_varapi.x: stream_varapi.o varapi.o file_op.o varapi.o
 	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
+
+st_mpi_varapi.x: st_mpi_varapi.o varapi.o file_op.o varapi.o vt_mpi.o
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
+
+st_mpi_varapi.o: stream_mpi.c
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
 
 stream_varapi.o: stream.c 
 	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
