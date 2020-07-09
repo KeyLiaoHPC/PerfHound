@@ -78,7 +78,7 @@
  * @param proj_name Project name, for intra-project data comparison.
  * @return int 
  */
-int vt_init(char *u_data_root, char *u_proj_name);
+int vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags);
 
 /**
  * @brief Get and record an pre-defined event reading.
@@ -86,7 +86,8 @@ int vt_init(char *u_data_root, char *u_proj_name);
  * @param etag Event tag, an exsited event name in varapi.h.
  * @return int Return error code.
  */
-void vt_read(char *ctag, int clen, uint32_t etag1, uint32_t etag2, uint32_t etag3);
+void vt_read(char *ctag, int clen);
+
 
 /**
  * @brief Record a self-defined event value.

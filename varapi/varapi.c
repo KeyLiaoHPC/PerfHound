@@ -54,10 +54,16 @@
 /* Variables for Varapi's control */
 int vt_run_id;
 
+/* Vartect data */
+data_t *pdata;                          // Varapi raw data.
+uint32_t vt_nmsg, vt_bufmsg;            // # of recorded messsages and buf capacity
+uint32_t next_id;                       // Next data id.
+#ifndef NETAG0
+uint32_t etags[_N_ETAG];
+#endif
+
 /* Variables for files and information */
-//data_t vt_data[_MSG_BUF_N];                   // Varapi raw data.
-char vt_data[_MSG_BUF_N][_MSG_LEN];
-int next_id, vt_nmsg;                           // Next data id.
+//char vt_data[_MSG_BUF_N][_MSG_LEN];
 char hostpath[_PATH_MAX];                       // Data path for the host.
 char projpath[_PATH_MAX];                       // Data path for the host.
 char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
@@ -97,12 +103,10 @@ extern void vt_bcast_tstamp(char *timestr);
 
 /* Initializing varapi */
 int
-vt_init(char *u_data_root, char *u_proj_name) {
+vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     // User-defined data root and project name.
     char udroot[_PATH_MAX], upname[_PATH_MAX];
     int vterr = 0;
-    next_id = 0;
-    vt_nmsg = 0;
 
 #ifdef USE_MPI
     // Get process information.
@@ -135,7 +139,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
     sprintf(projpath, "%s/%s", udroot, upname);
     sprintf(hostpath, "%s/%s", projpath, vt_myhost);
 
-    // Create directory
+    /* Create project directory and init process info */
     if (vt_myrank == 0) {
         vt_mkdir(projpath);
     }
@@ -151,7 +155,6 @@ vt_init(char *u_data_root, char *u_proj_name) {
     vt_headrank = 0;
     vt_iorank = 0;
 #endif
-    exit(1);
 
     /* Initialization of output directory and file*/
     /*
@@ -206,11 +209,16 @@ vt_init(char *u_data_root, char *u_proj_name) {
                vt_myrank, vt_mycpu, datafile);
     }// END: if (vt_touch(datafile, "w"))
 
+    /* Init data space. */
+    vt_bufmsg = _MSG_BUF_KIB / sizeof(data_t);
+    pdata = (data_t *)malloc(vt_bufmsg * sizeof(data_t));
+    vt_nmsg = 0;
+
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
     _vt_init_ns;
 
     /* Initial time reading. */
-    vt_read("VT_START", 8, 0, 0, 0);
+    vt_read("VT_START", 8);
     vt_write();
     return 0;
 }
@@ -227,24 +235,35 @@ vt_read_ts(uint64_t *cy, uint64_t *ns) {
 
 /* Get and record an event reading */
 void
-vt_read(char *ctag, int clen, uint32_t etag1, uint32_t etag2, uint32_t etag3) {
-    uint64_t cy = 0, ns = 0, pmu1 = 0, pmu2 = 0, pmu3 = 0;
+vt_read(char *ctag, int clen) {
+    register uint64_t cy = 0, ns = 0;
 
     vt_read_ts(&cy, &ns);
     //vt_read_pmu(etag, &pmu);
-#ifdef __aarch64__
-    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
-        ctag, cy, ns, vt_etags_arm[etag1], pmu1, vt_etags_arm[etag2],
-        pmu2, vt_etags_arm[etag3], pmu3);
-#else
-    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
-        ctag, cy, ns, vt_etags_x64[etag1], pmu1, vt_etags_x64[etag2],
-        pmu2, vt_etags_x64[etag3], pmu3);
+    pdata[next_id].cy = cy;
+    pdata[next_id].ns = ns;
+    memcpy(pdata[next_id].ctag, ctag, clen);
+#ifndef NETAG0
+    int i;
+    for (i = 0; i < _N_ETAG; i ++) {
+        vt_read_pmu(etags[i], &(pdata[next_id].pmu[i]));
+    }
 #endif
+
+//#ifdef __aarch64__
+//    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
+//        ctag, cy, ns, vt_etags_arm[etag1], pmu1, vt_etags_arm[etag2],
+//        pmu2, vt_etags_arm[etag3], pmu3);
+//#else
+//    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
+//        ctag, cy, ns, vt_etags_x64[etag1], pmu1, vt_etags_x64[etag2],
+//        pmu2, vt_etags_x64[etag3], pmu3);
+//#endif
     next_id ++;
     /* Check buffer health after reading */
-    if (next_id >= _MSG_BUF_N - 2) {
+    if (next_id >= vt_bufmsg) {
         vt_write();
+        next_id = 0;
     }
 }
 
@@ -259,13 +278,20 @@ void
 vt_write() {
 #ifdef USE_MPI
 #else
-    int i;
+    int i, j;
     vt_nmsg += next_id;
     vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
     for(i = 0; i < next_id; i ++) {
-        fprintf(fp_data, "%s\n", vt_data[i]);
+#ifdef NETAG0
+        fprintf(fp_data, "%s,%llu,%llu\n", pdata[i].ctag, pdata[i].cy, pdata[i].ns);
+#else
+        fprintf(fp_data, "%s,%llu,%llu,", pdata[i].ctag, pdata[i].cy, pdata[i].ns);
+        for (j = 0; j < _N_ETAG - 1; j ++) {
+            fprintf(fp_data, "%llu,", pdata[i].pmu[j]);
+        }
+        fprintf(fp_data, "%llu\n", pdata[i].pmu[j]);
+#endif
     }
-    memset(vt_data, '\0', _MSG_BUF_N * _MSG_LEN * sizeof(char));
     next_id = 0;
 #endif
 }
@@ -279,4 +305,5 @@ vt_finalize() {
     vt_log(fp_log, "[vt_end] Varapi is finished.\n");
     fclose(fp_log);
     fclose(fp_data);
+    free(pdata);
 }

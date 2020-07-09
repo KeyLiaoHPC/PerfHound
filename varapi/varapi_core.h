@@ -64,7 +64,10 @@
 #define _RANK_PER_IO    64
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
-//#define _MSG_BUF_BYTE   4096    // 4 KiB
+#ifndef _MSG_BUF_KIB
+#define _MSG_BUF_KIB    4096    // 4 KiB
+#endif
+
 #define _MSG_BUF_N      512      // 256 records
 #define _MSG_LEN        256
 #define _TAG_LEN        20
@@ -101,9 +104,30 @@
 
 #endif
 
+#ifdef NETAG0
+// Only collect cycle and nanosec
+#define _N_ETAG     0
+#elif  defined(NETAG1)
+#define _N_ETAG     1
+#elif  defined(NETAG2)
+#define _N_ETAG     2
+#elif  defined(NETAG3)
+#define _N_ETAG     3
+#elif  defined(NETAG4)
+#define _N_ETAG     4
+#elif  defined(NETAG5)
+#define _N_ETAG     5
+#else
+#define _NETAG0
+#define _N_ETAG     0
+#endif // END: #ifdef NETAG0
+
 typedef struct {
-    char ctag[32], etag[32]; // ctag is the remark of counting position, etag is event tag.
-    u_int64_t val;
+    char ctag[32];// ctag is the remark of counting position, etag is event tag.
+    u_int64_t cy, ns;
+#ifndef NETAG0
+    u_int64_t pmu[_N_ETAG];
+#endif
 } data_t;
 
 #endif
