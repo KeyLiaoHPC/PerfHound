@@ -70,13 +70,20 @@ char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
 char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
 // This timestamp is only for project records.
 char timestr[16];                               // Timestamp records. One stamp per line.
-FILE *fp_log, *fp_data;
+FILE *fp_log;
+#ifdef USE_MPI
+FILE **fp_data;
+#else
+FILE *fp_data;
+#endif
 
 /* MPI and process info*/
-uint32_t vt_nrank, vt_myrank, vt_mycpu, vt_mynuma;  // # of mpi ranks, rank id, core id.
-uint32_t vt_iorank;                                 // IO rank flag
-uint32_t vt_headrank;                               // Flag for the head rank of a host.
+uint32_t vt_nrank, vt_myrank, vt_mycpu;             // # of mpi ranks, rank id, core id.
+uint32_t vt_iorank, vt_head;                        // My IO rank and host head rank.
 char vt_myhost[_HOST_MAX];                          // My host name
+#ifdef USE_MPI
+uint32_t vt_iogrp_nrank, *vt_iogrp_grank, *vt_iogrp_gcpu;
+#endif
 
 /* Var for nanosec reading */
 #if defined(__aarch64__) && defined(USE_CNTVCT)
@@ -92,12 +99,19 @@ extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
 extern void vt_putstamp(char *hostpath, char *timestr);
 extern void vt_log(FILE *fp, char *fmt, ...);
 
-#ifdef USE_MPI
 /* Extern MPI functions */
+#ifdef USE_MPI
 extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
 extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
-                            uint32_t *head, int *iorank, char *projpath, int run_id);
+                            uint32_t *head, int *iorank, char *projpath, int run_id, 
+                            uint32_t *iogrp_nrank, uint32_t *vt_iogrp_grank, 
+                            uint32_t *vt_iogrp_gcpu);
 extern void vt_bcast_tstamp(char *timestr);
+extern void vt_newtype();
+extern void vt_io_barrier();
+extern int vt_get_data(uint32_t rank, uint32_t count, data_t *data);
+extern void vt_send_data(uint32_t count, data_t *data);
+extern void vt_mpi_clean();
 #endif
  
 
@@ -110,6 +124,8 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 
 #ifdef USE_MPI
     // Get process information.
+    uint32_t vt_iogrp_grank[_RANK_PER_IO];
+    uint32_t vt_iogrp_gcpu[_RANK_PER_IO];
     vt_get_rank(&vt_nrank, &vt_myrank);
 #else
     vt_nrank = 1;
@@ -123,19 +139,17 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     /* Gnerate path. */
     if (u_data_root == NULL) {
         sprintf(udroot, "./vartect_data");
-    }
-    else {
+    } else {
         // TODO: for now, no path syntax check here.
         sprintf(udroot, "%s", u_data_root);
     }
     if (u_proj_name == NULL) {
         sprintf(upname, "vartect_test");
-    }
-    else {
+    } else {
         // TODO: for now no syntax check here.
         sprintf(upname, u_proj_name);
     }
-    // Path for project directory and host drectory which can be relative path for now.
+    // Path for project directory and host drectory which can be relative here.
     sprintf(projpath, "%s/%s", udroot, upname);
     sprintf(hostpath, "%s/%s", projpath, vt_myhost);
 
@@ -149,10 +163,12 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     }
 #ifdef USE_MPI
     // Get process information.
-    vt_sync_mpi_info(vt_myhost, vt_nrank, vt_myrank, vt_mycpu, &vt_headrank, &vt_iorank, 
-                     projpath, vt_run_id);
+    vterr = vt_sync_mpi_info(vt_myhost, vt_nrank, vt_myrank, vt_mycpu, 
+                             &vt_head, &vt_iorank, projpath, vt_run_id, 
+                             &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
+
 #else
-    vt_headrank = 0;
+    vt_head = 0;
     vt_iorank = 0;
 #endif
 
@@ -166,7 +182,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
      * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
      * 
      */ 
-    if (vt_myrank == vt_headrank) {
+    if (vt_myrank == vt_head) {
         vterr = vt_mkdir(hostpath);
     }
 
@@ -181,9 +197,8 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #ifdef USE_MPI
         vt_bcast_tstamp(timestr);
 #endif
-    sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
-    // TODO: only 1 process now.
-    if(vt_iorank) {
+    if (vt_myrank == vt_head) {
+        sprintf(logfile, "%s/varapi_run%d_%s_%s.log", hostpath, vt_run_id, vt_myhost, timestr);
         // Initialize logging, get current run id in the project
         fp_log = NULL;
         fp_log = fopen(logfile, "w");
@@ -192,24 +207,36 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             exit(1);
         }
         vt_log(fp_log, "[vt_init] Varapi is started.\n");
-    }   // END: if(vt_is_iorank)
-    // Each process maintains its own data tracing file.
+    }   // END: if(vt_myrank == vt_iorank)
+
+    /* IO rank creates data files. */
+#ifdef USE_MPI
+    if (vt_myrank == vt_iorank) {
+        int i;
+        // Create data files.
+        fp_data = (FILE **)malloc(vt_iogrp_nrank * sizeof(FILE *));
+        for (i = 0; i < vt_iogrp_nrank; i ++) {
+            sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", 
+                    hostpath, vt_run_id, vt_iogrp_grank[i], vt_iogrp_gcpu[i]);
+            fp_data[i] = fopen(datafile, "w");
+            // TODO: Force quit.
+            if (fp_data[i] == NULL) {
+                printf("Failed creating datafile! Rank %d\n", vt_iogrp_grank[i]);
+                exit(1);
+            }
+        }
+    }
+#else
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
     fp_data = NULL;
     fp_data = fopen(datafile, "w");
-    if (vt_touch(datafile, "w")) {
-#ifdef USE_MPI
-        // When using MPI, gathering all ready flag, kick start if every process is ready.
-#else
-        exit(1);
-#endif        
-    } 
-    else {
-        vt_log(fp_log, "[vt_init] Rank %d on CPU # %d creates data file %s.\n", 
-               vt_myrank, vt_mycpu, datafile);
-    }// END: if (vt_touch(datafile, "w"))
+#endif
+
 
     /* Init data space. */
+#ifdef USE_MPI
+    vt_newtype();
+#endif 
     vt_bufmsg = _MSG_BUF_KIB / sizeof(data_t);
     pdata = (data_t *)malloc(vt_bufmsg * sizeof(data_t));
     vt_nmsg = 0;
@@ -236,29 +263,23 @@ vt_read_ts(uint64_t *cy, uint64_t *ns) {
 /* Get and record an event reading */
 void
 vt_read(char *ctag, int clen) {
-    register uint64_t cy = 0, ns = 0;
+    uint64_t cy = 0, ns = 0;
 
     vt_read_ts(&cy, &ns);
     //vt_read_pmu(etag, &pmu);
     pdata[next_id].cy = cy;
     pdata[next_id].ns = ns;
     memcpy(pdata[next_id].ctag, ctag, clen);
+
 #ifndef NETAG0
     int i;
     for (i = 0; i < _N_ETAG; i ++) {
-        vt_read_pmu(etags[i], &(pdata[next_id].pmu[i]));
+        //vt_read_pmu(etags[i], &(pdata[next_id].pmu[i]));
+        // TODO: no pmu yet.
+        pdata[next_id].pmu[i] = 0;
     }
 #endif
 
-//#ifdef __aarch64__
-//    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
-//        ctag, cy, ns, vt_etags_arm[etag1], pmu1, vt_etags_arm[etag2],
-//        pmu2, vt_etags_arm[etag3], pmu3);
-//#else
-//    sprintf(vt_data[next_id], "%s,%llu,%llu,%s,%llu,%s,%llu,%s,%llu", 
-//        ctag, cy, ns, vt_etags_x64[etag1], pmu1, vt_etags_x64[etag2],
-//        pmu2, vt_etags_x64[etag3], pmu3);
-//#endif
     next_id ++;
     /* Check buffer health after reading */
     if (next_id >= vt_bufmsg) {
@@ -277,10 +298,30 @@ vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val) {
 void
 vt_write() {
 #ifdef USE_MPI
+    int i, j, k;
+    
+    vt_io_barrier();
+    if (vt_myrank == vt_iorank) {
+        for (i = 0; i < vt_iogrp_nrank; i ++) {
+            vt_get_data(i, next_id, pdata);
+            for(j = 0; j < next_id; j ++) {
+#ifdef NETAG0
+                fprintf(fp_data[i], "%s,%llu,%llu\n", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+#else
+                fprintf(fp_data[i], "%s,%llu,%llu,", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+                for (k = 0; k < _N_ETAG - 1; k ++) {
+                    fprintf(fp_data[i], "%llu,", pdata[j].pmu[k]);
+                }
+                fprintf(fp_data[i], "%llu\n", pdata[i].pmu[_N_ETAG-1]);
+#endif
+            }
+        }
+    } else {
+        vt_send_data(next_id, pdata);
+    } // END: if (vt_myrank == vt_iorank)
 #else
     int i, j;
-    vt_nmsg += next_id;
-    vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
+
     for(i = 0; i < next_id; i ++) {
 #ifdef NETAG0
         fprintf(fp_data, "%s,%llu,%llu\n", pdata[i].ctag, pdata[i].cy, pdata[i].ns);
@@ -290,20 +331,44 @@ vt_write() {
             fprintf(fp_data, "%llu,", pdata[i].pmu[j]);
         }
         fprintf(fp_data, "%llu\n", pdata[i].pmu[j]);
-#endif
+#endif // END: #ifdef NETAG0
     }
+#endif // END: #ifdef USE_MPI
+
+    vt_nmsg += next_id;
     next_id = 0;
-#endif
+    if (vt_myrank == vt_iorank) {
+        vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
+    }
+
+    return;
 }
 
 /* Exiting varapi */
 void
 vt_finalize() {
-    vt_read("VT_END", 6, 0, 0, 0);
+    int i = 0;
+
+    vt_read("VT_END", 6);
     vt_write();
     vt_putstamp(hostpath, timestr);
     vt_log(fp_log, "[vt_end] Varapi is finished.\n");
+#ifdef USE_MPI
+    if (vt_myrank == vt_iorank) {
+        for (i = 0; i < vt_iogrp_nrank; i ++) {
+            fclose(fp_data[i]);
+        }
+        free(fp_data);
+    }
+    if (vt_myrank == vt_head) {
+        fclose(fp_log);
+    }
+#else
     fclose(fp_log);
     fclose(fp_data);
+#endif
     free(pdata);
+#ifdef USE_MPI
+    vt_mpi_clean();
+#endif
 }

@@ -70,7 +70,7 @@
 
 #define _MSG_BUF_N      512      // 256 records
 #define _MSG_LEN        256
-#define _TAG_LEN        20
+#define _CTAG_LEN       128
 
 /* CTAG: Counter tag*/
 #ifdef  __x86_64__
@@ -123,10 +123,10 @@
 #endif // END: #ifdef NETAG0
 
 typedef struct {
-    char ctag[32];// ctag is the remark of counting position, etag is event tag.
-    u_int64_t cy, ns;
+    char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
+    uint64_t cy, ns;
 #ifndef NETAG0
-    u_int64_t pmu[_N_ETAG];
+    uint64_t pmu[_N_ETAG];
 #endif
 } data_t;
 

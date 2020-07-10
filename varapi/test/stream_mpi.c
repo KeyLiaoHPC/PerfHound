@@ -268,7 +268,7 @@ main()
 	// if either of these fail there is something really screwed up!
 	MPI_Comm_size(MPI_COMM_WORLD, &numranks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    if (vt_init("./stmpi_vardata", "st_mpi")) {
+    if (vt_init("./stmpi_vardata", "st_mpi", NULL)) {
         exit(1);
     }
 
@@ -458,7 +458,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read("copy", 4, 0, 0, 0);
+        vt_read("copy", 4);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
@@ -473,7 +473,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read("scale", 5, 0, 0, 0);
+        vt_read("scale", 5);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
@@ -488,7 +488,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read("add", 3, 0, 0, 0);
+        vt_read("add", 3);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
@@ -503,7 +503,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read("triad", 5, 0, 0, 0);
+        vt_read("triad", 5);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];
