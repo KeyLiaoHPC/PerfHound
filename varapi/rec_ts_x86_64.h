@@ -38,7 +38,7 @@
 #define _vt_init_ns
 
 /* Read cycle */
-#define _vt_read_cy(_cy)    uint64_t hi lo;                         \
+#define _vt_read_cy(_cy)    uint64_t hi, lo;                        \
                             asm volatile(                           \
                                 "CPUID"         "\n\t"              \
                                 "RDTSCP"        "\n\t"              \
