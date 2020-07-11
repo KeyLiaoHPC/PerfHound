@@ -134,26 +134,24 @@ typedef struct {
 } data_t;
 
 /* Extern file-operating functions in file_op.c*/
-extern int vt_mkdir(char *path);
-extern int vt_touch(char *path, char *mode);
-extern int vt_getstamp(char *hostpath, char *timestr, int *run_id);
-extern void vt_putstamp(char *hostpath, char *timestr);
-extern void vt_log(FILE *fp, char *fmt, ...);
+int vt_mkdir(char *path);
+int vt_touch(char *path, char *mode);
+int vt_getstamp(char *hostpath, char *timestr, int *run_id);
+void vt_putstamp(char *hostpath, char *timestr);
+void vt_log(FILE *fp, char *fmt, ...);
 
 /* MPI Wrapper in vt_mpi.c*/
 #ifdef USE_MPI
-extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
-extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
-                            uint32_t *head, int *iorank, char *projpath, int run_id, 
-                            uint32_t *iogrp_nrank, uint32_t *vt_iogrp_grank, 
-                            uint32_t *vt_iogrp_gcpu);
-extern void vt_bcast_tstamp(char *timestr);
-extern void vt_newtype();
-extern void vt_io_barrier();
-extern void vt_world_barrier();
-extern int vt_get_data(uint32_t rank, uint32_t count, data_t *data);
-extern void vt_send_data(uint32_t count, data_t *data);
-extern void vt_mpi_clean();
+void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
+int vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
+                     uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
+void vt_bcast_tstamp(char *timestr);
+void vt_newtype();
+void vt_io_barrier();
+void vt_world_barrier();
+int vt_get_data(uint32_t rank, uint32_t count, data_t *data);
+void vt_send_data(uint32_t count, data_t *data);
+void vt_mpi_clean();
 #endif
 
 #endif // END: #ifndef __VARAPI_CORE_H__

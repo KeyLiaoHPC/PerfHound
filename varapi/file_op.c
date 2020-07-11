@@ -101,7 +101,7 @@ vt_touch(char *path, char *mode){
 
 /* Get timestamp of starting point. */
 int
-vt_getstamp(char *hostpath, char *timestr, int *run_id) {
+vt_getstamp(char *path, char *timestr, int *run_id) {
     long int tstamp_size;
     char stampfile[_PATH_MAX];
     time_t t = time(0);
@@ -112,7 +112,7 @@ vt_getstamp(char *hostpath, char *timestr, int *run_id) {
             lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec); 
     
     /* Create a time stamp remark file to record times of running.*/
-    sprintf(stampfile, "%s/tstamp.log", hostpath);
+    sprintf(stampfile, "%s/tstamp.log", path);
     fp = fopen(stampfile, "a+");
     if(fp == NULL) {
         return -1;
@@ -128,11 +128,11 @@ vt_getstamp(char *hostpath, char *timestr, int *run_id) {
 
 /* When varapi ends successfully, put tstamp in tstamp.log in every host directory.*/
 void
-vt_putstamp(char *hostpath, char *timestr) {
+vt_putstamp(char *path, char *timestr) {
     FILE *fp;
     char tstampfile[_PATH_MAX];
     
-    sprintf(tstampfile, "%s/tstamp.log", hostpath);
+    sprintf(tstampfile, "%s/tstamp.log", path);
     fp = fopen(tstampfile, "a+");
     fseek(fp, 0, SEEK_END);
     fprintf(fp, "%s\n", timestr);

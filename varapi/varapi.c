@@ -43,6 +43,7 @@
 #include <sched.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 #include "varapi.h"
 #include "varapi_core.h"
 #include "vt_etag.h"
@@ -133,20 +134,31 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     /* Create project directory and init process info */
     if (vt_myrank == 0) {
         vt_mkdir(projpath);
+        vterr = vt_getstamp(projpath, timestr, &vt_run_id);
+        if (vterr) {
+            printf("*** [VarAPI] EXIT. ERROR: Fail before initializing VarAPI MPI. [Rank %d] ***\n", vt_myrank);
+            exit(1);
+        }
     }
-    if (vterr) {
-        printf("*** [VarAPI] EXIT. ERROR: Fail before initializing VarAPI MPI. [Rank %d] ***\n", vt_myrank);
-        exit(1);
-    }
+    vt_world_barrier();
 #ifdef USE_MPI
-    // Get process information.
-    vterr = vt_sync_mpi_info(vt_myhost, vt_nrank, vt_myrank, vt_mycpu, 
-                             &vt_head, &vt_iorank, projpath, vt_run_id, 
+    // Get and sync process information. Print process map in the root of project.
+    // <projpath>/run<run_id>_rankmap.csv
+    // 
+    vterr = vt_sync_mpi_info(projpath, vt_run_id, &vt_head, &vt_iorank,
                              &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
 
 #else
     vt_head = 0;
     vt_iorank = 0;
+
+    FILE *fp_map;
+    char rmap_path[_PATH_MAX];
+
+    sprintf(rmap_path, "%s/run%d_rankmap.csv", projpath, vt_run_id);
+    fp_map = fopen(rmap_path, "w");
+    fprintf(fp_map, "rank,hostname,cpu,hostmain,io_head,io_rank\n");
+    fprintf(fp_map, "%d,%s,%u,%u,%u,%u\n", 0, vt_myhost, vt_mycpu, 0, 0, 0);
 #endif
 
     /* Initialization of output directory and file*/
@@ -163,14 +175,16 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
         vterr = vt_mkdir(hostpath);
     }
 
+    vt_world_barrier();
+
     if (vterr) {
-        printf("*** EXIT. ERROR: VARAPI init failed. ***\n");
+        printf("*** [VarAPI] EXIT. ERROR: VARAPI init failed. ***\n");
         exit(1);
     }
 
-    if (vt_myrank == 0) {
-        vt_getstamp(hostpath, timestr, &vt_run_id);
-    }
+    //if (vt_myrank == 0) {
+    //    vt_getstamp(hostpath, timestr, &vt_run_id);
+    //}
 #ifdef USE_MPI
         vt_bcast_tstamp(timestr);
 #endif
@@ -199,7 +213,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             fp_data[i] = fopen(datafile, "w");
             // TODO: Force quit.
             if (fp_data[i] == NULL) {
-                printf("Failed creating datafile! Rank %d\n", vt_iogrp_grank[i]);
+                printf("Failed creating datafile! Rank %d, ERRNO %d\n", vt_iogrp_grank[i], errno);
                 exit(1);
             }
         }
@@ -228,6 +242,15 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     _vt_init_ns;
 
     /* Initial time reading. */
+#ifdef USE_MPI
+    vt_world_barrier();
+#endif
+    if(vt_myrank == 0) {
+        printf("*** [VarAPI] Init finished, start your main program. ***\n");
+    }
+    if(vt_myrank == vt_head) {
+        vt_log(fp_log, "[vt_init] Init finished.\n");
+    }
     next_id = 0;
     vt_read("VT_START", 8);
     vt_write();
@@ -335,8 +358,10 @@ vt_clean() {
 
     vt_read("VT_END", 6);
     vt_write();
+    if (vt_myrank == 0) {
+        vt_putstamp(projpath, timestr);
+    }
     if (vt_myrank == vt_head) {
-        vt_putstamp(hostpath, timestr);
         vt_log(fp_log, "[vt_end] Varapi done.\n");
     }
 #ifdef USE_MPI

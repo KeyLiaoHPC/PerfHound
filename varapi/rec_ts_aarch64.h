@@ -37,7 +37,6 @@
 /* Init timer */
 #ifdef USE_CNTVCT
 #define _vt_init_ns     uint32_t freq;  \
-                        uint64_t nspt;  \
                         asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
                         nspt = 1 / (freq * 1e-9);
 #else

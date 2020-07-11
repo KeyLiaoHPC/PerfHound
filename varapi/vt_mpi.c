@@ -33,17 +33,20 @@
 // Short comment for variables, short explanation.
 
 //==================================================================================
+#define _GNU_SOURCE
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sched.h>
 #include <mpi.h>
 #include "varapi_core.h"
 
 /* Vars for IO group communicator. */
 MPI_Comm comm_iogrp;
-uint32_t iogrp_size, iogrp_rank, head, my_grank;
+uint32_t mpi_size, my_rank, iogrp_size, iogrp_rank, head, my_grank;
 uint32_t *iogrp_grank, *iogrp_gcpu;              // IO group world rank.
 MPI_Datatype vt_mpidata_t;  // MPI datatype for event data.
 
@@ -52,21 +55,22 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
     /* Init */
     // CAUTION: Here we are not resposible for checking if the main program has been
     // successfully loaded into MPI environment.
-    MPI_Comm_size(MPI_COMM_WORLD, nrank);
-    MPI_Comm_rank(MPI_COMM_WORLD, myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    *nrank = mpi_size;
+    *myrank = my_rank;
 
     return;
 }
 
 /* Sync and init Varapi MPI map info. */
 int 
-vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
-                 uint32_t *head, int *iorank, char *projpath, int run_id, 
-                 uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, 
-                 uint32_t *vt_iogrp_gcpu) {
+vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
+                 uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu) {
     int i, j;
-    int *cpu_all = NULL;
-    char *hname_all = NULL;
+    int *cpu_all = NULL, mycpu;
+    char *hname_all = NULL, myhost[_HOST_MAX];
     int mapped;
     uint32_t *head_all = NULL, *iorank_all = NULL;
     uint32_t head_now, head_next, iorank_cur;
@@ -76,21 +80,23 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
     //fflush(stdout);
     //MPI_Barrier(MPI_COMM_WORLD);
     /* Gathering hostnames from all mpi ranks. */
-    my_grank = myrank;
+    my_grank = my_rank;
     if (my_grank == 0) {
-        hname_all = (char *)malloc(nrank * _HOST_MAX * sizeof(char));
-        cpu_all = (int *)malloc(nrank * sizeof(int));
+        hname_all = (char *)malloc(mpi_size * _HOST_MAX * sizeof(char));
+        cpu_all = (int *)malloc(mpi_size * sizeof(int));
     }
     // Get hostnames.
+    gethostname(myhost, _HOST_MAX);
+    mycpu = sched_getcpu();
     MPI_Gather(myhost, _HOST_MAX, MPI_CHAR, hname_all, _HOST_MAX, MPI_CHAR, 0, MPI_COMM_WORLD);
     // Get cpu bindings.
     MPI_Gather(&mycpu, 1, MPI_UINT32_T, cpu_all, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
     /* Determine head and iorank */
     if (my_grank == 0) {
-        head_all = (uint32_t *)malloc(nrank * sizeof(uint32_t));
-        iorank_all = (uint32_t *)malloc(nrank * sizeof(uint32_t));
-        for (i = 0; i < nrank; i ++) {
+        head_all = (uint32_t *)malloc(mpi_size * sizeof(uint32_t));
+        iorank_all = (uint32_t *)malloc(mpi_size * sizeof(uint32_t));
+        for (i = 0; i < mpi_size; i ++) {
             head_all[i] = 0;
             iorank_all[i] = 0;
         }
@@ -140,7 +146,7 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
             } // END: if (head_all[i] == 0)
             i += 1;
             // One host finished
-            if (i >= nrank) {
+            if (i >= mpi_size) {
                 // check if there's any host left
                 if (head_now != head_next) {
                     memcpy(cur_hname, hname_all + head_next * _HOST_MAX, _HOST_MAX * sizeof(char));
@@ -158,7 +164,7 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
             }
         } // END: while(1)
 
-        for (i = 0; i < nrank; i ++) {
+        for (i = 0; i < mpi_size; i ++) {
             head_all[i] -= 1;
         }
     } // END: if (my_grank == 0)
@@ -187,7 +193,7 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
     uint32_t *iogrp_rank_all;
 
     if (my_grank == 0) { 
-        iogrp_rank_all = (uint32_t *)malloc(nrank * sizeof(uint32_t));
+        iogrp_rank_all = (uint32_t *)malloc(mpi_size * sizeof(uint32_t));
     }
     MPI_Gather(&iogrp_rank, 1, MPI_UINT32_T, iogrp_rank_all, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
 
@@ -199,8 +205,8 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         sprintf(map_file, "%s/run%d_rankmap.csv", projpath, run_id);
         // TODO: Debug info
         fp = fopen(map_file, "w");
-        fprintf(fp, "rank,hostname,cpu,hostmain,iohead,grp_rank\n");
-        for (i = 0; i < nrank; i ++) {
+        fprintf(fp, "rank,hostname,cpu,hostmain,io_head,io_rank\n");
+        for (i = 0; i < mpi_size; i ++) {
             fprintf(fp, "%d,%s,%u,%u,%u,%u\n", 
                     i, hname_all + i * _HOST_MAX, cpu_all[i], head_all[i], 
                     iorank_all[i], iogrp_rank_all[i]);
