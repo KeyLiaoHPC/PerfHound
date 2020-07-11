@@ -82,12 +82,8 @@ uint32_t vt_iogrp_nrank, *vt_iogrp_grank, *vt_iogrp_gcpu;
 #endif
 
 /* Var for nanosec reading */
-#if defined(__aarch64__) && defined(USE_CNTVCT)
 uint64_t nspt;  // nanosecond per tick, only for aarch64. 
-#else
 struct timespec ts;
-#endif
-
 
 /* Initializing varapi */
 int

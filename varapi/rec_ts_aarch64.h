@@ -48,7 +48,7 @@
 #define _vt_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
 
 /* Read virtual timer */
-#ifdef UES_CNTVCT
+#ifdef USE_CNTVCT
 #define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); \
                             _ns *= nspt;
 #else
