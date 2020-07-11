@@ -47,16 +47,12 @@
 #include "varapi_core.h"
 #include "vt_etag.h"
 
-#ifdef USE_MPI
-#include <mpi.h>
-#endif
-
 /* Variables for Varapi's control */
 int vt_run_id;
 
 /* Vartect data */
 data_t *pdata;                          // Varapi raw data.
-uint32_t vt_nmsg, vt_bufmsg;            // # of recorded messsages and buf capacity
+uint32_t vt_nmsg, vt_databuf;            // # of recorded messsages and buf capacity
 uint32_t next_id;                       // Next data id.
 #ifndef NETAG0
 uint32_t etags[_N_ETAG];
@@ -92,12 +88,6 @@ uint64_t nspt;  // nanosecond per tick, only for aarch64.
 struct timespec ts;
 #endif
 
-/* Extern file-operating functions in file_op.c*/
-extern int vt_mkdir(char *path);
-extern int vt_touch(char *path, char *mode);
-extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
-extern void vt_putstamp(char *hostpath, char *timestr);
-extern void vt_log(FILE *fp, char *fmt, ...);
 
 /* Initializing varapi */
 int
@@ -111,9 +101,16 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     uint32_t vt_iogrp_grank[_RANK_PER_IO];
     uint32_t vt_iogrp_gcpu[_RANK_PER_IO];
     vt_get_rank(&vt_nrank, &vt_myrank);
+    /* Notice user for vartect environment */
+    if (vt_myrank == 0) {
+        printf("*** [VarAPI] You are running in Vartect environment. "
+               "Your code has been compiled with VarAPI-MPI. ***\n");
+    }
 #else
     vt_nrank = 1;
     vt_myrank = 0;
+    printf("*** [VarAPI] You are running in Vartect environment. "
+            "Your code has been compiled with VarAPI-Serial. ***\n");
 #endif
 
     /* Get host and process info */
@@ -122,13 +119,13 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 
     /* Gnerate path. */
     if (u_data_root == NULL) {
-        sprintf(udroot, "./vartect_data");
+        sprintf(udroot, "./vt_data");
     } else {
         // TODO: for now, no path syntax check here.
         sprintf(udroot, "%s", u_data_root);
     }
     if (u_proj_name == NULL) {
-        sprintf(upname, "vartect_test");
+        sprintf(upname, "vt_test");
     } else {
         // TODO: for now no syntax check here.
         sprintf(upname, u_proj_name);
@@ -142,7 +139,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
         vt_mkdir(projpath);
     }
     if (vterr) {
-        printf("*** EXIT. ERROR: VARAPI init failed. [%d] ***\n", vt_myrank);
+        printf("*** [VarAPI] EXIT. ERROR: Fail before initializing VarAPI MPI. [Rank %d] ***\n", vt_myrank);
         exit(1);
     }
 #ifdef USE_MPI
@@ -187,10 +184,10 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
         fp_log = NULL;
         fp_log = fopen(logfile, "w");
         if(fp_log == NULL) {
-            printf("*** EXIT. ERROR: VARAPI log file init failed. ***\n");
+            printf("*** [VarAPI] EXIT. ERROR: VARAPI log file init failed. ***\n");
             exit(1);
         }
-        vt_log(fp_log, "[vt_init] Varapi is started.\n");
+        vt_log(fp_log, "[vt_init] VarAPI started.\n");
     }   // END: if(vt_myrank == vt_iorank)
 
     /* IO rank creates data files. */
@@ -223,9 +220,13 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #ifdef USE_MPI
     vt_newtype();
 #endif 
-    vt_bufmsg = _MSG_BUF_KIB / sizeof(data_t);
-    pdata = (data_t *)malloc(vt_bufmsg * sizeof(data_t));
+    vt_databuf = _MSG_BUF_KIB * 1024 / sizeof(data_t);
+    pdata = (data_t *)malloc(vt_databuf * sizeof(data_t));
     vt_nmsg = 0;
+    if (vt_myrank == vt_head) {
+        vt_log(fp_log, "[vt_init] Message buffer: %u pieces, %.2f KiB\n", vt_databuf, 
+               (double)vt_databuf * sizeof(data_t) / 1024);
+    } 
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
     _vt_init_ns;
@@ -269,7 +270,7 @@ vt_read(char *ctag, int clen) {
 
     next_id ++;
     /* Check buffer health after reading */
-    if (next_id >= vt_bufmsg) {
+    if (next_id >= vt_databuf) {
         vt_write();
         next_id = 0;
     }
@@ -323,24 +324,24 @@ vt_write() {
 #endif // END: #ifdef USE_MPI
 
     vt_nmsg += next_id;
-    next_id = 0;
     if (vt_myrank == vt_head) {
         vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
     }
+    next_id = 0;
 
     return;
 }
 
 /* Exiting varapi */
 void
-vt_finalize() {
+vt_clean() {
     int i = 0;
 
     vt_read("VT_END", 6);
     vt_write();
-    if (vt_myrank == 0) {
+    if (vt_myrank == vt_head) {
         vt_putstamp(hostpath, timestr);
-        vt_log(fp_log, "[vt_end] Varapi is finished.\n");
+        vt_log(fp_log, "[vt_end] Varapi done.\n");
     }
 #ifdef USE_MPI
     if (vt_myrank == vt_iorank) {
@@ -349,10 +350,12 @@ vt_finalize() {
         }
         free(fp_data);
     }
-    if (vt_myrank == vt_head) {
+    if (vt_myrank == 0) {
+        printf("*** [VarAPI] VarAPI Exited. ***\n");
         fclose(fp_log);
     }
 #else
+    printf("*** [VarAPI] VarAPI Exited. ***\n");
     fclose(fp_log);
     fclose(fp_data);
 #endif

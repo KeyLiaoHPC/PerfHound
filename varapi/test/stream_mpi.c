@@ -601,7 +601,7 @@ main()
 		free(TimesByRank);
 		free(AvgErrByRank);
 	}
-
+	vt_clean();
     MPI_Finalize();
 	return(0);
 }

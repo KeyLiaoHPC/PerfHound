@@ -102,9 +102,9 @@ void vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *va
 void vt_write();
 
 /**
- * @brief Exit vartect api.
- * @return int 
+ * @brief Exit VarAPI and release resources.
+ * @return  
  */
-void vt_finalize();
+void vt_clean();
 
 #endif

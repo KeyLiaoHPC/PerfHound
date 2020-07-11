@@ -38,6 +38,7 @@
 #define __VARAPI_CORE_H__
 
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 
 #include "vt_counter.h"
@@ -52,6 +53,7 @@
 
 #endif
 
+/* ======== User config area ======== */
 /* Limits for Varapi tracing. */
 #define _PATH_MAX    4096    // Path max length.
 #define _HOST_MAX    253     // Hostname max length.
@@ -70,7 +72,8 @@
 
 #define _MSG_BUF_N      512      // 256 records
 #define _MSG_LEN        256
-#define _CTAG_LEN       128
+#define _CTAG_LEN       16
+/* ======== The END of user config area ======== */
 
 /* CTAG: Counter tag*/
 #ifdef  __x86_64__
@@ -129,6 +132,13 @@ typedef struct {
     uint64_t pmu[_N_ETAG];
 #endif
 } data_t;
+
+/* Extern file-operating functions in file_op.c*/
+extern int vt_mkdir(char *path);
+extern int vt_touch(char *path, char *mode);
+extern int vt_getstamp(char *hostpath, char *timestr, int *run_id);
+extern void vt_putstamp(char *hostpath, char *timestr);
+extern void vt_log(FILE *fp, char *fmt, ...);
 
 /* MPI Wrapper in vt_mpi.c*/
 #ifdef USE_MPI
