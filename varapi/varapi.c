@@ -163,13 +163,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 
     /* Initialization of output directory and file*/
     /*
-     * 
      * data path: <Data_Root>/<Proj_Name>/<Host_Name>/<files>
-     * data file:
-     * run#_procmap.csv                 CSV file for process map. One copy per host.
-     * run#_r#_c#_all.csv               CSV file for raw tracing data. One per rank.
-     * varapi_run#_<host>_<tstamp>.log  Varapi log for the host. One per host.
-     * 
      */ 
     if (vt_myrank == vt_head) {
         vterr = vt_mkdir(hostpath);
