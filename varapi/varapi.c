@@ -99,22 +99,6 @@ extern void vt_getstamp(char *hostpath, char *timestr, int *run_id);
 extern void vt_putstamp(char *hostpath, char *timestr);
 extern void vt_log(FILE *fp, char *fmt, ...);
 
-/* Extern MPI functions */
-#ifdef USE_MPI
-extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
-extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
-                            uint32_t *head, int *iorank, char *projpath, int run_id, 
-                            uint32_t *iogrp_nrank, uint32_t *vt_iogrp_grank, 
-                            uint32_t *vt_iogrp_gcpu);
-extern void vt_bcast_tstamp(char *timestr);
-extern void vt_newtype();
-extern void vt_io_barrier();
-extern int vt_get_data(uint32_t rank, uint32_t count, data_t *data);
-extern void vt_send_data(uint32_t count, data_t *data);
-extern void vt_mpi_clean();
-#endif
- 
-
 /* Initializing varapi */
 int
 vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
@@ -211,6 +195,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 
     /* IO rank creates data files. */
 #ifdef USE_MPI
+    //printf("%d: %d: %d: %s\n", vt_myrank, vt_iorank, vt_iogrp_nrank, datafile);
     if (vt_myrank == vt_iorank) {
         int i;
         // Create data files.
@@ -226,6 +211,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             }
         }
     }
+    vt_world_barrier();
 #else
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
     fp_data = NULL;
@@ -245,6 +231,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     _vt_init_ns;
 
     /* Initial time reading. */
+    next_id = 0;
     vt_read("VT_START", 8);
     vt_write();
     return 0;
@@ -270,7 +257,7 @@ vt_read(char *ctag, int clen) {
     pdata[next_id].cy = cy;
     pdata[next_id].ns = ns;
     memcpy(pdata[next_id].ctag, ctag, clen);
-
+    pdata[next_id].ctag[clen] = '\0';
 #ifndef NETAG0
     int i;
     for (i = 0; i < _N_ETAG; i ++) {
@@ -337,7 +324,7 @@ vt_write() {
 
     vt_nmsg += next_id;
     next_id = 0;
-    if (vt_myrank == vt_iorank) {
+    if (vt_myrank == vt_head) {
         vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
     }
 
@@ -351,8 +338,10 @@ vt_finalize() {
 
     vt_read("VT_END", 6);
     vt_write();
-    vt_putstamp(hostpath, timestr);
-    vt_log(fp_log, "[vt_end] Varapi is finished.\n");
+    if (vt_myrank == 0) {
+        vt_putstamp(hostpath, timestr);
+        vt_log(fp_log, "[vt_end] Varapi is finished.\n");
+    }
 #ifdef USE_MPI
     if (vt_myrank == vt_iorank) {
         for (i = 0; i < vt_iogrp_nrank; i ++) {

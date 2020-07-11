@@ -43,7 +43,7 @@
 
 /* Vars for IO group communicator. */
 MPI_Comm comm_iogrp;
-uint32_t iogrp_size, iogrp_rank, iogrp_nrank, head, my_grank;
+uint32_t iogrp_size, iogrp_rank, head, my_grank;
 uint32_t *iogrp_grank, *iogrp_gcpu;              // IO group world rank.
 MPI_Datatype vt_mpidata_t;  // MPI datatype for event data.
 
@@ -62,7 +62,7 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
 int 
 vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
                  uint32_t *head, int *iorank, char *projpath, int run_id, 
-                 uint32_t *vt_iogrp_nrank, uint32_t *vt_iogrp_grank, 
+                 uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, 
                  uint32_t *vt_iogrp_gcpu) {
     int i, j;
     int *cpu_all = NULL;
@@ -98,7 +98,7 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         head_now = 0;
         head_next = head_now;
         iorank_cur = head_now;
-        iogrp_nrank = 2;
+        iogrp_size = 2;
         head_all[0] = head_now + 1;
         iorank_all[0] = head_now;
         i = head_now;
@@ -130,12 +130,12 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
                 if (mapped) {
                     head_all[i] = head_now + 1;
                     // One io rank works for _RANK_PER_IO ranks.
-                    if (iogrp_nrank > _RANK_PER_IO) {
-                        iogrp_nrank = 1;
+                    if (iogrp_size > _RANK_PER_IO) {
+                        iogrp_size = 1;
                         iorank_cur = i;
                     }
                     iorank_all[i] = iorank_cur;
-                    iogrp_nrank += 1;
+                    iogrp_size += 1;
                 }
             } // END: if (head_all[i] == 0)
             i += 1;
@@ -147,10 +147,10 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
                     head_now = head_next;
                     i = head_now;
                     iorank_cur = i;
-                    iogrp_nrank = 0;
+                    iogrp_size = 0;
                     head_all[i] = head_now + 1;
                     iorank_all[i] = iorank_cur;
-                    iogrp_nrank += 1;
+                    iogrp_size += 1;
                 } else {
                     // all host has been set, quit loop.
                     break;
@@ -173,14 +173,14 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
     /* Create new communicator. */
     MPI_Comm_split(MPI_COMM_WORLD, *iorank, my_grank, &comm_iogrp);
     MPI_Comm_rank(comm_iogrp, &iogrp_rank);
-    MPI_Comm_rank(comm_iogrp, &iogrp_size);
+    MPI_Comm_size(comm_iogrp, &iogrp_size);
 
     iogrp_grank = (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
     iogrp_gcpu =  (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
     MPI_Gather(&my_grank, 1, MPI_UINT32_T, iogrp_grank, 1, MPI_UINT32_T, 0, comm_iogrp);
     MPI_Gather(&mycpu, 1, MPI_UINT32_T, iogrp_gcpu, 1, MPI_UINT32_T, 0, comm_iogrp);
-    MPI_Bcast(iogrp_grank, iogrp_nrank, MPI_UINT32_T, 0, comm_iogrp);
-    MPI_Bcast(iogrp_gcpu, iogrp_nrank, MPI_UINT32_T, 0, comm_iogrp);
+    MPI_Bcast(iogrp_grank, iogrp_size, MPI_UINT32_T, 0, comm_iogrp);
+    MPI_Bcast(iogrp_gcpu, iogrp_size, MPI_UINT32_T, 0, comm_iogrp);
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* Gather and record group rank. */
@@ -199,7 +199,6 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         sprintf(map_file, "%s/run%d_rankmap.csv", projpath, run_id);
         // TODO: Debug info
         fp = fopen(map_file, "w");
-        printf("Mapping: %s, address: %x\n", map_file, fp);
         fprintf(fp, "rank,hostname,cpu,hostmain,iohead,grp_rank\n");
         for (i = 0; i < nrank; i ++) {
             fprintf(fp, "%d,%s,%u,%u,%u,%u\n", 
@@ -215,8 +214,8 @@ vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu,
         free(iorank_all);
     }
 
-    *vt_iogrp_nrank = iogrp_nrank;
-    for (i = 0; i < iogrp_nrank; i ++) {
+    *vt_iogrp_size = iogrp_size;
+    for (i = 0; i < iogrp_size; i ++) {
         vt_iogrp_grank[i] = iogrp_grank[i];
         vt_iogrp_gcpu[i] = iogrp_gcpu[i];
     }
@@ -238,8 +237,8 @@ void
 vt_iogrp_getinfo(uint32_t *nrank, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu) {
     int i = 0;
 
-    *nrank = iogrp_nrank;
-    for (i = 0; i < iogrp_nrank; i ++) {
+    *nrank = iogrp_size;
+    for (i = 0; i < iogrp_size; i ++) {
         vt_iogrp_grank[i] = iogrp_grank[i];
         vt_iogrp_gcpu[i] = iogrp_gcpu[i];
     }
@@ -259,7 +258,7 @@ vt_newtype() {
     int len[3];
     MPI_Aint disp[3];
     MPI_Datatype types[3];
-    nb = 3
+    nb = 3;
 #endif
     types[0] = MPI_CHAR;
     types[1] = MPI_UINT64_T;
@@ -303,6 +302,14 @@ vt_freetype() {
 void
 vt_io_barrier() {
     MPI_Barrier(comm_iogrp);
+
+    return;
+}
+
+/* MPI_COMM_WORLD barrier*/
+void
+vt_world_barrier() {
+    MPI_Barrier(MPI_COMM_WORLD);
 
     return;
 }

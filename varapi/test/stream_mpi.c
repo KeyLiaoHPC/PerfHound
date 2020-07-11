@@ -268,12 +268,13 @@ main()
 	// if either of these fail there is something really screwed up!
 	MPI_Comm_size(MPI_COMM_WORLD, &numranks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    if (vt_init("./stmpi_vardata", "st_mpi", NULL)) {
+    if (vt_init("./data", "st_mpi", NULL)) {
         exit(1);
     }
 
     /* --- NEW FEATURE --- distribute requested storage across MPI ranks --- */
-	array_elements = STREAM_ARRAY_SIZE / numranks;		// don't worry about rounding vs truncation
+	//array_elements = STREAM_ARRAY_SIZE / numranks;		// don't worry about rounding vs truncation
+	array_elements = STREAM_ARRAY_SIZE ;		// don't worry about rounding vs truncation
     array_alignment = 64;						// Can be modified -- provides partial support for adjusting relative alignment
 
 	// Dynamically allocate the three arrays using "posix_memalign()"

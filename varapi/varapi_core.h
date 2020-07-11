@@ -34,11 +34,11 @@
 
 //==================================================================================
 
-#include <stdint.h>
-#include <time.h>
-
 #ifndef __VARAPI_CORE_H__
 #define __VARAPI_CORE_H__
+
+#include <stdint.h>
+#include <time.h>
 
 #include "vt_counter.h"
 
@@ -83,7 +83,7 @@
 #define VT_CYCLE        0
 #define VT_NANOSEC      1
 
-#endif
+#endif  // END: #ifdef __x86_64__
 
 /* VT_TYPE*/
 #ifndef __VT_TYPE__
@@ -102,7 +102,7 @@
 #define VT_FLOAT    11
 #define VT_DOUBLE   12
 
-#endif
+#endif // END: #ifndef __VT_TYPE__
 
 #ifdef NETAG0
 // Only collect cycle and nanosec
@@ -118,7 +118,7 @@
 #elif  defined(NETAG5)
 #define _N_ETAG     5
 #else
-#define _NETAG0
+#define NETAG0
 #define _N_ETAG     0
 #endif // END: #ifdef NETAG0
 
@@ -130,4 +130,20 @@ typedef struct {
 #endif
 } data_t;
 
+/* MPI Wrapper in vt_mpi.c*/
+#ifdef USE_MPI
+extern void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
+extern int vt_sync_mpi_info(char *myhost, uint32_t nrank, uint32_t myrank, uint32_t mycpu, 
+                            uint32_t *head, int *iorank, char *projpath, int run_id, 
+                            uint32_t *iogrp_nrank, uint32_t *vt_iogrp_grank, 
+                            uint32_t *vt_iogrp_gcpu);
+extern void vt_bcast_tstamp(char *timestr);
+extern void vt_newtype();
+extern void vt_io_barrier();
+extern void vt_world_barrier();
+extern int vt_get_data(uint32_t rank, uint32_t count, data_t *data);
+extern void vt_send_data(uint32_t count, data_t *data);
+extern void vt_mpi_clean();
 #endif
+
+#endif // END: #ifndef __VARAPI_CORE_H__
