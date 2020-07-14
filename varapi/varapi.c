@@ -91,7 +91,7 @@ int
 vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     // User-defined data root and project name.
     char udroot[_PATH_MAX], upname[_PATH_MAX];
-    int vterr = 0;
+    int i, vterr = 0;
 
 #ifdef USE_MPI
     // Get process information.
@@ -198,13 +198,26 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #ifdef USE_MPI
     //printf("%d: %d: %d: %s\n", vt_myrank, vt_iorank, vt_iogrp_nrank, datafile);
     if (vt_myrank == vt_iorank) {
-        int i;
         // Create data files.
         fp_data = (FILE **)malloc(vt_iogrp_nrank * sizeof(FILE *));
         for (i = 0; i < vt_iogrp_nrank; i ++) {
             sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", 
                     hostpath, vt_run_id, vt_iogrp_grank[i], vt_iogrp_gcpu[i]);
             fp_data[i] = fopen(datafile, "w");
+            // Add header.
+            fprintf(fp_data[i], "tag,cycle,nanosec");
+            if (_N_ETAG > 0) {
+                fprintf(fp_data[i], ",");
+            } else {
+                fprintf(fp_data[i], "\n");
+                continue;
+            }
+            for (i = 0; i < _N_ETAG - 1; i ++) {
+                fprintf(fp_data[i], "pmu%d,", i+1);
+            }
+            if (_N_ETAG > 0) {
+                fprintf(fp_data[i], "pmu%d\n", _N_ETAG);
+            }
             // TODO: Force quit.
             if (fp_data[i] == NULL) {
                 printf("Failed creating datafile! Rank %d, ERRNO %d\n", vt_iogrp_grank[i], errno);
@@ -217,6 +230,19 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
     fp_data = NULL;
     fp_data = fopen(datafile, "w");
+    // Add header.
+    fprintf(fp_data, "tag,cycle,nanosec");
+    if (_N_ETAG > 0) {
+        fprintf(fp_data, ",");
+    } else {
+        fprintf(fp_data, "\n");
+    }
+    for (i = 0; i < _N_ETAG - 1; i ++) {
+        fprintf(fp_data, "pmu%d,", i+1);
+    }
+    if (_N_ETAG > 0) {
+        fprintf(fp_data, "pmu%d\n", _N_ETAG);
+    }
 #endif
 
 
@@ -245,6 +271,9 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     if(vt_myrank == vt_head) {
         vt_log(fp_log, "[vt_init] Init finished.\n");
     }
+#ifdef USE_MPI
+    vt_world_barrier();
+#endif
     next_id = 0;
     vt_read("VT_START", 8);
     vt_write();
@@ -341,6 +370,9 @@ vt_write() {
         vt_log(fp_log, "[vt_write] Write %d records, %d in total.\n", next_id, vt_nmsg);
     }
     next_id = 0;
+#ifdef USE_MPI
+    vt_world_barrier();
+#else
 
     return;
 }
