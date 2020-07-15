@@ -63,7 +63,9 @@
 #define _NETAG_MAX   8       // Max number of self-defined etag.
 
 /* MPI and IO settings. */
+#define _AUTO_WRITE     1
 #define _RANK_PER_IO    64
+#define _SYNC_NS_OFFSET 1e9     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 #ifndef _MSG_BUF_KIB
@@ -142,7 +144,10 @@ int  vt_touch(char *path, char *mode);
 
 /* MPI Wrapper in vt_mpi.c*/
 #ifdef USE_MPI
+void vt_atsync();
 void vt_bcast_tstamp(char *timestr);
+void vt_get_alt();
+void vt_get_bias(int r0, int r1);
 int  vt_get_data(uint32_t rank, uint32_t count, data_t *data);
 void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
 void vt_io_barrier();
@@ -151,7 +156,7 @@ void vt_newtype();
 void vt_send_data(uint32_t count, data_t *data);
 int  vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
                       uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
-void vt_bias_ns(int r0, int r1);
+void vt_tsync();
 void vt_world_barrier();
 #endif
 

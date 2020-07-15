@@ -459,7 +459,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read("copy", 4);
+        vt_read("copy", 4, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
@@ -474,7 +474,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read("scale", 5);
+        vt_read("scale", 5, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
@@ -489,7 +489,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read("add", 3);
+        vt_read("add", 3, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
@@ -504,7 +504,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read("triad", 5);
+        vt_read("triad", 5, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];

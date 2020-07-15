@@ -156,5 +156,6 @@ vt_log(FILE *fp, char *fmt, ...) {
     va_end(args);
 
     fprintf(fp, msg);
+    fflush(fp);
     memset(msg, '\0', 1024 * sizeof(char));
 }

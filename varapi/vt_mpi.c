@@ -41,6 +41,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sched.h>
+#include <math.h>
 #include <mpi.h>
 #include "varapi_core.h"
 
@@ -49,7 +50,7 @@ MPI_Comm comm_iogrp;
 uint32_t mpi_size, iogrp_size, iogrp_rank, head, my_grank;
 uint32_t *iogrp_grank, *iogrp_gcpu;              // IO group world rank.
 MPI_Datatype vt_mpidata_t;  // MPI datatype for event data.
-int64_t bns;                // bns = tx - t0, dnsclock bias to rank 0;
+int64_t bns, wait_ns;                // bns = tx - t0, dnsclock bias to rank 0;
 
 
 void
@@ -356,25 +357,25 @@ vt_mpi_clean() {
 
 /* Get core time bias in ns, ns_sync = ns_now + bns. */
 void
-vt_bias_ns(int r0, int r1) {
+vt_get_bias(int r0, int r1) {
     struct timespec ts; 
-    uint64_t volatile ns0, ns1, ns2;
+    uint64_t ns0, ns1, ns2;
     double d_bns;
     MPI_Status st;
     
 /*
- *      Rank 0      Rank 1
- *      get ns0     nop
- *      send ns0    nop
- *      nop         recv ns0
- *      // first sync
- *      nop         get ns0
- *      nop         send ns0
- *      get ns1     nop
- *      send ns1    nop
- *      nop         recv ns1
- *      nop         get ns2
- *      bns = ns1 - (ns2 - ns0) * 0.5 - ns0
+ *  Step    Rank 0      Rank 1
+ *   1      get ns0     nop
+ *   2      send ns0    nop
+ *   3      nop         recv ns0
+ *          // first sync
+ *   4      nop         get ns0
+ *   5      nop         send ns0
+ *   6      get ns1     nop
+ *   7      send ns1    nop
+ *   8      nop         recv ns1
+ *   9      nop         get ns2
+ *   10     bns = ns1 - (ns2 - ns0) * 0.5 - ns0
  *
  */
     // warm icache
@@ -382,23 +383,88 @@ vt_bias_ns(int r0, int r1) {
 
     if (my_grank == r0) {
         _vt_read_ns(ns0);
-        MPI_Send(&ns0, 1, MPI_INT64_T, r1, 101, MPI_COMM_WORLD);
+        MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 101, MPI_COMM_WORLD);
         // First sync
-        MPI_Recv(&ns0, 1, MPI_INT64_T, r1, 102, MPI_COMM_WORLD, &st);
+        MPI_Recv(&ns0, 1, MPI_UINT64_T, r1, 102, MPI_COMM_WORLD, &st);
         _vt_read_ns(ns0);
-        MPI_Send(&ns0, 1, MPI_INT64_T, r1, 103, MPI_COMM_WORLD);
+        MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 103, MPI_COMM_WORLD);
+        bns = 0;
     }
 
     if (my_grank == r1) {
-        MPI_Recv(&ns0, 1, MPI_INT64_T, r0, 101, MPI_COMM_WORLD, &st);
+        MPI_Recv(&ns0, 1, MPI_UINT64_T, r0, 101, MPI_COMM_WORLD, &st);
         // First sync
         _vt_read_ns(ns0);
-        MPI_Send(&ns0, 1, MPI_INT64_T, r0, 102, MPI_COMM_WORLD);
-        MPI_Recv(&ns1, 1, MPI_INT64_T, r0, 103, MPI_COMM_WORLD, &st);
+        MPI_Send(&ns0, 1, MPI_UINT64_T, r0, 102, MPI_COMM_WORLD);
+        MPI_Recv(&ns1, 1, MPI_UINT64_T, r0, 103, MPI_COMM_WORLD, &st);
         _vt_read_ns(ns2);
 
         d_bns = (double)ns1 - (double)(ns2 - ns0) * 0.5 - (double)ns0;
         bns = (int64_t)d_bns;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    return;
+}
+
+/* sync all ranks */
+void
+vt_tsync() {
+    uint64_t ns, ns_new;
+    int64_t tmp;
+    struct timespec ts;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    _vt_read_ns(ns);
+    MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
+    
+    ns = ns + _SYNC_NS_OFFSET + bns;
+    //ns = bns < 0? (ns - abs(bns)) : (ns + bns);
+
+    _vt_read_ns(ns_new);
+    while (ns_new < ns) {
+        _vt_read_ns(ns_new);
+    }
+
+    return;
+}
+
+/* Get execution offsets to rank 0. */
+void
+vt_get_alt() {
+    uint64_t ns, ns_r0;
+    struct timespec ts;
+
+    _vt_read_ns(ns);
+    ns_r0 = ns;
+    MPI_Bcast(&ns_r0, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
+    // wait_ns < 0: This rank is running slower (reach the sync point later) than rank 0,
+    // wait_ns > 0: This rank is running faster (reach the sync point earlier) than rank 0.
+    wait_ns = (int64_t) (ns_r0 - bns) - ns; 
+
+}
+
+/* Restore the variation according to alt bias. */
+void
+vt_atsync() {
+    uint64_t ns, ns_new;
+    int64_t wait_ns_min;
+    int64_t register tmp;
+    struct timespec ts;
+
+    // How much slower from the slowest rank ? Get the minimum wait_ns;
+    MPI_Allreduce(&wait_ns, &wait_ns_min, 1, MPI_INT64_T, MPI_MIN, MPI_COMM_WORLD);
+    // Current rank 0 reading
+    _vt_read_ns(ns);
+    MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
+    // offset needs to contain the minimum wait_ns
+    tmp = bns + _SYNC_NS_OFFSET - wait_ns_min - wait_ns;
+    ns = ns + (uint64_t)tmp;
+    // Reset the unbalance
+
+    _vt_read_ns(ns_new);
+    while (ns_new < ns) {
+        _vt_read_ns(ns_new);
     }
 
     return;

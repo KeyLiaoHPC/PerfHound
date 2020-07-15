@@ -84,9 +84,10 @@ int vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags);
  * @brief Get and record an pre-defined event reading.
  * @param ctag Code tag, a descriptive word tag for the counting point.
  * @param etag Event tag, an exsited event name in varapi.h.
+ * @param auto_write Write to file or cover from beginnning when buffer is full.
  * @return int Return error code.
  */
-void vt_read(char *ctag, int clen);
+void vt_read(char *ctag, int clen, int auto_write);
 
 
 /**

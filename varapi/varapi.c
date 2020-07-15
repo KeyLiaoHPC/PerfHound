@@ -264,19 +264,30 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     /* Initial time reading. */
 #ifdef USE_MPI
     vt_world_barrier();
+    if (vt_myrank == vt_head) {
+        vt_log(fp_log, "[vt_init] Time sync started.\n");
+    }
+    for (i = 1; i < vt_nrank; i ++) {
+        vt_get_bias(0, i);
+    }
+    
+    if (vt_myrank == vt_head) {
+        vt_log(fp_log, "[vt_init] Time sync finished.\n");
+    }
 #endif
-    if(vt_myrank == 0) {
+    if (vt_myrank == 0) {
         printf("*** [VarAPI] Init finished, start your main program. ***\n");
     }
-    if(vt_myrank == vt_head) {
+    if (vt_myrank == vt_head) {
         vt_log(fp_log, "[vt_init] Init finished.\n");
     }
 #ifdef USE_MPI
-    vt_world_barrier();
+    //vt_world_barrier();
+    vt_tsync();
 #endif
     next_id = 0;
-    vt_read("VT_START", 8);
-    vt_write();
+    vt_read("VT_START", 8, 1);
+    //vt_write();
     return 0;
 }
 
@@ -292,7 +303,7 @@ vt_read_ts(uint64_t *cy, uint64_t *ns) {
 
 /* Get and record an event reading */
 void
-vt_read(char *ctag, int clen) {
+vt_read(char *ctag, int clen, int auto_write) {
     uint64_t cy = 0, ns = 0;
 
     vt_read_ts(&cy, &ns);
@@ -313,8 +324,11 @@ vt_read(char *ctag, int clen) {
     next_id ++;
     /* Check buffer health after reading */
     if (next_id >= vt_databuf) {
-        vt_write();
-        next_id = 0;
+        if (auto_write) {
+            vt_write();
+        } else {
+            next_id = 0;
+        }
     }
 }
 
@@ -327,10 +341,15 @@ vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val) {
 /* Write data to file. */
 void
 vt_write() {
+    if (next_id == 0) {
+        return;
+    }
+    vt_read("VT_WR", 5, 0);
+
 #ifdef USE_MPI
     int i, j, k;
-    
-    vt_io_barrier();
+    vt_get_alt();
+    //vt_io_barrier();
     if (vt_myrank == vt_iorank) {
         for (i = 0; i < vt_iogrp_nrank; i ++) {
             vt_get_data(i, next_id, pdata);
@@ -343,6 +362,7 @@ vt_write() {
                     fprintf(fp_data[i], "%llu,", pdata[j].pmu[k]);
                 }
                 fprintf(fp_data[i], "%llu\n", pdata[i].pmu[_N_ETAG-1]);
+                fflush(fp_data[i]);
 #endif
             }
         }
@@ -361,6 +381,7 @@ vt_write() {
             fprintf(fp_data, "%llu,", pdata[i].pmu[j]);
         }
         fprintf(fp_data, "%llu\n", pdata[i].pmu[j]);
+        fflush(fp_data);
 #endif // END: #ifdef NETAG0
     }
 #endif // END: #ifdef USE_MPI
@@ -371,9 +392,10 @@ vt_write() {
     }
     next_id = 0;
 #ifdef USE_MPI
-    vt_world_barrier();
-#else
-
+    //vt_world_barrier();
+    vt_atsync();
+#endif
+    vt_read("VT_WR_END", 9, 0);
     return;
 }
 
@@ -382,7 +404,7 @@ void
 vt_clean() {
     int i = 0;
 
-    vt_read("VT_END", 6);
+    vt_read("VT_END", 6, 1);
     vt_write();
     if (vt_myrank == 0) {
         vt_putstamp(projpath, timestr);
