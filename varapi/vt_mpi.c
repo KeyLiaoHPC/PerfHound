@@ -46,9 +46,11 @@
 
 /* Vars for IO group communicator. */
 MPI_Comm comm_iogrp;
-uint32_t mpi_size, my_rank, iogrp_size, iogrp_rank, head, my_grank;
+uint32_t mpi_size, iogrp_size, iogrp_rank, head, my_grank;
 uint32_t *iogrp_grank, *iogrp_gcpu;              // IO group world rank.
 MPI_Datatype vt_mpidata_t;  // MPI datatype for event data.
+int64_t bns;                // bns = tx - t0, dnsclock bias to rank 0;
+
 
 void
 vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
@@ -56,10 +58,10 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
     // CAUTION: Here we are not resposible for checking if the main program has been
     // successfully loaded into MPI environment.
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_grank);
 
     *nrank = mpi_size;
-    *myrank = my_rank;
+    *myrank = my_grank;
 
     return;
 }
@@ -80,7 +82,6 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     //fflush(stdout);
     //MPI_Barrier(MPI_COMM_WORLD);
     /* Gathering hostnames from all mpi ranks. */
-    my_grank = my_rank;
     if (my_grank == 0) {
         hname_all = (char *)malloc(mpi_size * _HOST_MAX * sizeof(char));
         cpu_all = (int *)malloc(mpi_size * sizeof(int));
@@ -352,3 +353,53 @@ vt_mpi_clean() {
     return;
 }
 
+
+/* Get core time bias in ns, ns_sync = ns_now + bns. */
+void
+vt_bias_ns(int r0, int r1) {
+    struct timespec ts; 
+    uint64_t volatile ns0, ns1, ns2;
+    double d_bns;
+    MPI_Status st;
+    
+/*
+ *      Rank 0      Rank 1
+ *      get ns0     nop
+ *      send ns0    nop
+ *      nop         recv ns0
+ *      // first sync
+ *      nop         get ns0
+ *      nop         send ns0
+ *      get ns1     nop
+ *      send ns1    nop
+ *      nop         recv ns1
+ *      nop         get ns2
+ *      bns = ns1 - (ns2 - ns0) * 0.5 - ns0
+ *
+ */
+    // warm icache
+    _vt_read_ns(ns0);
+
+    if (my_grank == r0) {
+        _vt_read_ns(ns0);
+        MPI_Send(&ns0, 1, MPI_INT64_T, r1, 101, MPI_COMM_WORLD);
+        // First sync
+        MPI_Recv(&ns0, 1, MPI_INT64_T, r1, 102, MPI_COMM_WORLD, &st);
+        _vt_read_ns(ns0);
+        MPI_Send(&ns0, 1, MPI_INT64_T, r1, 103, MPI_COMM_WORLD);
+    }
+
+    if (my_grank == r1) {
+        MPI_Recv(&ns0, 1, MPI_INT64_T, r0, 101, MPI_COMM_WORLD, &st);
+        // First sync
+        _vt_read_ns(ns0);
+        MPI_Send(&ns0, 1, MPI_INT64_T, r0, 102, MPI_COMM_WORLD);
+        MPI_Recv(&ns1, 1, MPI_INT64_T, r0, 103, MPI_COMM_WORLD, &st);
+        _vt_read_ns(ns2);
+
+        d_bns = (double)ns1 - (double)(ns2 - ns0) * 0.5 - (double)ns0;
+        bns = (int64_t)d_bns;
+    }
+
+    return;
+}
