@@ -55,8 +55,8 @@ int vt_run_id;
 data_t *pdata;                          // Varapi raw data.
 uint32_t vt_nmsg, vt_databuf;            // # of recorded messsages and buf capacity
 uint32_t next_id;                       // Next data id.
-#ifndef NETAG0
-uint32_t etags[_N_ETAG];
+#ifdef _N_EV
+uint32_t etags[_N_EV];
 #endif
 
 /* Variables for files and information */
@@ -204,50 +204,48 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", 
                     hostpath, vt_run_id, vt_iogrp_grank[i], vt_iogrp_gcpu[i]);
             fp_data[i] = fopen(datafile, "w");
-            // Add header.
-            fprintf(fp_data[i], "tag,cycle,nanosec");
-            if (_N_ETAG > 0) {
-                fprintf(fp_data[i], ",");
-            } else {
-                fprintf(fp_data[i], "\n");
-                continue;
-            }
-            for (i = 0; i < _N_ETAG - 1; i ++) {
-                fprintf(fp_data[i], "pmu%d,", i+1);
-            }
-            if (_N_ETAG > 0) {
-                fprintf(fp_data[i], "pmu%d\n", _N_ETAG);
-            }
-            // TODO: Force quit.
             if (fp_data[i] == NULL) {
                 printf("Failed creating datafile! Rank %d, ERRNO %d\n", vt_iogrp_grank[i], errno);
                 exit(1);
             }
+            // Add header.
+#ifdef  VT_EV_SHORT
+            fprintf(fp_data[i], "tag,cycle,nanosec,ev1,ev2,ev3,ev4\n");
+
+#elif   VT_EV_LONG
+            fprintf(fp_data[i], "tag,cycle,nanosec,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+
+#else
+            fprintf(fp_data[i], "tag,cycle,nanosec\n");
+
+#endif
         }
     }
-    vt_world_barrier();
 #else
     sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", hostpath, vt_run_id, vt_myrank, vt_mycpu);
     fp_data = NULL;
     fp_data = fopen(datafile, "w");
-    // Add header.
-    fprintf(fp_data, "tag,cycle,nanosec");
-    if (_N_ETAG > 0) {
-        fprintf(fp_data, ",");
-    } else {
-        fprintf(fp_data, "\n");
+    if (fp_data == NULL) {
+        printf("Failed creating datafile! ERRNO %d\n", errno);
+        exit(1);
     }
-    for (i = 0; i < _N_ETAG - 1; i ++) {
-        fprintf(fp_data, "pmu%d,", i+1);
-    }
-    if (_N_ETAG > 0) {
-        fprintf(fp_data, "pmu%d\n", _N_ETAG);
-    }
-#endif
+
+#ifdef  VT_EV_SHORT
+    fprintf(fp_data, "tag,cycle,nanosec,ev1,ev2,ev3,ev4\n");
+
+#elif   VT_EV_LONG
+    fprintf(fp_data, "tag,cycle,nanosec,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+
+#else
+    fprintf(fp_data, "tag,cycle,nanosec\n");
+
+#endif // END: #ifdef  VT_EV_SHORT
+#endif // END: #ifdef USE_MPI
 
 
     /* Init data space. */
 #ifdef USE_MPI
+    vt_world_barrier();
     vt_newtype();
 #endif 
     vt_databuf = _MSG_BUF_KIB * 1024 / sizeof(data_t);
@@ -312,14 +310,8 @@ vt_read(char *ctag, int clen, int auto_write) {
     pdata[next_id].ns = ns;
     memcpy(pdata[next_id].ctag, ctag, clen);
     pdata[next_id].ctag[clen] = '\0';
-#ifndef NETAG0
-    int i;
-    for (i = 0; i < _N_ETAG; i ++) {
-        //vt_read_pmu(etags[i], &(pdata[next_id].pmu[i]));
-        // TODO: no pmu yet.
-        pdata[next_id].pmu[i] = 0;
-    }
-#endif
+
+    // TODO: Need to add event readings
 
     next_id ++;
     /* Check buffer health after reading */
@@ -347,42 +339,48 @@ vt_write() {
     vt_read("VT_WR", 5, 0);
 
 #ifdef USE_MPI
+    /* MPI Write */
     int i, j, k;
     vt_get_alt();
     //vt_io_barrier();
     if (vt_myrank == vt_iorank) {
         for (i = 0; i < vt_iogrp_nrank; i ++) {
             vt_get_data(i, next_id, pdata);
-            for(j = 0; j < next_id; j ++) {
-#ifdef NETAG0
-                fprintf(fp_data[i], "%s,%llu,%llu\n", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
-#else
-                fprintf(fp_data[i], "%s,%llu,%llu,", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
-                for (k = 0; k < _N_ETAG - 1; k ++) {
-                    fprintf(fp_data[i], "%llu,", pdata[j].pmu[k]);
-                }
-                fprintf(fp_data[i], "%llu\n", pdata[i].pmu[_N_ETAG-1]);
-                fflush(fp_data[i]);
+            for (j = 0; j < next_id; j ++) {
+                fprintf(fp_data[i], "%s,%llu,%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+#ifdef  _N_EV
+                fprintf(fp_data[i], ",%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
 #endif
+
+#ifdef  VT_UEV1
+                fprintf(fp_data[i], ",%.15f", pdata[j].uev[0])
+#elif   VT_UEV2
+                fprintf(fp_data[i], ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
+#endif
+                fprintf(fp_data[i], "\n");
+                fflush(fp_data[i]);
             }
         }
     } else {
         vt_send_data(next_id, pdata);
     } // END: if (vt_myrank == vt_iorank)
 #else
+    /* No-MPI Write */
     int i, j;
 
     for(i = 0; i < next_id; i ++) {
-#ifdef NETAG0
-        fprintf(fp_data, "%s,%llu,%llu\n", pdata[i].ctag, pdata[i].cy, pdata[i].ns);
-#else
-        fprintf(fp_data, "%s,%llu,%llu,", pdata[i].ctag, pdata[i].cy, pdata[i].ns);
-        for (j = 0; j < _N_ETAG - 1; j ++) {
-            fprintf(fp_data, "%llu,", pdata[i].pmu[j]);
-        }
-        fprintf(fp_data, "%llu\n", pdata[i].pmu[j]);
+        fprintf(fp_data, "%s,%llu,%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+#ifdef  _N_EV
+        fprintf(fp_data, ",%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+#endif
+
+#ifdef  VT_UEV1
+        fprintf(fp_data, ",%.15f", pdata[j].uev[0])
+#elif   VT_UEV2
+        fprintf(fp_data, ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
+#endif
+        fprintf(fp_data, "\n");
         fflush(fp_data);
-#endif // END: #ifdef NETAG0
     }
 #endif // END: #ifdef USE_MPI
 

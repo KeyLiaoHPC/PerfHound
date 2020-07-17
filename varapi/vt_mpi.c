@@ -257,17 +257,25 @@ void
 vt_newtype() {
     int nb, err;
     data_t vtdata;
-#ifndef NETAG0
+#ifdef _N_EV
+#ifdef _N_UEV
+    int len[5];
+    MPI_Aint disp[5];
+    MPI_Datatype types[5];
+    nb = 5;
+#else
     int len[4];
     MPI_Aint disp[4];
     MPI_Datatype types[4];
     nb = 4;
+#endif // END: #ifdef _N_UEV
 #else
     int len[3];
     MPI_Aint disp[3];
     MPI_Datatype types[3];
     nb = 3;
-#endif
+#endif // END: #ifdef _N_EV
+
     types[0] = MPI_CHAR;
     types[1] = MPI_UINT64_T;
     types[2] = MPI_UINT64_T;
@@ -277,23 +285,22 @@ vt_newtype() {
     disp[0] = (uint64_t)vtdata.ctag -(uint64_t)&vtdata;
     disp[1] = (uint64_t)&vtdata.cy - (uint64_t)&vtdata;
     disp[2] = (uint64_t)&vtdata.ns - (uint64_t)&vtdata;
-#ifndef NETAG0
+
+#ifdef _N_EV
     types[3] = MPI_UINT64_T;
-    len[3] = _N_ETAG;
-    disp[3] = (uint64_t)&vtdata.pmu - (uint64_t)&vtdata.ns;
+    len[3] = _N_EV;
+    disp[3] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
+#ifdef _N_UEV
+    types[4] = MPI_DOUBLE;
+    len[4] = _N_UEV;
+    disp[4] = (uint64_t)vtdata.uev - (uint64_t)vtdata.ev;
+#endif
+
 #endif
 
     err = MPI_Type_create_struct(nb, len, disp, types, &vt_mpidata_t);
-    if (err != 0) {
-
-    printf("New: %d\n", err);
-    fflush(stdout);
-    }
     err = MPI_Type_commit(&vt_mpidata_t);
-    if (err != 0) {
-    printf("Commit: %d\n", err);
-    fflush(stdout);
-    }
+    
     MPI_Barrier(MPI_COMM_WORLD);
     return;
 }
@@ -314,7 +321,7 @@ vt_io_barrier() {
     return;
 }
 
-/* MPI_COMM_WORLD barrier*/
+/* MPI_COMM_WORLD barrier */
 void
 vt_world_barrier() {
     MPI_Barrier(MPI_COMM_WORLD);

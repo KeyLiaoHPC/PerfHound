@@ -109,31 +109,58 @@
 
 #endif // END: #ifndef __VT_TYPE__
 
-#ifdef NETAG0
-// Only collect cycle and nanosec
-#define _N_ETAG     0
-#elif  defined(NETAG1)
-#define _N_ETAG     1
-#elif  defined(NETAG2)
-#define _N_ETAG     2
-#elif  defined(NETAG3)
-#define _N_ETAG     3
-#elif  defined(NETAG4)
-#define _N_ETAG     4
-#elif  defined(NETAG5)
-#define _N_ETAG     5
+#ifdef VT_UEV1
+    #ifdef VT_EV_SHORT
+    #define _N_EV   3
+    #define _N_UEV  1
+
+    #elif  VT_EV_LONG
+    #define _N_EV   11
+    #define _N_UEV  1
+
+    #endif
+
+#elif VT_UEV2
+    #ifdef VT_EV_SHORT
+    #define _N_EV   2
+    #define _N_UEV  2
+
+    #elif  VT_EV_LONG
+    #define _N_EV   10
+    #define _N_UEV  2
+    #endif
+
 #else
-#define NETAG0
-#define _N_ETAG     0
-#endif // END: #ifdef NETAG0
+    #ifdef VT_EV_SHORT
+    #define _N_EV   4
+    #elif  VT_EV_LONG
+    #define _N_EV   12
+    #endif
+
+#endif // END: #ifdef VT_EV_SHORT
 
 typedef struct {
     char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
-    uint64_t cy, ns;
-#ifndef NETAG0
-    uint64_t pmu[_N_ETAG];
+    uint64_t cy, ns;    // 32 Bytes
+
+#ifdef _N_EV
+    uint64_t    ev[_N_EV];
+
+// #else
+// #define _N_EV  0
 #endif
+
+#ifdef _N_UEV
+    double      uev[_N_UEV];
+
+// #else
+// #define _N_UEV  0
+
+#endif
+
 } data_t;
+
+
 
 /* Extern file-operating functions in file_op.c*/
 int  vt_getstamp(char *hostpath, char *timestr, int *run_id);
@@ -154,6 +181,8 @@ void vt_io_barrier();
 void vt_mpi_clean();
 void vt_newtype();
 void vt_send_data(uint32_t count, data_t *data);
+void vt_set_ev(uint32_t *etag);
+void vt_set_uev(char *uetag);
 int  vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
                       uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
 void vt_tsync();
