@@ -38,18 +38,19 @@
 #define __VARAPI_H__
 #include <stdint.h>
 
-/* CTAG: Counter tag*/
-#ifdef  __x86_64__
+/* Performance monitor header. */
+#ifndef __PM_HEADER__
+#define __PM_HEADER__
+#ifdef __x86_64__
+#include "vt_pm_x86_64.h"
+#include "vt_event_x86_64.h"
 
-#define VT_CYCLE        0
-#define VT_NANOSEC      1
+#elif  __aarch64__
+#include "vt_pm_aarch64.h"
+#include "vt_event_aarch64.h"
 
-#elif   __aarch64__
-
-#define VT_CYCLE        0
-#define VT_NANOSEC      1
-
-#endif
+#endif // END: #ifdef __x86_64__
+#endif // END: #ifndef __PM_HEADER__
 
 /* VT_TYPE*/
 #ifndef __VT_TYPE__
@@ -81,24 +82,23 @@
 int vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags);
 
 /**
+ * @brief Register system events which will be recorded. 
+ * @param etag Array of event code.
+ * @param nev  Actual number of events, should be less or equal to _N_EV.
+ */
+void vt_set_ev(uint32_t *etag, int nev);
+void vt_set_uev(char *uetag, void *pval, int vt_type);
+void vt_commit();
+
+/**
  * @brief Get and record an pre-defined event reading.
  * @param ctag Code tag, a descriptive word tag for the counting point.
  * @param etag Event tag, an exsited event name in varapi.h.
  * @param auto_write Write to file or cover from beginnning when buffer is full.
  * @return int Return error code.
  */
-void vt_read(char *ctag, int clen, int auto_write);
+void vt_read(char *ctag, int clen, int auto_write, int read_ev, int read_uev);
 
-
-/**
- * @brief Record a self-defined event value.
- * 
- * @param ctag 
- * @param etag 
- * @param vt_type 
- * @param val 
- */
-void vt_record(char *ctag, int clen, char *etag, int elen, int vt_type, void *val);
 
 void vt_write();
 

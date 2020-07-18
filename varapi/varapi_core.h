@@ -41,17 +41,19 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "vt_counter.h"
-
+/* Performance monitor header. */
+#ifndef __PM_HEADER__
+#define __PM_HEADER__
 #ifdef __x86_64__
-#include "rec_ts_x86_64.h"
-#include "rec_event_x86_64.h"
+#include "vt_pm_x86_64.h"
+#include "vt_event_x86_64.h"
 
-#elif  defined(__aarch64__)
-#include "rec_ts_aarch64.h"
-#include "rec_event_aarch64.h"
+#elif  __aarch64__
+#include "vt_pm_aarch64.h"
+#include "vt_event_aarch64.h"
 
-#endif
+#endif // END: #ifdef __x86_64__
+#endif // END: #ifndef __PM_HEADER__
 
 /* ======== User config area ======== */
 /* Limits for Varapi tracing. */
@@ -109,36 +111,47 @@
 
 #endif // END: #ifndef __VT_TYPE__
 
-#ifdef VT_UEV1
-    #ifdef VT_EV_SHORT
+/* System event and user-defined event */
+#define VT_MODE_TS
+#ifdef VT_UEV_1
+    #ifdef VT_MODE_SHORT
+    #undef VT_MODE_TS
     #define _N_EV   3
     #define _N_UEV  1
 
-    #elif  VT_EV_LONG
+    #elif  VT_MODE_LONG
+    #undef VT_MODE_TS
     #define _N_EV   11
     #define _N_UEV  1
 
     #endif
 
-#elif VT_UEV2
-    #ifdef VT_EV_SHORT
+#elif VT_UEV_2
+    #ifdef VT_MODE_SHORT
+    #undef VT_MODE_TS
     #define _N_EV   2
     #define _N_UEV  2
 
-    #elif  VT_EV_LONG
+    #elif  VT_MODE_LONG
+    #undef VT_MODE_TS
     #define _N_EV   10
     #define _N_UEV  2
     #endif
 
 #else
-    #ifdef VT_EV_SHORT
+    #ifdef VT_MODE_SHORT
+    #undef VT_MODE_TS
     #define _N_EV   4
-    #elif  VT_EV_LONG
+    #elif  VT_MODE_LONG
+    #undef VT_MODE_TS
     #define _N_EV   12
     #endif
 
-#endif // END: #ifdef VT_EV_SHORT
+#endif // END: #ifdef VT_MODE_SHORT
 
+
+
+/* VarAPI record data type */
 typedef struct {
     char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
     uint64_t cy, ns;    // 32 Bytes
@@ -181,8 +194,7 @@ void vt_io_barrier();
 void vt_mpi_clean();
 void vt_newtype();
 void vt_send_data(uint32_t count, data_t *data);
-void vt_set_ev(uint32_t *etag);
-void vt_set_uev(char *uetag);
+
 int  vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
                       uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
 void vt_tsync();

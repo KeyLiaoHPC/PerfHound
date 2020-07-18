@@ -256,6 +256,7 @@ main()
 	int         rc, numranks, myrank;
 	STREAM_TYPE	AvgError[3] = {0.0,0.0,0.0};
 	STREAM_TYPE *AvgErrByRank;
+	uint32_t	stream_event[3] = {L1D_CACHE, L2D_CACHE, L3D_CACHE};
 
     /* --- SETUP --- call MPI_Init() before anything else! --- */
 
@@ -268,9 +269,14 @@ main()
 	// if either of these fail there is something really screwed up!
 	MPI_Comm_size(MPI_COMM_WORLD, &numranks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+	/* VarAPI init. */
     if (vt_init("./data", "st_mpi", NULL)) {
         exit(1);
     }
+	vt_set_ev(stream_event, 3);
+	vt_set_uev("i", &k, VT_INT);
+	vt_commit();
 
     /* --- NEW FEATURE --- distribute requested storage across MPI ranks --- */
 	//array_elements = STREAM_ARRAY_SIZE / numranks;		// don't worry about rounding vs truncation
@@ -451,6 +457,7 @@ main()
     // 
 
     scalar = SCALAR;
+    vt_read("start", 5, 0, 0, 0);
     for (k=0; k<NTIMES; k++)
 	{
 		// kernel 1: Copy
@@ -459,7 +466,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read("copy", 4, 0);
+        vt_read("copy", 4, 1, 1, 1);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
@@ -474,7 +481,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read("scale", 5, 0);
+        vt_read("scale", 5, 1, 1, 1);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
@@ -489,7 +496,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read("add", 3, 0);
+        vt_read("add", 3, 1, 1, 1);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
@@ -504,7 +511,7 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read("triad", 5, 0);
+        vt_read("triad", 5, 1, 1, 1);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];
