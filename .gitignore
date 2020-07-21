@@ -6,6 +6,7 @@
 *.mod.c
 *.csv
 *.swp
+*.out
 .vscode
 ./*.sh
 .vscode/

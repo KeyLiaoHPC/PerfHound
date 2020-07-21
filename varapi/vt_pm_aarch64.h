@@ -64,6 +64,11 @@
 #ifdef USE_CNTVCT
 #define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); \
                             _ns *= nspt;
+#elif USE_SYSCALL
+#include <sys/syscall.h>
+#define _vt_read_ns(_ns)    syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
+                            (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
+
 #else
 #define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
