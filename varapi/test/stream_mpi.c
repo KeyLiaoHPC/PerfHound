@@ -256,7 +256,7 @@ main()
 	int         rc, numranks, myrank;
 	STREAM_TYPE	AvgError[3] = {0.0,0.0,0.0};
 	STREAM_TYPE *AvgErrByRank;
-	uint32_t	stream_event[3] = {L1D_CACHE, L2D_CACHE, L3D_CACHE};
+//	uint32_t	stream_event[3] = {L1D_CACHE, L2D_CACHE, L3D_CACHE};
 
     /* --- SETUP --- call MPI_Init() before anything else! --- */
 
@@ -274,8 +274,8 @@ main()
     if (vt_init("./data", "st_mpi", NULL)) {
         exit(1);
     }
-	vt_set_ev(stream_event, 3);
-	vt_set_uev("i", &k, VT_INT);
+	//vt_set_ev(stream_event, 3);
+	//vt_set_uev("i", &k, VT_INT);
 	vt_commit();
 
     /* --- NEW FEATURE --- distribute requested storage across MPI ranks --- */
@@ -466,11 +466,12 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read("copy", 4, 1, 1, 1);
+        vt_read("copy_st", 7, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
 #endif
+        vt_read("copy_en", 7, 1, 0, 0);
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
 		times[0][k] = t1 - t0;
@@ -481,10 +482,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read("scale", 5, 1, 1, 1);
+        vt_read("scale_st", 8, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
+        vt_read("scale_en", 8, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -496,10 +498,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read("add", 3, 1, 1, 1);
+        vt_read("add_st", 6, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
+        vt_read("add_en", 6, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -511,10 +514,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read("triad", 5, 1, 1, 1);
+        vt_read("triad_st", 8, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];
+        vt_read("triad_en", 8, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();

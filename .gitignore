@@ -14,3 +14,4 @@ data/
 bin/
 lib/
 include/
+*.host

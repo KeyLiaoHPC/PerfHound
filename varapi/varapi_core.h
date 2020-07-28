@@ -66,7 +66,7 @@
 
 /* MPI and IO settings. */
 #define _AUTO_WRITE     1
-#define _RANK_PER_IO    64
+#define _RANK_PER_IO    40
 #define _SYNC_NS_OFFSET 1e9     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
@@ -112,6 +112,10 @@
 #endif // END: #ifndef __VT_TYPE__
 
 /* System event and user-defined event */
+#ifndef _MODE_SET
+#define _MODE_SET
+
+#ifndef VT_MODE_TS
 #define VT_MODE_TS
 #ifdef VT_UEV_1
     #ifdef VT_MODE_SHORT
@@ -148,6 +152,8 @@
     #endif
 
 #endif // END: #ifdef VT_MODE_SHORT
+#endif // #ifndef VT_MODE_TS
+#endif // #ifndef _MODE_SET
 
 
 

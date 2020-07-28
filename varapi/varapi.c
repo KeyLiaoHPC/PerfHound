@@ -155,6 +155,8 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     // 
     vterr = vt_sync_mpi_info(projpath, vt_run_id, &vt_head, &vt_iorank,
                              &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
+    //if (vt_myrank == vt_iorank)
+    //    printf("%d: %d\n", vt_myrank, vt_iogrp_gcpu[0]);
 
 #else
     vt_head = 0;
@@ -167,13 +169,14 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     fp_map = fopen(rmap_path, "w");
     fprintf(fp_map, "rank,hostname,cpu,hostmain,io_head,io_rank\n");
     fprintf(fp_map, "%d,%s,%u,%u,%u,%u\n", 0, vt_myhost, vt_mycpu, 0, 0, 0);
+    fclose(fp_map);
 #endif
 
     /* Initialization of output directory and file*/
     /*
      * data path: <Data_Root>/<Proj_Name>/<Host_Name>/<files>
      */ 
-    if (vt_myrank == vt_head) {
+    if (vt_myrank == vt_iorank) {
         vterr = vt_mkdir(hostpath);
     }
 
@@ -207,6 +210,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
         for (i = 0; i < vt_iogrp_nrank; i ++) {
             sprintf(datafile, "%s/run%d_r%d_c%d_all.csv", 
                     hostpath, vt_run_id, vt_iogrp_grank[i], vt_iogrp_gcpu[i]);
+            //printf("%s\n", datafile);
             vt_fdata[i] = fopen(datafile, "w");
             if (vt_fdata[i] == NULL) {
                 printf("Failed creating datafile! Rank %d, ERRNO %d\n", vt_iogrp_grank[i], errno);
@@ -541,14 +545,18 @@ vt_write() {
             vt_get_data(i, vt_i, pdata);
             for (j = 0; j < vt_i; j ++) {
                 fprintf(vt_fdata[i], "%s,%llu,%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+#ifndef VT_MODE_TS
 #ifdef  _N_EV
-                fprintf(vt_fdata[i], ",%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+                for (k = 0; k < _N_EV; k ++) {
+                    fprintf(vt_fdata[i], ",%llu", pdata[j].ev[k]);
+                }
 #endif
 
 #ifdef  VT_UEV_1
                 fprintf(vt_fdata[i], ",%.15f", pdata[j].uev[0]);
 #elif   VT_UEV_2
                 fprintf(vt_fdata[i], ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
+#endif
 #endif
                 fprintf(vt_fdata[i], "\n");
                 fflush(vt_fdata[i]);

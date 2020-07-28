@@ -106,7 +106,7 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
         head_now = 0;
         head_next = head_now;
         iorank_cur = head_now;
-        iogrp_size = 2;
+        iogrp_size = 1;
         head_all[0] = head_now + 1;
         iorank_all[0] = head_now;
         i = head_now;
@@ -115,6 +115,7 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     
     /* Scan rank list, map head rank in host and assign io rank to every process. */
     if (my_grank == 0) {
+        i = 0;
         while (1) {
             mapped = 1;
             // main host rank not set yet
@@ -138,8 +139,8 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
                 if (mapped) {
                     head_all[i] = head_now + 1;
                     // One io rank works for _RANK_PER_IO ranks.
-                    if (iogrp_size > _RANK_PER_IO) {
-                        iogrp_size = 1;
+                    if (iogrp_size >= _RANK_PER_IO) {
+                        iogrp_size = 0;
                         iorank_cur = i;
                     }
                     iorank_all[i] = iorank_cur;
@@ -155,10 +156,9 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
                     head_now = head_next;
                     i = head_now;
                     iorank_cur = i;
-                    iogrp_size = 0;
                     head_all[i] = head_now + 1;
                     iorank_all[i] = iorank_cur;
-                    iogrp_size += 1;
+                    iogrp_size = 1;
                 } else {
                     // all host has been set, quit loop.
                     break;
@@ -182,6 +182,10 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     MPI_Comm_split(MPI_COMM_WORLD, *iorank, my_grank, &comm_iogrp);
     MPI_Comm_rank(comm_iogrp, &iogrp_rank);
     MPI_Comm_size(comm_iogrp, &iogrp_size);
+    if (my_grank == *iorank) {
+        printf("%d: %d\n", my_grank, iogrp_size);
+        fflush(stdout);
+    }
 
     iogrp_grank = (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
     iogrp_gcpu =  (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
@@ -226,6 +230,10 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     for (i = 0; i < iogrp_size; i ++) {
         vt_iogrp_grank[i] = iogrp_grank[i];
         vt_iogrp_gcpu[i] = iogrp_gcpu[i];
+        if (my_grank == *iorank) {
+            //printf("%d, %d: %d %d\n", i, my_grank, iogrp_gcpu[0], vt_iogrp_gcpu[0]);
+            fflush(stdout);
+        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
