@@ -457,7 +457,7 @@ main()
     // 
 
     scalar = SCALAR;
-    vt_read("start", 5, 0, 0, 0);
+    vt_read(1, 1, 0, 0, 0, 0);
     for (k=0; k<NTIMES; k++)
 	{
 		// kernel 1: Copy
@@ -466,12 +466,12 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read("copy_st", 7, 1, 0, 0);
+        vt_read(1, 2, 0, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
 #endif
-        vt_read("copy_en", 7, 1, 0, 0);
+        vt_read(1, 3, 0, 1, 0, 0);
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
 		times[0][k] = t1 - t0;
@@ -482,11 +482,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read("scale_st", 8, 1, 0, 0);
+        vt_read(1, 4, 0, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
-        vt_read("scale_en", 8, 1, 0, 0);
+        vt_read(1, 5, 0, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -498,11 +498,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read("add_st", 6, 1, 0, 0);
+        vt_read(1, 6, 0, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
-        vt_read("add_en", 6, 1, 0, 0);
+        vt_read(1, 7, 0, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -514,11 +514,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read("triad_st", 8, 1, 0, 0);
+        vt_read(1, 8, 0, 1, 0, 0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];
-        vt_read("triad_en", 8, 1, 0, 0);
+        vt_read(1, 9, 0, 1, 0, 0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();

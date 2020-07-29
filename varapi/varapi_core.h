@@ -159,9 +159,10 @@
 
 /* VarAPI record data type */
 typedef struct {
-    char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
+    //char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
+    uint32_t ctag[2];      // 
     uint64_t cy, ns;    // 32 Bytes
-
+    double uval;
 #ifdef _N_EV
     uint64_t    ev[_N_EV];
 

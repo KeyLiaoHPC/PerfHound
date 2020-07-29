@@ -267,41 +267,44 @@ vt_newtype() {
     data_t vtdata;
 #ifdef _N_EV
 #ifdef _N_UEV
+    int len[6];
+    MPI_Aint disp[6];
+    MPI_Datatype types[6];
+    nb = 6;
+#else
     int len[5];
     MPI_Aint disp[5];
     MPI_Datatype types[5];
     nb = 5;
+#endif // END: #ifdef _N_UEV
 #else
     int len[4];
     MPI_Aint disp[4];
     MPI_Datatype types[4];
-    nb = 4;
-#endif // END: #ifdef _N_UEV
-#else
-    int len[3];
-    MPI_Aint disp[3];
-    MPI_Datatype types[3];
     nb = 3;
 #endif // END: #ifdef _N_EV
 
-    types[0] = MPI_CHAR;
+    types[0] = MPI_UINT32_T;
     types[1] = MPI_UINT64_T;
     types[2] = MPI_UINT64_T;
-    len[0] = _CTAG_LEN;
+    types[3] = MPI_DOUBLE;
+    len[0] = 2;
     len[1] = 1;
     len[2] = 1;
+    len[3] = 1;
     disp[0] = (uint64_t)vtdata.ctag -(uint64_t)&vtdata;
     disp[1] = (uint64_t)&vtdata.cy - (uint64_t)&vtdata;
     disp[2] = (uint64_t)&vtdata.ns - (uint64_t)&vtdata;
+    disp[3] = (uint64_t)&vtdata.uval - (uint64_t)&vtdata;
 
 #ifdef _N_EV
-    types[3] = MPI_UINT64_T;
-    len[3] = _N_EV;
-    disp[3] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
+    types[4] = MPI_UINT64_T;
+    len[4] = _N_EV;
+    disp[4] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
 #ifdef _N_UEV
-    types[4] = MPI_DOUBLE;
-    len[4] = _N_UEV;
-    disp[4] = (uint64_t)vtdata.uev - (uint64_t)vtdata.ev;
+    types[5] = MPI_DOUBLE;
+    len[5] = _N_UEV;
+    disp[5] = (uint64_t)vtdata.uev - (uint64_t)vtdata.ev;
 #endif
 
 #endif

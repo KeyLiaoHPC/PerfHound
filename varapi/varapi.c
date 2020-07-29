@@ -315,7 +315,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #ifdef __aarch64__
     _vt_cy_init;
 #endif
-    vt_read("VT_START", 8, 1, 0, 0);
+    vt_read(0, 0, 0, 1, 0, 0);
     //vt_write();
     return 0;
 }
@@ -400,17 +400,18 @@ vt_commit() {
 
 /* Get and record an event reading */
 void
-vt_read(char *ctag, int clen, int auto_write, int read_ev, int read_uev) {
+vt_read(uint32_t group_tag, uint32_t point_tag, double uval, int auto_write, int read_ev, int read_uev) {
     int i;
     uint64_t register cy = 0, ns = 0;
 
     _vt_read_cy (cy);
     _vt_read_ns (ns);
 
+    pdata[vt_i].ctag[0] = group_tag;
+    pdata[vt_i].ctag[1] = point_tag;
     pdata[vt_i].cy = cy;
     pdata[vt_i].ns = ns;
-    memcpy(pdata[vt_i].ctag, ctag, clen);
-    pdata[vt_i].ctag[clen] = '\0';
+    pdata[vt_i].uval = uval;
 
     /* Read system event */
 #ifndef VT_MODE_TS
@@ -533,7 +534,7 @@ vt_write() {
     if (vt_i == 0) {
         return;
     }
-    vt_read("VT_WR", 5, 0, 0, 0);
+    vt_read(0, 2, 0, 0, 0, 0);
 
 #ifdef USE_MPI
     /* MPI Write */
@@ -544,7 +545,9 @@ vt_write() {
         for (i = 0; i < vt_iogrp_nrank; i ++) {
             vt_get_data(i, vt_i, pdata);
             for (j = 0; j < vt_i; j ++) {
-                fprintf(vt_fdata[i], "%s,%llu,%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+                fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f", 
+                        pdata[j].ctag[0], pdata[j].ctag[1], 
+                        pdata[j].cy, pdata[j].ns, pdata[j].uval);
 #ifndef VT_MODE_TS
 #ifdef  _N_EV
                 for (k = 0; k < _N_EV; k ++) {
@@ -570,16 +573,23 @@ vt_write() {
     int i, j;
 
     for(i = 0; i < vt_i; i ++) {
-        fprintf(vt_fdata, "%s,%llu,%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+        fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f", 
+                pdata[j].ctag[0], pdata[j].ctag[1], 
+                pdata[j].cy, pdata[j].ns, pdata[j].uval);
+#ifndef VT_MODE_TS
 #ifdef  _N_EV
-        fprintf(vt_fdata, ",%llu", pdata[j].ctag, pdata[j].cy, pdata[j].ns);
+        for (k = 0; k < _N_EV; k ++) {
+            fprintf(vt_fdata, ",%llu", pdata[j].ev[k]);
+        }
 #endif
 
 #ifdef  VT_UEV_1
-        fprintf(vt_fdata, ",%.15f", pdata[j].uev[0])
+        fprintf(vt_fdata, ",%.15f", pdata[j].uev[0]);
 #elif   VT_UEV_2
         fprintf(vt_fdata, ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
 #endif
+#endif
+
         fprintf(vt_fdata, "\n");
         fflush(vt_fdata);
     }
@@ -594,7 +604,7 @@ vt_write() {
     //vt_world_barrier();
     vt_atsync();
 #endif
-    vt_read("VT_WR_END", 9, 0, 0, 0);
+    vt_read(0, 3, 0, 0, 0, 0);
     return;
 }
 
@@ -603,7 +613,7 @@ void
 vt_clean() {
     int i = 0;
 
-    vt_read("VT_END", 6, 1, 0, 0);
+    vt_read(0, 1, 0, 1, 0, 0);
     vt_write();
     if (vt_myrank == 0) {
         vt_putstamp(projpath, timestr);

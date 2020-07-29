@@ -97,8 +97,9 @@ void vt_commit();
  * @param auto_write Write to file or cover from beginnning when buffer is full.
  * @return int Return error code.
  */
-void vt_read(char *ctag, int clen, int auto_write, int read_ev, int read_uev);
+void vt_read(uint32_t group_tag, uint32_t point_tag, double uval, int auto_write, int read_ev, int read_uev);
 
+int vt_newtag(uint32_t group_tag, uint32_t point_tag, const char *name);
 
 void vt_write();
 
