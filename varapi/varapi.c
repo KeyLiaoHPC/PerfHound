@@ -71,7 +71,7 @@ void *vt_puev[_N_UEV];
 /* Variables for files and information */
 char hostpath[_PATH_MAX];                       // Data path for the host.
 char projpath[_PATH_MAX];                       // Data path for the host.
-char cfile[_PATH_MAX], efile[_PATH_MAX];        // Full path of ctag and etag.
+char vt_cfile[_PATH_MAX];                       // Full path of ctag.
 char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
 // This timestamp is only for project records.
 char timestr[16];                               // Timestamp records. One stamp per line
@@ -299,23 +299,25 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #else
     tag_commited = 1;
 #endif
-
-    switch (vt_myrank) {
+    /* Create files for event tags and counting point tags. */
+    if (vt_myrank == 0) {
         char fetag[_PATH_MAX];
-        FILE *fp_etag;
-        case 0:
-            sprintf(fetag, "%s/run%d_etags.csv", projpath, vt_run_id);
-            fp_etag = fopen(fetag, "w");
-            fclose(fp_etag);
-            break;
-        default:
-            break;
+        FILE *fp;
+
+        sprintf(fetag, "%s/run%d_etags.csv", projpath, vt_run_id);
+        fp = fopen(fetag, "a");
+        fclose(fp);
+
+        sprintf(vt_cfile, "%s/run%d_ctags.csv", projpath, vt_run_id);
+        fp = fopen(vt_cfile, "w");
+        fprintf(fp, "group_id,point_id,name\n");
+        fclose(fp);
     }
 
 #ifdef __aarch64__
     _vt_cy_init;
 #endif
-    vt_read(0, 0, 0, 1, 0, 0);
+    vt_read(0, 0, 0, 0, 0, 0);
     //vt_write();
     return 0;
 }
@@ -352,6 +354,39 @@ vt_set_uev(char *uetag, void *pval, int vt_type) {
         vt_nuev ++;
     }
 #endif
+}
+
+/* Set group tag for counting points */
+int 
+vt_newgrp(uint32_t grp_id, const char *grp_name) {
+    if (vt_myrank == 0) {
+        FILE *fp;
+
+        fp = fopen(vt_cfile, "a");
+        fprintf(fp, "%u,0,%s\n", grp_id, grp_name);
+        fclose(fp);
+        fflush(fp);
+    }
+
+    vt_world_barrier();
+    return 0;
+}
+
+
+/* Set counting points' tag. */
+int 
+vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name) {
+    if (vt_myrank == 0) {
+        FILE *fp;
+
+        fp = fopen(vt_cfile, "a");
+        fprintf(fp, "%u,%u,%s\n", grp_id, p_id, name);
+        fclose(fp);
+        fflush(fp);
+    }
+    
+    vt_world_barrier();
+    return 0;
 }
 
 
