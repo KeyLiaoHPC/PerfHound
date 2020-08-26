@@ -111,76 +111,35 @@
 
 #endif // END: #ifndef __VT_TYPE__
 
-/* System event and user-defined event */
+/* VarTect Mode */
+// VT_MODE_TS:          Timestamp mode.     [Default]
+// VT_MODE_SHORT_EV:    Up to 4 Events.
+// VT_MODE_LONG_EV:     Up to 12 Events.
 #ifndef _MODE_SET
 #define _MODE_SET
-
-#ifndef VT_MODE_TS
 #define VT_MODE_TS
-#ifdef VT_UEV_1
-    #ifdef VT_MODE_SHORT
-    #undef VT_MODE_TS
-    #define _N_EV   3
-    #define _N_UEV  1
 
-    #elif  VT_MODE_LONG
-    #undef VT_MODE_TS
-    #define _N_EV   11
-    #define _N_UEV  1
+// Collecting performance events. 
+#ifdef VT_MODE_SHORT_EV
+#undef VT_MODE_TS
+#define _N_EV 4
 
-    #endif
+#elif defined(VT_MODE_LONG_EV)
+#undef VT_MODE_TS
+#define _N_EV 12
 
-#elif VT_UEV_2
-    #ifdef VT_MODE_SHORT
-    #undef VT_MODE_TS
-    #define _N_EV   2
-    #define _N_UEV  2
-
-    #elif  VT_MODE_LONG
-    #undef VT_MODE_TS
-    #define _N_EV   10
-    #define _N_UEV  2
-    #endif
-
-#else
-    #ifdef VT_MODE_SHORT
-    #undef VT_MODE_TS
-    #define _N_EV   4
-    #elif  VT_MODE_LONG
-    #undef VT_MODE_TS
-    #define _N_EV   12
-    #endif
-
-#endif // END: #ifdef VT_MODE_SHORT
-#endif // #ifndef VT_MODE_TS
+#endif // END: #ifdef VT_MODE_SHORT_EV
 #endif // #ifndef _MODE_SET
-
-
 
 /* VarAPI record data type */
 typedef struct {
-    //char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
-    uint32_t ctag[2];      // 
-    uint64_t cy, ns;    // 32 Bytes
-    double uval;
+    uint32_t ctag[2];
+    uint64_t cy, ns;    
+    double uval;        // 32 Bytes
 #ifdef _N_EV
     uint64_t    ev[_N_EV];
-
-// #else
-// #define _N_EV  0
 #endif
-
-#ifdef _N_UEV
-    double      uev[_N_UEV];
-
-// #else
-// #define _N_UEV  0
-
-#endif
-
 } data_t;
-
-
 
 /* Extern file-operating functions in file_op.c*/
 int  vt_getstamp(char *hostpath, char *timestr, int *run_id);
@@ -189,7 +148,7 @@ int  vt_mkdir(char *path);
 void vt_putstamp(char *hostpath, char *timestr);
 int  vt_touch(char *path, char *mode);
 
-/* MPI Wrapper in vt_mpi.c*/
+/* MPI Wrapper in vt_mpi.c */
 #ifdef USE_MPI
 void vt_atsync();
 void vt_bcast_tstamp(char *timestr);
@@ -201,7 +160,6 @@ void vt_io_barrier();
 void vt_mpi_clean();
 void vt_newtype();
 void vt_send_data(uint32_t count, data_t *data);
-
 int  vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
                       uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
 void vt_tsync();

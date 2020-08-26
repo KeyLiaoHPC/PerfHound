@@ -266,17 +266,10 @@ vt_newtype() {
     int nb, err;
     data_t vtdata;
 #ifdef _N_EV
-#ifdef _N_UEV
-    int len[6];
-    MPI_Aint disp[6];
-    MPI_Datatype types[6];
-    nb = 6;
-#else
     int len[5];
     MPI_Aint disp[5];
     MPI_Datatype types[5];
     nb = 5;
-#endif // END: #ifdef _N_UEV
 #else
     int len[4];
     MPI_Aint disp[4];
@@ -301,12 +294,6 @@ vt_newtype() {
     types[4] = MPI_UINT64_T;
     len[4] = _N_EV;
     disp[4] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
-#ifdef _N_UEV
-    types[5] = MPI_DOUBLE;
-    len[5] = _N_UEV;
-    disp[5] = (uint64_t)vtdata.uev - (uint64_t)vtdata.ev;
-#endif
-
 #endif
 
     err = MPI_Type_create_struct(nb, len, disp, types, &vt_mpidata_t);

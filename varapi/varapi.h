@@ -79,7 +79,7 @@
  * @param proj_name Project name, for intra-project data comparison.
  * @return int 
  */
-int vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags);
+int vt_init(char *u_data_root, char *u_proj_name);
 
 /**
  * @brief Register system events which will be recorded. 
@@ -87,7 +87,6 @@ int vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags);
  * @param nev  Actual number of events, should be less or equal to _N_EV.
  */
 void vt_set_ev(uint32_t *etag, int nev);
-void vt_set_uev(char *uetag, void *pval, int vt_type);
 void vt_commit();
 
 /**
@@ -100,7 +99,7 @@ void vt_commit();
  * @param read_uev 
  * @return int Return error code.
  */
-void vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev, int read_uev);
+void vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev);
 
 int vt_newgrp(uint32_t grp_id, const char *grp_name);
 

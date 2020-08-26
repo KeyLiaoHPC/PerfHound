@@ -62,10 +62,6 @@ int tag_commited;
 #ifndef VT_MODE_TS
 int vt_nev;
 uint32_t vt_etags[_N_EV];
-int vt_nuev;
-int vt_uev_type[_N_UEV];
-char vt_uenames[_N_UEV][_CTAG_LEN];
-void *vt_puev[_N_UEV];
 #endif
 
 /* Variables for files and information */
@@ -96,7 +92,7 @@ struct timespec ts;
 
 /* Initializing varapi */
 int
-vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
+vt_init(char *u_data_root, char *u_proj_name) {
     // User-defined data root and project name.
     char udroot[_PATH_MAX], upname[_PATH_MAX];
     int i, vterr = 0;
@@ -148,8 +144,8 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             exit(1);
         }
     }
-    vt_world_barrier();
 #ifdef USE_MPI
+    vt_world_barrier();
     // Get and sync process information. Print process map in the root of project.
     // <projpath>/run<run_id>_rankmap.csv
     // 
@@ -180,7 +176,9 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
         vterr = vt_mkdir(hostpath);
     }
 
+#ifdef USE_MPI
     vt_world_barrier();
+#endif
 
     if (vterr) {
         printf("*** [VarAPI] EXIT. ERROR: VARAPI init failed. ***\n");
@@ -218,13 +216,13 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
             }
             // Add header.
 #ifdef  VT_MODE_SHORT
-            fprintf(vt_fdata[i], "tag,cycle,nanosec,ev1,ev2,ev3,ev4\n");
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,,ev1,ev2,ev3,ev4\n");
 
 #elif   VT_MODE_LONG
-            fprintf(vt_fdata[i], "tag,cycle,nanosec,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
 
 #else
-            fprintf(vt_fdata[i], "tag,cycle,nanosec\n");
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,\n");
 
 #endif // END: #ifdef  VT_MODE_SHORT
         }
@@ -239,13 +237,13 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
     }
 
 #ifdef  VT_MODE_SHORT
-    fprintf(vt_fdata, "tag,cycle,nanosec,ev1,ev2,ev3,ev4\n");
+    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4\n");
 
 #elif   VT_MODE_LONG
-    fprintf(vt_fdata, "tag,cycle,nanosec,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
 
 #else
-    fprintf(vt_fdata, "tag,cycle,nanosec\n");
+    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval\n");
 
 #endif // END: #ifdef  VT_MODE_SHORT
 #endif // END: #ifdef USE_MPI
@@ -317,7 +315,7 @@ vt_init(char *u_data_root, char *u_proj_name, uint32_t *u_etags) {
 #ifdef __aarch64__
     _vt_cy_init;
 #endif
-    vt_read(0, 0, 0, 0, 0, 0);
+    vt_read(0, 0, 0, 0, 0);
     //vt_write();
     return 0;
 }
@@ -340,22 +338,6 @@ vt_set_ev(uint32_t *etag, int n) {
 #endif
 }
 
-/* Set user-defined events. */
-void
-vt_set_uev(char *uetag, void *pval, int vt_type) {
-#ifdef _N_UEV
-    if (tag_commited) return;
-
-
-    if (vt_nuev < _N_UEV) {
-        memcpy(vt_uenames[vt_nuev], uetag, _CTAG_LEN);
-        vt_puev[vt_nuev] = pval;
-        vt_uev_type[vt_nuev] = vt_type;
-        vt_nuev ++;
-    }
-#endif
-}
-
 /* Set group tag for counting points */
 int 
 vt_newgrp(uint32_t grp_id, const char *grp_name) {
@@ -367,8 +349,9 @@ vt_newgrp(uint32_t grp_id, const char *grp_name) {
         fclose(fp);
         fflush(fp);
     }
-
+#ifdef USE_MPI
     vt_world_barrier();
+#endif
     return 0;
 }
 
@@ -385,7 +368,10 @@ vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name) {
         fflush(fp);
     }
     
+#ifdef USE_MPI
     vt_world_barrier();
+#endif
+
     return 0;
 }
 
@@ -421,35 +407,32 @@ vt_commit() {
             fprintf(fp, "aarch64,0x%x\n", vt_etags[i]);
 #endif
         }
-#ifdef _N_UEV
-        for (i = 0; i < vt_nuev; i ++) {
-            fprintf(fp, "u,%s\n", vt_uenames[i]);
-        }
-#endif
         fflush(fp);
         fclose(fp);
     }
+#ifdef USE_MPI
     vt_world_barrier();
+#endif 
 #endif
 }
 
 /* Get and record an event reading */
 void
-vt_read(uint32_t group_tag, uint32_t point_tag, double uval, int auto_write, int read_ev, int read_uev) {
+vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev) {
     int i;
     uint64_t register cy = 0, ns = 0;
 
     _vt_read_cy (cy);
     _vt_read_ns (ns);
 
-    pdata[vt_i].ctag[0] = group_tag;
-    pdata[vt_i].ctag[1] = point_tag;
+    pdata[vt_i].ctag[0] = grp_id;
+    pdata[vt_i].ctag[1] = p_id;
     pdata[vt_i].cy = cy;
     pdata[vt_i].ns = ns;
     pdata[vt_i].uval = uval;
 
     /* Read system event */
-#ifndef VT_MODE_TS
+#ifdef _N_EV
     if (read_ev) {
         switch (vt_nev) {
             case 1:
@@ -498,58 +481,6 @@ vt_read(uint32_t group_tag, uint32_t point_tag, double uval, int auto_write, int
     }
 #endif // END: #ifdef _N_EV
 
-    /* Read uesr-defined event */
-#ifdef _N_UEV
-    if (read_uev) {
-        for (i = 0; i < vt_nuev; i ++) {
-            switch (vt_uev_type[i]) {
-                case VT_INT: 
-                    _vt_read_uev(int, vt_puev[i], pdata[vt_i].uev[i]);
-                    break; 
-                case VT_INT8:
-                    _vt_read_uev(int8_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;   
-                case VT_INT16:
-                    _vt_read_uev(int16_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;  
-                case VT_INT32:
-                    _vt_read_uev(int32_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_INT64:
-                    _vt_read_uev(int64_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;  
-                case VT_UINT:
-                    _vt_read_uev(uint, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;   
-                case VT_UINT8:
-                    _vt_read_uev(uint8_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_UINT16:
-                    _vt_read_uev(uint16_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_UINT32:
-                    _vt_read_uev(uint32_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_UINT64:
-                    _vt_read_uev(uint64_t, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_FLOAT:
-                    _vt_read_uev(float, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                case VT_DOUBLE:
-                    _vt_read_uev(double, vt_puev[i], pdata[vt_i].uev[i]);
-                    break;
-                default:
-                    pdata[vt_i].uev[i] = 0;
-                    break;
-            }
-        }
-    } else {
-        for (i = 0; i < _N_UEV; i ++) {
-            pdata[vt_i].uev[i] = 0;
-        }
-    } // END: if (read_uev)
-#endif // END: #ifdef _N_UEV
 
     vt_i ++;
     /* Check buffer health after reading */
@@ -569,7 +500,7 @@ vt_write() {
     if (vt_i == 0) {
         return;
     }
-    vt_read(0, 2, 0, 0, 0, 0);
+    vt_read(0, 2, 0, 0, 0);
 
 #ifdef USE_MPI
     /* MPI Write */
@@ -583,18 +514,10 @@ vt_write() {
                 fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f", 
                         pdata[j].ctag[0], pdata[j].ctag[1], 
                         pdata[j].cy, pdata[j].ns, pdata[j].uval);
-#ifndef VT_MODE_TS
 #ifdef  _N_EV
                 for (k = 0; k < _N_EV; k ++) {
                     fprintf(vt_fdata[i], ",%llu", pdata[j].ev[k]);
                 }
-#endif
-
-#ifdef  VT_UEV_1
-                fprintf(vt_fdata[i], ",%.15f", pdata[j].uev[0]);
-#elif   VT_UEV_2
-                fprintf(vt_fdata[i], ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
-#endif
 #endif
                 fprintf(vt_fdata[i], "\n");
                 fflush(vt_fdata[i]);
@@ -609,20 +532,13 @@ vt_write() {
 
     for(i = 0; i < vt_i; i ++) {
         fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f", 
-                pdata[j].ctag[0], pdata[j].ctag[1], 
-                pdata[j].cy, pdata[j].ns, pdata[j].uval);
-#ifndef VT_MODE_TS
-#ifdef  _N_EV
+                pdata[i].ctag[0], pdata[i].ctag[1], 
+                pdata[i].cy, pdata[i].ns, pdata[i].uval);
+
+#ifdef _N_EV
         for (k = 0; k < _N_EV; k ++) {
             fprintf(vt_fdata, ",%llu", pdata[j].ev[k]);
         }
-#endif
-
-#ifdef  VT_UEV_1
-        fprintf(vt_fdata, ",%.15f", pdata[j].uev[0]);
-#elif   VT_UEV_2
-        fprintf(vt_fdata, ",%.15f,%.15f", pdata[j].uev[0], pdata[j].uev[1]);
-#endif
 #endif
 
         fprintf(vt_fdata, "\n");
@@ -639,7 +555,7 @@ vt_write() {
     //vt_world_barrier();
     vt_atsync();
 #endif
-    vt_read(0, 3, 0, 0, 0, 0);
+    vt_read(0, 3, 0, 0, 0);
     return;
 }
 
@@ -648,7 +564,7 @@ void
 vt_clean() {
     int i = 0;
 
-    vt_read(0, 1, 0, 1, 0, 0);
+    vt_read(0, 1, 0, 1, 0);
     vt_write();
     if (vt_myrank == 0) {
         vt_putstamp(projpath, timestr);
