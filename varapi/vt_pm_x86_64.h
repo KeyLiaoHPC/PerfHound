@@ -16,8 +16,8 @@
  * this program. If not, see https://www.gnu.org/licenses/.
  * 
  * =================================================================================
- * rec_ts_aarch64.h
- * Description: Macros for timer on aarch64.
+ * rec_ts_x86_64.h
+ * Description: Macros for timer on x86_64.
  * Author: Key Liao
  * Modified: Jul. 2nd, 2020
  * Email: keyliaohpc@gmail.com
@@ -35,22 +35,33 @@
 //==================================================================================
 
 /* Init timer */
-#ifdef USE_CNTVCT
-#define _vt_init_ns     uint32_t freq;  \
-                        asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
-                        nspt = 1 / (freq * 1e-9);
-#else
-#define _vt_init_ns     asm volatile("NOP"  "\n\t":::);
-#endif
+#define _vt_init_ns
 
 /* Read cycle */
-#define _vt_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
+#define _vt_read_cy(_cy)    uint64_t hi, lo;                        \
+                            asm volatile(                           \
+                                "CPUID"         "\n\t"              \
+                                "RDTSCP"        "\n\t"              \
+                                "mov %%rdx, %0" "\n\t"              \
+                                "mov %%rax, %1" "\n\t"              \
+                                :"=r" (hi), "=r" (lo)               \
+                                :                                   \
+                                :"%rax", "%rbx", "%rcx", "%rdx");   \
+                            (_cy) = hi << 32 | lo;
+
+
 
 /* Read virtual timer */
-#ifdef USE_CNTVCT
-#define _vt_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::); \
-                            _ns *= nspt;
+#ifdef USE_SYSCALL
+#include <sys/syscall.h>
+#define _vt_read_ns(_ns)    syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
+                            (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
+                            
 #else
 #define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
-#endif
+
+#endif            
+
+/* User-defined event reading. */
+#define _vt_read_uev(_tp, _void_ptr, _val)  _val = (double)(*((_tp *)_void_ptr));

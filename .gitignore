@@ -6,6 +6,7 @@
 *.mod.c
 *.csv
 *.swp
+*.out
 .vscode
 ./*.sh
 .vscode/
@@ -13,3 +14,4 @@ data/
 bin/
 lib/
 include/
+*.host

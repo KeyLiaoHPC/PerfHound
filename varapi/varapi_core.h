@@ -41,17 +41,19 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "vt_counter.h"
-
+/* Performance monitor header. */
+#ifndef __PM_HEADER__
+#define __PM_HEADER__
 #ifdef __x86_64__
-#include "rec_ts_x86_64.h"
-#include "rec_event_x86_64.h"
+#include "vt_pm_x86_64.h"
+#include "vt_event_x86_64.h"
 
-#elif  defined(__aarch64__)
-#include "rec_ts_aarch64.h"
-#include "rec_event_aarch64.h"
+#elif  __aarch64__
+#include "vt_pm_aarch64.h"
+#include "vt_event_aarch64.h"
 
-#endif
+#endif // END: #ifdef __x86_64__
+#endif // END: #ifndef __PM_HEADER__
 
 /* ======== User config area ======== */
 /* Limits for Varapi tracing. */
@@ -64,7 +66,7 @@
 
 /* MPI and IO settings. */
 #define _AUTO_WRITE     1
-#define _RANK_PER_IO    64
+#define _RANK_PER_IO    40
 #define _SYNC_NS_OFFSET 1e9     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
@@ -109,29 +111,33 @@
 
 #endif // END: #ifndef __VT_TYPE__
 
-#ifdef NETAG0
-// Only collect cycle and nanosec
-#define _N_ETAG     0
-#elif  defined(NETAG1)
-#define _N_ETAG     1
-#elif  defined(NETAG2)
-#define _N_ETAG     2
-#elif  defined(NETAG3)
-#define _N_ETAG     3
-#elif  defined(NETAG4)
-#define _N_ETAG     4
-#elif  defined(NETAG5)
-#define _N_ETAG     5
-#else
-#define NETAG0
-#define _N_ETAG     0
-#endif // END: #ifdef NETAG0
+/* VarTect Mode */
+// VT_MODE_TS:          Timestamp mode.     [Default]
+// VT_MODE_SHORT_EV:    Up to 4 Events.
+// VT_MODE_LONG_EV:     Up to 12 Events.
+#ifndef _MODE_SET
+#define _MODE_SET
+#define VT_MODE_TS
 
+// Collecting performance events. 
+#ifdef VT_MODE_SHORT_EV
+#undef VT_MODE_TS
+#define _N_EV 4
+
+#elif defined(VT_MODE_LONG_EV)
+#undef VT_MODE_TS
+#define _N_EV 12
+
+#endif // END: #ifdef VT_MODE_SHORT_EV
+#endif // #ifndef _MODE_SET
+
+/* VarAPI record data type */
 typedef struct {
-    char ctag[_CTAG_LEN];// ctag is the remark of counting position, etag is event tag.
-    uint64_t cy, ns;
-#ifndef NETAG0
-    uint64_t pmu[_N_ETAG];
+    uint32_t ctag[2];
+    uint64_t cy, ns;    
+    double uval;        // 32 Bytes
+#ifdef _N_EV
+    uint64_t    ev[_N_EV];
 #endif
 } data_t;
 
@@ -142,7 +148,7 @@ int  vt_mkdir(char *path);
 void vt_putstamp(char *hostpath, char *timestr);
 int  vt_touch(char *path, char *mode);
 
-/* MPI Wrapper in vt_mpi.c*/
+/* MPI Wrapper in vt_mpi.c */
 #ifdef USE_MPI
 void vt_atsync();
 void vt_bcast_tstamp(char *timestr);

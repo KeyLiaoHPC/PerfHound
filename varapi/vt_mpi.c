@@ -106,7 +106,7 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
         head_now = 0;
         head_next = head_now;
         iorank_cur = head_now;
-        iogrp_size = 2;
+        iogrp_size = 1;
         head_all[0] = head_now + 1;
         iorank_all[0] = head_now;
         i = head_now;
@@ -115,6 +115,7 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     
     /* Scan rank list, map head rank in host and assign io rank to every process. */
     if (my_grank == 0) {
+        i = 0;
         while (1) {
             mapped = 1;
             // main host rank not set yet
@@ -138,8 +139,8 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
                 if (mapped) {
                     head_all[i] = head_now + 1;
                     // One io rank works for _RANK_PER_IO ranks.
-                    if (iogrp_size > _RANK_PER_IO) {
-                        iogrp_size = 1;
+                    if (iogrp_size >= _RANK_PER_IO) {
+                        iogrp_size = 0;
                         iorank_cur = i;
                     }
                     iorank_all[i] = iorank_cur;
@@ -155,10 +156,9 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
                     head_now = head_next;
                     i = head_now;
                     iorank_cur = i;
-                    iogrp_size = 0;
                     head_all[i] = head_now + 1;
                     iorank_all[i] = iorank_cur;
-                    iogrp_size += 1;
+                    iogrp_size = 1;
                 } else {
                     // all host has been set, quit loop.
                     break;
@@ -182,6 +182,10 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     MPI_Comm_split(MPI_COMM_WORLD, *iorank, my_grank, &comm_iogrp);
     MPI_Comm_rank(comm_iogrp, &iogrp_rank);
     MPI_Comm_size(comm_iogrp, &iogrp_size);
+    if (my_grank == *iorank) {
+        printf("%d: %d\n", my_grank, iogrp_size);
+        fflush(stdout);
+    }
 
     iogrp_grank = (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
     iogrp_gcpu =  (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
@@ -226,6 +230,10 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     for (i = 0; i < iogrp_size; i ++) {
         vt_iogrp_grank[i] = iogrp_grank[i];
         vt_iogrp_gcpu[i] = iogrp_gcpu[i];
+        if (my_grank == *iorank) {
+            //printf("%d, %d: %d %d\n", i, my_grank, iogrp_gcpu[0], vt_iogrp_gcpu[0]);
+            fflush(stdout);
+        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -257,43 +265,40 @@ void
 vt_newtype() {
     int nb, err;
     data_t vtdata;
-#ifndef NETAG0
+#ifdef _N_EV
+    int len[5];
+    MPI_Aint disp[5];
+    MPI_Datatype types[5];
+    nb = 5;
+#else
     int len[4];
     MPI_Aint disp[4];
     MPI_Datatype types[4];
-    nb = 4;
-#else
-    int len[3];
-    MPI_Aint disp[3];
-    MPI_Datatype types[3];
     nb = 3;
-#endif
-    types[0] = MPI_CHAR;
+#endif // END: #ifdef _N_EV
+
+    types[0] = MPI_UINT32_T;
     types[1] = MPI_UINT64_T;
     types[2] = MPI_UINT64_T;
-    len[0] = _CTAG_LEN;
+    types[3] = MPI_DOUBLE;
+    len[0] = 2;
     len[1] = 1;
     len[2] = 1;
+    len[3] = 1;
     disp[0] = (uint64_t)vtdata.ctag -(uint64_t)&vtdata;
     disp[1] = (uint64_t)&vtdata.cy - (uint64_t)&vtdata;
     disp[2] = (uint64_t)&vtdata.ns - (uint64_t)&vtdata;
-#ifndef NETAG0
-    types[3] = MPI_UINT64_T;
-    len[3] = _N_ETAG;
-    disp[3] = (uint64_t)&vtdata.pmu - (uint64_t)&vtdata.ns;
+    disp[3] = (uint64_t)&vtdata.uval - (uint64_t)&vtdata;
+
+#ifdef _N_EV
+    types[4] = MPI_UINT64_T;
+    len[4] = _N_EV;
+    disp[4] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
 #endif
 
     err = MPI_Type_create_struct(nb, len, disp, types, &vt_mpidata_t);
-    if (err != 0) {
-
-    printf("New: %d\n", err);
-    fflush(stdout);
-    }
     err = MPI_Type_commit(&vt_mpidata_t);
-    if (err != 0) {
-    printf("Commit: %d\n", err);
-    fflush(stdout);
-    }
+    
     MPI_Barrier(MPI_COMM_WORLD);
     return;
 }
@@ -314,7 +319,7 @@ vt_io_barrier() {
     return;
 }
 
-/* MPI_COMM_WORLD barrier*/
+/* MPI_COMM_WORLD barrier */
 void
 vt_world_barrier() {
     MPI_Barrier(MPI_COMM_WORLD);
