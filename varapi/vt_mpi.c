@@ -69,7 +69,7 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
 
 /* Sync and init Varapi MPI map info. */
 int 
-vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
+vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank, 
                  uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu) {
     int i, j;
     int *cpu_all = NULL, mycpu;
@@ -82,6 +82,9 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
     //printf("Start init. rank %u host %s cpu %u\n", myrank, myhost, mycpu);
     //fflush(stdout);
     //MPI_Barrier(MPI_COMM_WORLD);
+    /* Sync current run id. */
+    MPI_Bcast(run_id, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
     /* Gathering hostnames from all mpi ranks. */
     if (my_grank == 0) {
         hname_all = (char *)malloc(mpi_size * _HOST_MAX * sizeof(char));
@@ -208,7 +211,7 @@ vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank,
         char map_file[_PATH_MAX];
         FILE *fp;
 
-        sprintf(map_file, "%s/run%d_rankmap.csv", projpath, run_id);
+        sprintf(map_file, "%s/run%d_rankmap.csv", projpath, *run_id);
         // TODO: Debug info
         fp = fopen(map_file, "w");
         fprintf(fp, "rank,hostname,cpu,hostmain,io_head,io_rank\n");

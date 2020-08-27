@@ -149,7 +149,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
     // Get and sync process information. Print process map in the root of project.
     // <projpath>/run<run_id>_rankmap.csv
     // 
-    vterr = vt_sync_mpi_info(projpath, vt_run_id, &vt_head, &vt_iorank,
+    vterr = vt_sync_mpi_info(projpath, &vt_run_id, &vt_head, &vt_iorank,
                              &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
     //if (vt_myrank == vt_iorank)
     //    printf("%d: %d\n", vt_myrank, vt_iogrp_gcpu[0]);

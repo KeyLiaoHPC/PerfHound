@@ -160,7 +160,7 @@ void vt_io_barrier();
 void vt_mpi_clean();
 void vt_newtype();
 void vt_send_data(uint32_t count, data_t *data);
-int  vt_sync_mpi_info(char *projpath, int run_id, uint32_t *head, int *iorank, 
+int  vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank, 
                       uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
 void vt_tsync();
 void vt_world_barrier();
