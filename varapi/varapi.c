@@ -315,7 +315,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
 #ifdef __aarch64__
     _vt_cy_init;
 #endif
-    vt_read(0, 0, 0, 0, 0);
+    vt_read(0, 1, 0, 0, 0);
     //vt_write();
     return 0;
 }
@@ -500,7 +500,7 @@ vt_write() {
     if (vt_i == 0) {
         return;
     }
-    vt_read(0, 2, 0, 0, 0);
+    vt_read(0, 3, 0, 0, 0);
 
 #ifdef USE_MPI
     /* MPI Write */
@@ -555,7 +555,7 @@ vt_write() {
     //vt_world_barrier();
     vt_atsync();
 #endif
-    vt_read(0, 3, 0, 0, 0);
+    vt_read(0, 4, 0, 0, 0);
     return;
 }
 
@@ -564,7 +564,7 @@ void
 vt_clean() {
     int i = 0;
 
-    vt_read(0, 1, 0, 1, 0);
+    vt_read(0, 2, 0, 1, 0);
     vt_write();
     if (vt_myrank == 0) {
         vt_putstamp(projpath, timestr);
