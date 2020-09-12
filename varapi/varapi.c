@@ -137,10 +137,19 @@ vt_init(char *u_data_root, char *u_proj_name) {
 
     /* Create project directory and init process info */
     if (vt_myrank == 0) {
-        vt_mkdir(projpath);
+        vterr = vt_mkdir(projpath);
+        if (vterr) {
+            printf("*** [VarAPI] EXIT %d. Failed to create Project path: %s\n", vterr, projpath);
+            fflush(stdout);
+            exit(1);
+        }
+        printf("*** [VarAPI] Project path: %s\n", projpath);
+        fflush(stdout);
+
         vterr = vt_getstamp(projpath, timestr, &vt_run_id);
         if (vterr) {
-            printf("*** [VarAPI] EXIT. ERROR: Fail before initializing VarAPI MPI. [Rank %d] ***\n", vt_myrank);
+            printf("*** [VarAPI] EXIT %d. ERROR: Fail before initializing VarAPI MPI. [Rank %d] ***\n", vterr, vt_myrank);
+            fflush(stdout);
             exit(1);
         }
     }

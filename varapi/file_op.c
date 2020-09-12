@@ -34,14 +34,16 @@
 
 //==================================================================================
 
+#include <errno.h>
+#include <fcntl.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
+#include <unistd.h>
 #include "varapi_core.h"
 
 /**
@@ -56,28 +58,47 @@
 int
 vt_mkdir(char *path){
     int err;
-    char tmp_path[_PATH_MAX];
+    const char *htmp;
+    char tmp_path[_PATH_MAX], tmp_path_full[_PATH_MAX];
     char *p;
 
     // walk through path
     strcpy(tmp_path, path);
     memset(path, 0, _PATH_MAX * sizeof(char));
 
-    for (p = tmp_path; *p != '\0'; p++) {
+    // Expend home directory first if exists.
+    if (tmp_path[0] == '~' && tmp_path[1] == '/') {
+        htmp = getenv("HOME");
+        if(htmp == NULL) {
+            htmp = getpwuid(getuid()) -> pw_dir;
+        }
+        sprintf(tmp_path_full, "%s/%s", htmp, &tmp_path[2]);
+        strcpy(tmp_path, tmp_path_full);
+    }
+
+    // recursively detect '/' for identifying each path section.
+    for (p = tmp_path + 1; *p != '\0'; p++) {
         if (*p == '/') {
+            // Jump the first '/' which is root directory.
             *p = '\0';
             err = mkdir(tmp_path, S_IRWXU);
-            if(err != 0) {
-                if(errno != EEXIST)
-                    return -1;
+            if(err) {
+                if(errno != EEXIST) {
+                    printf("*** [VarAPI] Failed in mkdir, path string: %s\n", tmp_path);
+                    fflush(stdout);
+                    return errno;
+                }
             }
             *p = '/';
         }
     }
 
     if (mkdir(tmp_path, S_IRWXU) != 0){
-        if(errno != EEXIST)
-            return -1;
+        if(errno != EEXIST) {
+            printf("*** [VarAPI] Failed in mkdir, path string: %s\n", tmp_path);
+            fflush(stdout);
+            return errno;
+        }
     }
 
     // expand relative path into absolute path to avoid runtime path changing 
