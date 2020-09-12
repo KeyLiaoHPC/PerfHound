@@ -1,13 +1,15 @@
 #!/bin/bash
-CC = mpicc
+MPICC = mpicc
+CC = gcc
 CFLAGS = -O3 -fno-builtin
+CFLAGS += -I$(LIBPFC)/include
 #CFLAGS += -DUSE_MPI
 CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
 VARAPI = $(PWD)
 VARAPI_FLAGS = -DUSE_VARAPI #-DVT_MODE_SHORT -DVT_UEV_1
-LDFLAGS = 
+LDFLAGS = -lpfc
 # Installing path
 PREFIX ?= .
 
@@ -33,10 +35,10 @@ install:
 	@echo VarAPI has been installed in ${PREFIX}
 
 %.par.o: %.c
-	$(CC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -o $@ -c $< 
+	$(MPICC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
 %.ser.o: %.c
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -o $@ -c $< 
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
 clean:
 	rm -rf *.o *.x *.so

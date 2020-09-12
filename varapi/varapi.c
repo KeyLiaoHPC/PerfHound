@@ -263,7 +263,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
     } 
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
-    _vt_init_ns;
+    _vt_init_ts;
 
     /* Initial time reading. */
 #ifdef USE_MPI

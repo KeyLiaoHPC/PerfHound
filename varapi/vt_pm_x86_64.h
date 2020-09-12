@@ -34,34 +34,55 @@
 
 //==================================================================================
 
-/* Init timer */
-#define _vt_init_ns
+#include "libpfc.h"
 
-/* Read cycle */
-#define _vt_read_cy(_cy)    uint64_t hi, lo;                        \
-                            asm volatile(                           \
-                                "CPUID"         "\n\t"              \
-                                "RDTSCP"        "\n\t"              \
-                                "mov %%rdx, %0" "\n\t"              \
-                                "mov %%rax, %1" "\n\t"              \
-                                :"=r" (hi), "=r" (lo)               \
-                                :                                   \
-                                :"%rax", "%rbx", "%rcx", "%rdx");   \
-                            (_cy) = hi << 32 | lo;
+/* Init fixed-function registers. */
+// This call is based on https://github.com/obilaniu/libpfc
+#define _vt_init_ts                                     \
+    do {                                                \
+        int cpu = sched_getcpu();                       \
+        PFC_CNT pfc_cnts[7] = {0, 0, 0, 0, 0, 0, 0};    \
+        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};    \
+        if (pfcPinThread(cpu)) {                        \
+            exit(1);                                    \
+        }                                               \
+    } while(0)
 
+/* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
+#define _vt_read_cy(_cy)                                \
+    asm volatile(                                       \
+        "\n\tlfence"                                    \
+        _pfc_asm_code_cnt_read_(mov, 0x40000001, 0)     \
+        "\n\tlfence"                                    \
+        :                                               \
+        : "r"(_cy)                                      \
+        : "memory", "rax", "rcx", "rdx"                 \
+    );     
 
 
 /* Read virtual timer */
-#ifdef USE_SYSCALL
+#ifdef USE_SYSCALL_TS
 #include <sys/syscall.h>
 #define _vt_read_ns(_ns)    syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
                             
 #else
-#define _vt_read_ns(_ns)    clock_gettime(CLOCK_MONOTONIC, &ts);    \
-                            (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
+#define _vt_read_ns(_ns)                                \
+    do {                                                \
+        register uint64_t hi, lo, cy;                   \
+        asm volatile(                                   \
+            "CPUID"         "\n\t"                      \
+            "RDTSCP"        "\n\t"                      \
+            "mov %%rdx, %0" "\n\t"                      \
+            "mov %%rax, %1" "\n\t"                      \
+            :"=r" (hi), "=r" (lo)                       \
+            :                                           \
+            :"%rax", "%rbx", "%rcx", "%rdx");           \
+        cy = hi << 32 | lo;                             \
+        _ns = (double)cy / 2.494140000;                 \
+    } while(0)
 
-#endif            
+#endif
 
 /* User-defined event reading. */
 #define _vt_read_uev(_tp, _void_ptr, _val)  _val = (double)(*((_tp *)_void_ptr));
