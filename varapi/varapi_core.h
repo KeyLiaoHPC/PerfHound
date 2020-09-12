@@ -117,7 +117,10 @@
 // VT_MODE_LONG_EV:     Up to 12 Events.
 #ifndef _MODE_SET
 #define _MODE_SET
+
+#ifndef VT_MODE_TS
 #define VT_MODE_TS
+#endif
 
 // Collecting performance events. 
 #ifdef VT_MODE_SHORT_EV

@@ -8,7 +8,7 @@ CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
 VARAPI = $(PWD)
-VARAPI_FLAGS = -DUSE_VARAPI #-DVT_MODE_SHORT -DVT_UEV_1
+VARAPI_FLAGS = -DUSE_VARAPI -DVT_MODE_TS #-DVT_MODE_SHORT -DVT_UEV_1
 LDFLAGS = -lpfc
 # Installing path
 PREFIX ?= .

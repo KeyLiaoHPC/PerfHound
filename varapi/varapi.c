@@ -288,6 +288,7 @@ vt_init(char *u_data_root, char *u_proj_name) {
 #ifdef USE_MPI
     //vt_world_barrier();
     vt_tsync();
+    
 #endif
     vt_i = 0;
 #ifndef VT_MODE_TS
@@ -375,18 +376,6 @@ vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name) {
     return 0;
 }
 
-
-
-
-/* Read cycle and nanosec */
-void
-vt_read_ts(uint64_t *cy, uint64_t *ns) {
-    _vt_read_cy (*cy);
-    _vt_read_ns (*ns);
-
-    return;
-}
-
 void
 vt_commit() {
 #ifdef _N_EV
@@ -419,16 +408,10 @@ vt_commit() {
 /* Get and record an event reading */
 void
 vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev) {
-    int i;
-    uint64_t register cy = 0, ns = 0;
-
-    _vt_read_cy (cy);
-    _vt_read_ns (ns);
-
     pdata[vt_i].ctag[0] = grp_id;
     pdata[vt_i].ctag[1] = p_id;
-    pdata[vt_i].cy = cy;
-    pdata[vt_i].ns = ns;
+    _vt_read_cy (pdata[vt_i].cy);
+    _vt_read_ns (pdata[vt_i].ns);
     pdata[vt_i].uval = uval;
 
     /* Read system event */
@@ -480,7 +463,6 @@ vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev
         }
     }
 #endif // END: #ifdef _N_EV
-
 
     vt_i ++;
     /* Check buffer health after reading */
@@ -589,6 +571,7 @@ vt_clean() {
     fclose(vt_fdata);
 #endif
     free(pdata);
+    _vt_fini_ts;
 #ifdef USE_MPI
     vt_mpi_clean();
 #endif

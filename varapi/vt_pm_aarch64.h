@@ -36,27 +36,32 @@
 
 /* Init timer */
 #ifdef USE_CNTVCT
-#define _vt_init_ts     uint32_t freq;  \
-                        asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
-                        nspt = 1 / (freq * 1e-9);
+#define _vt_init_ts    \ 
+    uint32_t freq;                                              \
+    asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
+    nspt = 1 / (freq * 1e-9);
 
 #else
 #define _vt_init_ts     asm volatile("NOP"  "\n\t":::);
 
 #endif // END: #ifdef USE_CNTVCT
 
+/* Cleanup timer resource */
+#define _vt_fini_ts
+
 /* Init Armv8 PMU settings */
-#define _vt_cy_init    uint64_t _pmu_val0 = 0;             \
-                        _pmu_val0 = _pmu_val0 | (1 << 31);  \
-                        asm volatile(                       \
-                            "mrs x22, pmcr_el0" "\n\t"      \
-                            "orr x22, x22, #0x7"    "\n\t"  \
-                            "msr pmcr_el0, x22"     "\n\t"  \
-                            "msr pmcntenset_el0, %0" "\n\t" \
-                            :                               \
-                            : "r" (_pmu_val0)               \
-                            : "x22"                         \
-                        );
+#define _vt_cy_init                     \
+    uint64_t _pmu_val0 = 0;             \
+    _pmu_val0 = _pmu_val0 | (1 << 31);  \
+    asm volatile(                       \
+        "mrs x22, pmcr_el0" "\n\t"      \
+        "orr x22, x22, #0x7"    "\n\t"  \
+        "msr pmcr_el0, x22"     "\n\t"  \
+        "msr pmcntenset_el0, %0" "\n\t" \
+        :                               \
+        : "r" (_pmu_val0)               \
+        : "x22"                         \
+    );
 /* Read cycle */
 #define _vt_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
 

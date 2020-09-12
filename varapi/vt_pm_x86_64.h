@@ -36,28 +36,51 @@
 
 #include "libpfc.h"
 
+#define _pfc_read(rcx)                \
+    "\n\tmov      $"#rcx", %%rcx                 "  \
+    "\n\trdpmc                                   "  \
+    "\n\tshl      $32,     %%rdx                 "  \
+    "\n\tor       %%rax,   %%rdx                 "  \
+    "\n\tmov      %%rdx,   %0                    "  \
+    "\n\t"
+
 /* Init fixed-function registers. */
 // This call is based on https://github.com/obilaniu/libpfc
-#define _vt_init_ts                                     \
-    do {                                                \
-        int cpu = sched_getcpu();                       \
-        PFC_CNT pfc_cnts[7] = {0, 0, 0, 0, 0, 0, 0};    \
-        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};    \
-        if (pfcPinThread(cpu)) {                        \
-            exit(1);                                    \
-        }                                               \
-    } while(0)
+#define _vt_init_ts                                         \
+    PFC_CNT pfc_cnts[7] = {0, 0, 0, 0, 0, 0, 0};            \
+    PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};            \
+    const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0}; \
+    do {                                                    \
+        int cpu = sched_getcpu();                           \
+        if (pfcPinThread(cpu)) {                            \
+            exit(1);                                        \
+        }                                                   \
+        if (pfcInit() != 0) {                               \
+            printf("Failed to load pfc file.\n");           \
+            fflush(stdout);                                 \
+            exit(1);                                        \
+        }                                                   \
+        pfcWrCfgs(0, 7, pfc_cfgs);                          \
+        pfcWrCnts(0, 7, pfc_zero_cnts);                     \
+    } while(0)  
+
+#define _vt_fini_ts     \
+    pfcFini()
 
 /* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
 #define _vt_read_cy(_cy)                                \
-    asm volatile(                                       \
-        "\n\tlfence"                                    \
-        _pfc_asm_code_cnt_read_(mov, 0x40000001, 0)     \
-        "\n\tlfence"                                    \
-        :                                               \
-        : "r"(_cy)                                      \
-        : "memory", "rax", "rcx", "rdx"                 \
-    );     
+    do {                                                \
+        register uint64_t cy;                           \
+        asm volatile(                                   \
+            "\n\tlfence"                                \
+            _pfc_read(0x40000001)                       \
+            "\n\tlfence"                                \
+            : "=r"(cy)                                  \
+            :                                           \
+            : "memory", "rax", "rcx", "rdx"             \
+        );                                              \
+        _cy = cy;                                       \
+    } while(0)
 
 
 /* Read virtual timer */
