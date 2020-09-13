@@ -36,6 +36,8 @@
 
 #include "libpfc.h"
 
+#define _X86_TSC_HZ 2.49414
+
 #define _pfc_read(rcx)                \
     "\n\tmov      $"#rcx", %%rcx                 "  \
     "\n\trdpmc                                   "  \
@@ -46,7 +48,7 @@
 
 /* Init fixed-function registers. */
 // This call is based on https://github.com/obilaniu/libpfc
-#define _vt_init_ts                                         \
+#define _vt_init_ts(_nspt)                                  \
     PFC_CNT pfc_cnts[7] = {0, 0, 0, 0, 0, 0, 0};            \
     PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};            \
     const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0}; \
@@ -62,7 +64,8 @@
         }                                                   \
         pfcWrCfgs(0, 7, pfc_cfgs);                          \
         pfcWrCnts(0, 7, pfc_zero_cnts);                     \
-    } while(0)  
+    } while(0);                                             \
+    _nspt = 1 / _X86_TSC_HZ;                            
 
 #define _vt_fini_ts     \
     pfcFini()
@@ -72,9 +75,7 @@
     do {                                                \
         register uint64_t cy;                           \
         asm volatile(                                   \
-            "\n\tlfence"                                \
             _pfc_read(0x40000001)                       \
-            "\n\tlfence"                                \
             : "=r"(cy)                                  \
             :                                           \
             : "memory", "rax", "rcx", "rdx"             \
@@ -92,18 +93,32 @@
 #else
 #define _vt_read_ns(_ns)                                \
     do {                                                \
-        register uint64_t hi, lo, cy;                   \
+        register uint64_t cy;                           \
         asm volatile(                                   \
-            "CPUID"         "\n\t"                      \
-            "RDTSCP"        "\n\t"                      \
-            "mov %%rdx, %0" "\n\t"                      \
-            "mov %%rax, %1" "\n\t"                      \
-            :"=r" (hi), "=r" (lo)                       \
+            "\n\tRDTSCP"                                \
+            "\n\tshl $32, %%rdx"                        \
+            "\n\tor  %%rax, %%rdx"                      \
+            "\n\tmov %%rdx, %0"                         \
+            "\n\t"                                      \
+            :"=r" (cy)                                  \
             :                                           \
-            :"%rax", "%rbx", "%rcx", "%rdx");           \
-        cy = hi << 32 | lo;                             \
-        _ns = (double)cy / 2.494140000;                 \
+            : "memory", "%rax", "%rdx");                \
+        _ns = cy;                                       \
     } while(0)
+
+//    do {                                                \
+//        register uint64_t hi, lo, cy;                   \
+//        asm volatile(                                   \
+//            "CPUID"         "\n\t"                      \
+//            "RDTSCP"        "\n\t"                      \
+//            "mov %%rdx, %0" "\n\t"                      \
+//            "mov %%rax, %1" "\n\t"                      \
+//            :"=r" (hi), "=r" (lo)                       \
+//            :                                           \
+//            :"%rax", "%rbx", "%rcx", "%rdx");           \
+//        cy = hi << 32 | lo;                             \
+//        _ns = (double)cy / 2.494140000;                 \
+//    } while(0)
 
 #endif
 

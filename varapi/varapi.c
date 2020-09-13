@@ -87,7 +87,7 @@ uint32_t vt_iogrp_nrank, *vt_iogrp_grank, *vt_iogrp_gcpu;
 #endif
 
 /* Var for nanosec reading */
-uint64_t nspt;  // nanosecond per tick, only for aarch64. 
+double vt_nspt;  // nanosecond per tick, only for aarch64. 
 struct timespec ts;
 
 /* Initializing varapi */
@@ -272,8 +272,11 @@ vt_init(char *u_data_root, char *u_proj_name) {
     } 
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
-    _vt_init_ts;
-
+    _vt_init_ts(vt_nspt);
+    if (vt_myrank == 0) {
+        printf("*** [VarAPI] Timer has been set, we have %f nanosec per tick. ***\n", vt_nspt);
+        fflush(stdout);
+    }
     /* Initial time reading. */
 #ifdef USE_MPI
     vt_world_barrier();
@@ -520,7 +523,9 @@ vt_write() {
 #else
     /* No-MPI Write */
     int i, j;
-
+    for (i = 0; i < vt_i; i ++) {
+        pdata[i].ns = (uint64_t)((double)pdata[i].ns * vt_nspt);
+    }
     for(i = 0; i < vt_i; i ++) {
         fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f", 
                 pdata[i].ctag[0], pdata[i].ctag[1], 
