@@ -38,7 +38,7 @@
 #ifdef USE_CNTVCT
 #define _vt_init_ts(_nspt)    \ 
     uint32_t freq;                                              \
-    asm volatile("mrs %0, cntfreq_el0"  "\n\t": "=r" (freq)::); \
+    asm volatile("mrs %0, cntfrq_el0"  "\n\t": "=r" (freq)::); \
     _nspt = 1 / ((double)freq * 1e-9);
 
 #else
