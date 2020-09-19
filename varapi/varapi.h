@@ -75,37 +75,50 @@
 /**
  * @brief Initialise vartect api. This function must be called exactly once before the 
  * variation detection.
- * @param data_dir  Root dir for output data.
- * @param proj_name Project name, for intra-project data comparison.
+ * @param data_dir      Root dir for output data.
+ * @param proj_name     Project name, for intra-project data comparison.
  * @return int 
  */
 int vt_init(char *u_data_root, char *u_proj_name);
 
 /**
  * @brief Register system events which will be recorded. 
- * @param etag Array of event code.
- * @param nev  Actual number of events, should be less or equal to _N_EV.
+ * @param etags         Array of event names.
+ * @param n             Actual number of events, should be less or equal to _N_EV.
  */
-void vt_set_ev(uint32_t *etag, int nev);
+int vt_set_evt(const char *etags);
+
 void vt_commit();
 
 /**
  * @brief Get and record an pre-defined event reading.
- * @param grp_id 
- * @param p_id 
- * @param uval 
- * @param auto_write 
- * @param read_ev 
- * @param read_uev 
- * @return int Return error code.
+ * @param grp_id        Group index.
+ * @param p_id          Collecting point index.
+ * @param uval          Any user-defined value.
+ * @param auto_write    Set to 1 if VarAPI automatically detect the buffer and 
+ *                      dump to files when the buffer is full.
+ * @param read_ev       Set to 1 if collect performance events at this point.  
+ * @return              Int. Return error code.
  */
 void vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev);
 
-int vt_newgrp(uint32_t grp_id, const char *grp_name);
+/**
+ * @brief Creating a collecting group
+ */
+int vt_set_grp(uint32_t grp_id, const char *grp_name);
 
-int vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name);
+/**
+ * @brief Creating tag for a collecting point.
+ * 
+ */
+int vt_set_tag(uint32_t grp_id, uint32_t p_id, const char *name);
 
+/**
+ * @brief Write collected data to csv files.
+ */
 void vt_write();
+
+void vt_strict_sync();
 
 /**
  * @brief Exit VarAPI and release resources.

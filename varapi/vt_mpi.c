@@ -185,10 +185,6 @@ vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank,
     MPI_Comm_split(MPI_COMM_WORLD, *iorank, my_grank, &comm_iogrp);
     MPI_Comm_rank(comm_iogrp, &iogrp_rank);
     MPI_Comm_size(comm_iogrp, &iogrp_size);
-    if (my_grank == *iorank) {
-        printf("%d: %d\n", my_grank, iogrp_size);
-        fflush(stdout);
-    }
 
     iogrp_grank = (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));
     iogrp_gcpu =  (uint32_t *)malloc(iogrp_size * sizeof(uint32_t));

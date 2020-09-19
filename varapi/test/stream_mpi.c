@@ -275,7 +275,7 @@ main()
     if (vt_init("~/experiments/test_data", "st_mpi")) {
         exit(1);
     }
-	//vt_set_ev(stream_event, 3);
+	//vt_set_evt(stream_event, 3);
 	//vt_set_uev("i", &k, VT_INT);
 	vt_commit();
 

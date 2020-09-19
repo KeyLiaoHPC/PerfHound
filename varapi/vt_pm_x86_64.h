@@ -48,19 +48,18 @@
 
 /* Init fixed-function registers. */
 // This call is based on https://github.com/obilaniu/libpfc
-#define _vt_init_ts(_nspt)                                  \
-    PFC_CNT pfc_cnts[7] = {0, 0, 0, 0, 0, 0, 0};            \
-    PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};            \
-    const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0}; \
-    do {                                                    \
-        if (pfcInit() != 0) {                               \
-            printf("Failed to load pfc file.\n");           \
-            fflush(stdout);                                 \
-            exit(1);                                        \
-        }                                                   \
-        pfcWrCfgs(0, 7, pfc_cfgs);                          \
-        pfcWrCnts(0, 7, pfc_zero_cnts);                     \
-    } while(0);                                             \
+#define _vt_init_ts(_nspt)                                      \
+    do {                                                        \
+        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};            \
+        const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0}; \
+        if (pfcInit() != 0) {                                   \
+            printf("Failed to load pfc file.\n");               \
+            fflush(stdout);                                     \
+            exit(1);                                            \
+        }                                                       \
+        pfcWrCfgs(0, 7, pfc_cfgs);                              \
+        pfcWrCnts(0, 7, pfc_zero_cnts);                         \
+    } while(0);                                                 \
     _nspt = 1 / _X86_TSC_GHZ;                            
 
 #define _vt_fini_ts     \
@@ -100,23 +99,69 @@
             :                                           \
             : "memory", "%rax", "%rdx");                \
         _ns = cy;                                       \
-    } while(0)
-
-//    do {                                                \
-//        register uint64_t hi, lo, cy;                   \
-//        asm volatile(                                   \
-//            "CPUID"         "\n\t"                      \
-//            "RDTSCP"        "\n\t"                      \
-//            "mov %%rdx, %0" "\n\t"                      \
-//            "mov %%rax, %1" "\n\t"                      \
-//            :"=r" (hi), "=r" (lo)                       \
-//            :                                           \
-//            :"%rax", "%rbx", "%rcx", "%rdx");           \
-//        cy = hi << 32 | lo;                             \
-//        _ns = (double)cy / 2.494140000;                 \
-//    } while(0)
+    } while(0);
 
 #endif
 
-/* User-defined event reading. */
-#define _vt_read_uev(_tp, _void_ptr, _val)  _val = (double)(*((_tp *)_void_ptr));
+/* Macros for reading x86_64 events */
+#ifdef _N_EV
+/* Parsing string events to hex event code */
+#define _vt_parse_event(_code, _evstr)  \
+    _code = pfcParseCfg(_evstr);
+
+/* Set IA32_PERFEVTSELx */
+#define _vt_config_event(_code_arr)  \
+    do {                                            \
+        const PFC_CNT pfc_zeros[4] = {0, 0, 0, 0};  \
+        pfcWrCfgs(3, 4, _code_arr);                 \
+        pfcWrCnts(3, 4, pfc_zeros);                 \
+    } while(0);
+
+/* Read PMC */
+#define _pm_read(rcx, off)                      \
+    "\n\tmov      $"#rcx", %%rcx            "   \
+    "\n\trdpmc                              "   \
+    "\n\tshl      $32,     %%rdx            "   \
+    "\n\tor       %%rax,   %%rdx            "   \
+    "\n\tmov      %%rdx,   "#off"(%0)       "   \
+    "\n\t"
+
+#define _vt_read_pm_1(arr)                      \
+        asm volatile(                           \
+            _pm_read(0x00000000, 0)             \
+            :                                   \
+            : "r"((arr))                        \
+            : "memory", "%rax", "%rcx", "%rdx"  \
+        );                                              
+
+#define _vt_read_pm_2(arr)                      \
+        asm volatile(                           \
+            _pm_read(0x00000000, 0)             \
+            _pm_read(0x00000001, 8)             \
+            :                                   \
+            : "r"((arr))                        \
+            : "memory", "%rax", "%rcx", "%rdx"  \
+        );                                       
+        
+#define _vt_read_pm_3(arr)                      \
+        asm volatile(                           \
+            _pm_read(0x00000000, 0)             \
+            _pm_read(0x00000001, 8)             \
+            _pm_read(0x00000002, 16)            \
+            :                                   \
+            : "r"((arr))                        \
+            : "memory", "%rax", "%rcx", "%rdx"  \
+        );                                       
+
+#define _vt_read_pm_4(arr)                      \
+        asm volatile(                           \
+            _pm_read(0x00000000, 0)             \
+            _pm_read(0x00000001, 8)             \
+            _pm_read(0x00000002, 16)            \
+            _pm_read(0x00000003, 24)            \
+            :                                   \
+            : "r"((arr))                        \
+            : "memory", "%rax", "%rcx", "%rdx"  \
+        );                                              
+
+#endif

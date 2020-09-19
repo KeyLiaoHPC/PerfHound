@@ -41,19 +41,6 @@
 #include <stdio.h>
 #include <time.h>
 
-/* Performance monitor header. */
-#ifndef __PM_HEADER__
-#define __PM_HEADER__
-#ifdef __x86_64__
-#include "vt_pm_x86_64.h"
-#include "vt_event_x86_64.h"
-
-#elif  __aarch64__
-#include "vt_pm_aarch64.h"
-#include "vt_event_aarch64.h"
-
-#endif // END: #ifdef __x86_64__
-#endif // END: #ifndef __PM_HEADER__
 
 /* ======== User config area ======== */
 /* Limits for Varapi tracing. */
@@ -123,16 +110,27 @@
 #endif
 
 // Collecting performance events. 
-#ifdef VT_MODE_SHORT_EV
+#ifdef VT_MODE_EV
 #undef VT_MODE_TS
 #define _N_EV 4
 
-#elif defined(VT_MODE_LONG_EV)
-#undef VT_MODE_TS
-#define _N_EV 12
-
-#endif // END: #ifdef VT_MODE_SHORT_EV
+#endif // END: #ifdef VT_MODE_EV
 #endif // #ifndef _MODE_SET
+
+/* Import performance monitor header after setting mode. */
+#ifndef __PM_HEADER__
+#define __PM_HEADER__
+#ifdef __x86_64__
+#include "vt_pm_x86_64.h"
+#include "vt_event_x86_64.h"
+
+#elif  __aarch64__
+#include "vt_pm_aarch64.h"
+#include "vt_event_aarch64.h"
+
+#endif // END: #ifdef __x86_64__
+#endif // END: #ifndef __PM_HEADER__
+
 
 /* VarAPI record data type */
 typedef struct {

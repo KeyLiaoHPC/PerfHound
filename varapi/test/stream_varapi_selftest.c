@@ -147,9 +147,9 @@ main() {
         char tag_str[256];
         group ++;
         sprintf(tag_str, "%llubytes", cur_bytes);
-        vt_newgrp(group, tag_str);
+        vt_set_grp(group, tag_str);
         for (i = 0; i < 8; i ++) {
-            vt_newtag(group, i + 1, stream_tag[i]);
+            vt_set_tag(group, i + 1, stream_tag[i]);
         }
 
         /* Initailization */

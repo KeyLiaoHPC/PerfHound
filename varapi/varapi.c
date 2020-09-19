@@ -57,19 +57,19 @@ int vt_run_id;
 data_t *pdata;                          // Varapi raw data.
 uint32_t vt_nmsg, vt_databuf;            // # of recorded messsages and buf capacity
 uint32_t vt_i;                       // Next data id.
-int tag_commited;
+int vt_ev_commited;
 
 #ifndef VT_MODE_TS
 int vt_nev;
-uint32_t vt_etags[_N_EV];
+uint64_t vt_events[_N_EV];
 #endif
 
 /* Variables for files and information */
 char hostpath[_PATH_MAX];                       // Data path for the host.
 char projpath[_PATH_MAX];                       // Data path for the host.
 char vt_cfile[_PATH_MAX];                       // Full path of ctag.
+char vt_efile[_PATH_MAX];                       // Full path of performance event.
 char logfile[_PATH_MAX], datafile[_PATH_MAX];   // Full path of log and data.
-// This timestamp is only for project records.
 char timestr[16];                               // Timestamp records. One stamp per line
 FILE *vt_flog;
 #ifdef USE_MPI
@@ -271,6 +271,13 @@ vt_init(char *u_data_root, char *u_proj_name) {
                (double)vt_databuf * sizeof(data_t) / 1024);
     } 
 
+    /* Set all event codes to 0. */
+#ifdef _N_EV
+    for (i = 0; i < _N_EV; i ++) {
+        vt_events[i] = 0;
+    }
+#endif
+
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
     _vt_init_ts(vt_nspt);
     if (vt_myrank == 0) {
@@ -305,23 +312,24 @@ vt_init(char *u_data_root, char *u_proj_name) {
     vt_i = 0;
 #ifndef VT_MODE_TS
     vt_nev = 0;
-    vt_nuev = 0;
-    tag_commited = 0;
+    vt_ev_commited = 0;
 #else
-    tag_commited = 1;
+    vt_ev_commited = 1;
 #endif
     /* Create files for event tags and counting point tags. */
     if (vt_myrank == 0) {
-        char fetag[_PATH_MAX];
         FILE *fp;
 
-        sprintf(fetag, "%s/run%d_etags.csv", projpath, vt_run_id);
-        fp = fopen(fetag, "a");
+        sprintf(vt_efile, "%s/run%d_etags.csv", projpath, vt_run_id);
+        fp = fopen(vt_efile, "w");
+        fprintf(fp, "event_id,event_name,event_code\n");
+        fflush(fp);
         fclose(fp);
 
         sprintf(vt_cfile, "%s/run%d_ctags.csv", projpath, vt_run_id);
         fp = fopen(vt_cfile, "w");
         fprintf(fp, "group_id,point_id,name\n");
+        fflush(fp);
         fclose(fp);
     }
 
@@ -331,33 +339,76 @@ vt_init(char *u_data_root, char *u_proj_name) {
     vt_read(0, 1, 0, 0, 0);
     //vt_write();
     return 0;
-}
+} // END: int vt_init()
 
 /* Set system events. */
-void
-vt_set_ev(uint32_t *etag, int n) {
+int
+vt_set_evt(const char *etag) {
+#ifndef _N_EV
+    return 0;
+#endif
+
 #ifdef _N_EV
-    if (tag_commited) return;
+    // We do not support redefine events for now.
+    if (vt_ev_commited) {
+        return 1;
+    }
+    
+    if (vt_nev >= _N_EV) {
+        return 2;     
+    }
 
     int i;
+    uint64_t event_code;
+    FILE *fp;
 
-    vt_nev = n;
-    if (n > _N_EV) {
-        vt_nev = _N_EV;
+    _vt_parse_event (event_code, etag);
+    if (event_code) {
+        vt_events[vt_nev] = event_code;
+        if (vt_myrank == 0) {
+            printf("*** [VarAPI] Event %s added. ***\n", etag);
+            vt_log(vt_flog, "[vt_set_evt] Event %s added.\n", etag);
+        }
+        vt_nev ++;
+    } else {
+        printf("*** [VarAPI] Event %s doesn't exist or have not been supported. ***\n", etag);
+        vt_log(vt_flog, "[vt_set_evt] Event %s not found.\n", etag);
     }
-    for (i = 0; i < vt_nev; i ++) {
-        vt_etags[i] = etag[i];
+    
+
+    if (vt_myrank == 0) {
+        fp = fopen(vt_efile, "a");
+        for (i = 0; i < vt_nev; i ++) {
+            fprintf(fp, "%d,%s,0x%llx\n", i, etag, vt_events[i]);
+        }
+        fflush(fp);
+        fclose(fp);
+    }
+#endif // END: #ifdef _N_EV
+    return 0;
+} // END: int vt_set_evt
+
+/* Commit events and configure event registers. */
+void
+vt_commit() {
+#ifdef _N_EV
+    _vt_config_event (vt_events);
+    vt_ev_commited = 1;
+    if (vt_myrank == 0) {
+        printf("*** [VarAPI] %d events have been written. ***\n", vt_nev);
+        vt_log(vt_flog, "[vt_set_evt] %d events written.\n", vt_nev);
     }
 #endif
+    return;
 }
 
 /* Set group tag for counting points */
 int 
-vt_newgrp(uint32_t grp_id, const char *grp_name) {
+vt_set_grp(uint32_t grp_id, const char *grp_name) {
     if (vt_myrank == 0) {
         FILE *fp;
 
-        fp = fopen(vt_cfile, "a");
+        fp = fopen(vt_cfile, "w");
         fprintf(fp, "%u,0,%s\n", grp_id, grp_name);
         fclose(fp);
         fflush(fp);
@@ -371,7 +422,7 @@ vt_newgrp(uint32_t grp_id, const char *grp_name) {
 
 /* Set counting points' tag. */
 int 
-vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name) {
+vt_set_tag(uint32_t grp_id, uint32_t p_id, const char *name) {
     if (vt_myrank == 0) {
         FILE *fp;
 
@@ -388,38 +439,12 @@ vt_newtag(uint32_t grp_id, uint32_t p_id, const char *name) {
     return 0;
 }
 
-void
-vt_commit() {
-#ifdef _N_EV
-    tag_commited = 1;
-    if (vt_myrank == 0) {
-        int i;
-        char fetag[_PATH_MAX];
-        FILE *fp;
-        
-        vt_log(vt_flog, "[vt_commit] User request %d system events, %d user-defined events.\n",
-                vt_nev, vt_nuev);
-        sprintf(fetag, "%s/run%d_etags.csv", projpath, vt_run_id);
-        fp = fopen(fetag, "w");
-        for (i = 0; i < vt_nev; i ++) {
-#ifdef __x86_64__
-            fprintf(fp, "x86_64,0x%x\n", vt_etags[i]);
-#elif __aarch64__
-            fprintf(fp, "aarch64,0x%x\n", vt_etags[i]);
-#endif
-        }
-        fflush(fp);
-        fclose(fp);
-    }
-#ifdef USE_MPI
-    vt_world_barrier();
-#endif 
-#endif
-}
 
 /* Get and record an event reading */
 void
 vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev) {
+#ifdef _N_EV
+#endif
     pdata[vt_i].ctag[0] = grp_id;
     pdata[vt_i].ctag[1] = p_id;
     _vt_read_cy (pdata[vt_i].cy);
@@ -428,53 +453,18 @@ vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev
 
     /* Read system event */
 #ifdef _N_EV
-    if (read_ev) {
-        switch (vt_nev) {
-            case 1:
-                _vt_read_pm_1 (pdata[vt_i].ev);
-                break;
-            case 2:
-                _vt_read_pm_2 (pdata[vt_i].ev);
-                break;
-            case 3:
-                _vt_read_pm_3 (pdata[vt_i].ev);
-                break;
-            case 4:
-                _vt_read_pm_4 (pdata[vt_i].ev);
-                break;
-            case 5:
-                _vt_read_pm_5 (pdata[vt_i].ev);
-                break;
-            case 6:
-                _vt_read_pm_6 (pdata[vt_i].ev);
-                break;
-            case 7:
-                _vt_read_pm_7 (pdata[vt_i].ev);
-                break;
-            case 8:
-                _vt_read_pm_8 (pdata[vt_i].ev);
-                break;
-            case 9:
-                _vt_read_pm_9 (pdata[vt_i].ev);
-                break;
-            case 10:
-                _vt_read_pm_10 (pdata[vt_i].ev);
-                break;
-            case 11:
-                _vt_read_pm_11 (pdata[vt_i].ev);
-                break;
-            case 12:
-                _vt_read_pm_12 (pdata[vt_i].ev);
-                break;
-            default:
-                break;
+    if(read_ev && vt_ev_commited) {
+        if (vt_nev == 1) {
+            _vt_read_pm_1 (pdata[vt_i].ev);
+        } else if(vt_nev == 2) {
+            _vt_read_pm_2 (pdata[vt_i].ev);
+        } else if(vt_nev == 3) {
+            _vt_read_pm_3 (pdata[vt_i].ev);
+        } else if(vt_nev == 4) {
+            _vt_read_pm_4 (pdata[vt_i].ev);
         }
-    } else {
-        for (i = 0; i < _N_EV; i ++) {
-            pdata[vt_i].ev[i] = 0;
-        }
-    }
-#endif // END: #ifdef _N_EV
+    } 
+#endif
 
     vt_i ++;
     /* Check buffer health after reading */
@@ -513,21 +503,24 @@ vt_write() {
                 printf("*** [VarAPI] Failed to get remote data before writing.");
             }
             for (j = 0; j < cnt; j ++) {
-                fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f", 
-                        pdata[j].ctag[0], pdata[j].ctag[1], 
-                        pdata[j].cy, pdata[j].ns, pdata[j].uval);
-#ifdef  _N_EV
-                for (k = 0; k < _N_EV; k ++) {
-                    fprintf(vt_fdata[i], ",%llu", pdata[j].ev[k]);
-                }
+#ifdef _N_EV
+                fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f,%llu,%llu,%llu,%llu\n", 
+                    pdata[j].ctag[0], pdata[j].ctag[1], 
+                    pdata[j].cy, pdata[j].ns, pdata[j].uval,
+                    pdata[j].ev[0], pdata[j].ev[1], pdata[j].ev[2], pdata[j].ev[3]);
+#else
+                fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f\n", 
+                    pdata[j].ctag[0], pdata[j].ctag[1], 
+                    pdata[j].cy, pdata[j].ns, pdata[j].uval);
 #endif
-                fprintf(vt_fdata[i], "\n");
             }
             fflush(vt_fdata[i]);
         }
     } else {
         vt_send_data(vt_i, pdata);
     } // END: if (vt_myrank == vt_iorank)
+
+    
 #else
     /* No-MPI Write */
     int i, j;
@@ -535,22 +528,31 @@ vt_write() {
         pdata[i].ns = (uint64_t)((double)pdata[i].ns * vt_nspt);
     }
     for(i = 0; i < vt_i; i ++) {
-        fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f", 
+#ifdef _N_EV
+        fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f,%llu,%llu,%llu,%llu\n", 
+                pdata[i].ctag[0], pdata[i].ctag[1], 
+                pdata[i].cy, pdata[i].ns, pdata[i].uval,
+                pdata[i].ev[0], pdata[i].ev[1], pdata[i].ev[2], pdata[i].ev[3]);
+#else
+        fprintf(vt_fdata, "%u,%u,%llu,%llu,%.15f\n", 
                 pdata[i].ctag[0], pdata[i].ctag[1], 
                 pdata[i].cy, pdata[i].ns, pdata[i].uval);
-
-#ifdef _N_EV
-        for (k = 0; k < _N_EV; k ++) {
-            fprintf(vt_fdata, ",%llu", pdata[j].ev[k]);
-        }
 #endif
-
-        fprintf(vt_fdata, "\n");
-        fflush(vt_fdata);
     }
+    fflush(vt_fdata);
 #endif // END: #ifdef USE_MPI
 
-    //vt_nmsg += vt_i;
+    /* Clean event readings. */
+#ifdef _N_EV
+    for (i = 0; i < vt_i; i ++) {
+        pdata[i].ev[0] = 0;
+        pdata[i].ev[1] = 0;
+        pdata[i].ev[2] = 0;
+        pdata[i].ev[3] = 0;
+    }
+#endif
+
+    /* Logging and recover original intra-rank bias */
     if (vt_myrank == vt_head) {
         vt_log(vt_flog, "[vt_write] Write records.\n");
     }
@@ -562,6 +564,13 @@ vt_write() {
     vt_read(0, 4, 0, 0, 0);
     return;
 }
+
+#ifdef USE_MPI
+void
+vt_strict_sync() {
+    vt_tsync();
+}
+#endif
 
 /* Exiting varapi */
 void
