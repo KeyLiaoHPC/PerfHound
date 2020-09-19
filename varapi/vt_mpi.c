@@ -277,7 +277,7 @@ vt_newtype() {
     int len[4];
     MPI_Aint disp[4];
     MPI_Datatype types[4];
-    nb = 3;
+    nb = 4;
 #endif // END: #ifdef _N_EV
 
     types[0] = MPI_UINT32_T;
@@ -332,12 +332,18 @@ vt_world_barrier() {
 
 /* IO rank gets vartect data from a group member. */
 int
-vt_get_data(uint32_t rank, uint32_t count, data_t *data) {
+vt_get_data(uint32_t rank, uint32_t *count, data_t *data) {
     if (rank) {
+        uint32_t remote_cnt;
         int err;
         MPI_Status st;
 
-        err = MPI_Recv(data, count, vt_mpidata_t, rank, rank, comm_iogrp, &st);
+        err = MPI_Recv(&remote_cnt, 1, MPI_UINT32_T, rank, rank, comm_iogrp, &st);
+        if (err) {
+            return -1;
+        }
+        *count = remote_cnt;
+        err = MPI_Recv(data, *count, vt_mpidata_t, rank, rank, comm_iogrp, &st);
         if (err) {
             return -1;
         }
@@ -349,6 +355,7 @@ vt_get_data(uint32_t rank, uint32_t count, data_t *data) {
 /* Send vartect data to io rank. */
 void
 vt_send_data(uint32_t count, data_t *data) {
+    MPI_Send(&count, 1, MPI_UINT32_T, 0, iogrp_rank, comm_iogrp);
     MPI_Send(data, count, vt_mpidata_t, 0, iogrp_rank, comm_iogrp);
 }
 
@@ -439,7 +446,7 @@ vt_tsync() {
 
 /* Get execution offsets to rank 0. */
 void
-vt_get_alt() {
+vt_get_cur_bias() {
     uint64_t ns, ns_r0;
     struct timespec ts;
 
@@ -454,7 +461,7 @@ vt_get_alt() {
 
 /* Restore the variation according to alt bias. */
 void
-vt_atsync() {
+vt_recover_bias() {
     uint64_t ns, ns_new;
     int64_t wait_ns_min;
     int64_t register tmp;

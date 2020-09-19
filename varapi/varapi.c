@@ -497,14 +497,22 @@ vt_write() {
     vt_read(0, 3, 0, 0, 0);
 
 #ifdef USE_MPI
+    vt_world_barrier();
     /* MPI Write */
-    int i, j, k;
-    vt_get_alt();
+    int i, j, k, err;
+    uint32_t cnt;
+    vt_get_cur_bias();
+    for (i = 0; i < vt_i; i ++) {
+        pdata[i].ns = (uint64_t)((double)pdata[i].ns * vt_nspt);
+    }
     //vt_io_barrier();
     if (vt_myrank == vt_iorank) {
         for (i = 0; i < vt_iogrp_nrank; i ++) {
-            vt_get_data(i, vt_i, pdata);
-            for (j = 0; j < vt_i; j ++) {
+            cnt = vt_i;
+            if (vt_get_data(i, &cnt, pdata)) {
+                printf("*** [VarAPI] Failed to get remote data before writing.");
+            }
+            for (j = 0; j < cnt; j ++) {
                 fprintf(vt_fdata[i], "%u,%u,%llu,%llu,%.15f", 
                         pdata[j].ctag[0], pdata[j].ctag[1], 
                         pdata[j].cy, pdata[j].ns, pdata[j].uval);
@@ -514,8 +522,8 @@ vt_write() {
                 }
 #endif
                 fprintf(vt_fdata[i], "\n");
-                fflush(vt_fdata[i]);
             }
+            fflush(vt_fdata[i]);
         }
     } else {
         vt_send_data(vt_i, pdata);
@@ -542,14 +550,14 @@ vt_write() {
     }
 #endif // END: #ifdef USE_MPI
 
-    vt_nmsg += vt_i;
+    //vt_nmsg += vt_i;
     if (vt_myrank == vt_head) {
-        vt_log(vt_flog, "[vt_write] Write %d records, %d in total.\n", vt_i, vt_nmsg);
+        vt_log(vt_flog, "[vt_write] Write records.\n");
     }
     vt_i = 0;
 #ifdef USE_MPI
     //vt_world_barrier();
-    vt_atsync();
+    vt_recover_bias();
 #endif
     vt_read(0, 4, 0, 0, 0);
     return;

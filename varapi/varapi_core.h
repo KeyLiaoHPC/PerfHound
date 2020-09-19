@@ -66,7 +66,7 @@
 
 /* MPI and IO settings. */
 #define _AUTO_WRITE     1
-#define _RANK_PER_IO    40
+#define _RANK_PER_IO    20
 #define _SYNC_NS_OFFSET 1e9     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
@@ -153,11 +153,11 @@ int  vt_touch(char *path, char *mode);
 
 /* MPI Wrapper in vt_mpi.c */
 #ifdef USE_MPI
-void vt_atsync();
+void vt_recover_bias();
 void vt_bcast_tstamp(char *timestr);
-void vt_get_alt();
+void vt_get_cur_bias();
 void vt_get_bias(int r0, int r1);
-int  vt_get_data(uint32_t rank, uint32_t count, data_t *data);
+int  vt_get_data(uint32_t rank, uint32_t *count, data_t *data);
 void vt_get_rank(uint32_t *nrank, uint32_t *myrank);
 void vt_io_barrier();
 void vt_mpi_clean();
