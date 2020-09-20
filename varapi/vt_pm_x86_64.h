@@ -104,10 +104,11 @@
 #endif
 
 /* Macros for reading x86_64 events */
-#ifdef _N_EV
+#ifdef VT_MODE_EV
 /* Parsing string events to hex event code */
 #define _vt_parse_event(_code, _evstr)  \
     _code = pfcParseCfg(_evstr);
+    if(_code == 0) _code = 0xFFFFFFFF;
 
 /* Set IA32_PERFEVTSELx */
 #define _vt_config_event(_code_arr)  \

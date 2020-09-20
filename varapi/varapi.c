@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <errno.h>
 #include "varapi.h"
@@ -359,11 +360,12 @@ vt_set_evt(const char *etag) {
     }
 
     int i;
-    uint64_t event_code;
+    uint64_t event_code = 0;
     FILE *fp;
 
     _vt_parse_event (event_code, etag);
-    if (event_code) {
+
+    if (event_code <= 0xFFFFFFFF - 1) {
         vt_events[vt_nev] = event_code;
         if (vt_myrank == 0) {
             printf("*** [VarAPI] Event %s added. ***\n", etag);
