@@ -54,11 +54,11 @@
 /* MPI and IO settings. */
 #define _AUTO_WRITE     1
 #define _RANK_PER_IO    20
-#define _SYNC_NS_OFFSET 1e9     // Offset of sync, 1 sec for default.
+#define _SYNC_NS_OFFSET 1e4     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 #ifndef _MSG_BUF_KIB
-#define _MSG_BUF_KIB    4096    // 4 KiB
+#define _MSG_BUF_KIB    16384    // 4 KiB
 #endif
 
 #define _MSG_BUF_N      512      // 256 records

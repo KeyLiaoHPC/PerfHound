@@ -79,9 +79,6 @@ vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank,
     uint32_t head_now, head_next, iorank_cur;
     char cur_hname[_HOST_MAX];
 
-    //printf("Start init. rank %u host %s cpu %u\n", myrank, myhost, mycpu);
-    //fflush(stdout);
-    //MPI_Barrier(MPI_COMM_WORLD);
     /* Sync current run id. */
     MPI_Bcast(run_id, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -421,15 +418,17 @@ vt_get_bias(int r0, int r1) {
 /* sync all ranks */
 void
 vt_tsync() {
-    uint64_t ns, ns_new;
+    uint64_t ns, ns_new, ns_mpi;
     int64_t tmp;
     struct timespec ts;
 
     MPI_Barrier(MPI_COMM_WORLD);
     _vt_read_ns(ns);
     MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
-    
-    ns = ns + _SYNC_NS_OFFSET + bns;
+    _vt_read_ns(ns_mpi);
+    MPI_Bcast(&ns_mpi, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
+    // Double broadcast to guarantee the offset won't less than the actual bias.
+    ns = ns_mpi + (ns_mpi - ns) + _SYNC_NS_OFFSET + bns;
     //ns = bns < 0? (ns - abs(bns)) : (ns + bns);
 
     _vt_read_ns(ns_new);

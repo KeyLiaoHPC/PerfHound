@@ -1,14 +1,14 @@
 #!/bin/bash
 MPICC = mpicc
 CC = gcc
-CFLAGS = -O3 -fno-builtin
+CFLAGS = -O2 -fno-builtin
 CFLAGS += -I$(LIBPFC)/include
 #CFLAGS += -DUSE_MPI
 CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
 VARAPI = $(PWD)
-VARAPI_FLAGS = -DUSE_VARAPI -DVT_MODE_TS #-DVT_MODE_SHORT -DVT_UEV_1
+VARAPI_FLAGS = -DUSE_VARAPI -DVT_MODE_EV #-DVT_MODE_SHORT -DVT_UEV_1
 LDFLAGS = -lpfc
 # Installing path
 PREFIX ?= .
@@ -17,11 +17,11 @@ VPATH = $(VARAPI)/include
 
 .PHONY: all install clean
 
-all: libvartect_par.so libvartect_ser.so install
+all: libvarapi_mpi.so libvarapi.so install
 
-libvartect_par.so: varapi.par.o file_op.par.o vt_mpi.par.o
+libvarapi_mpi.so: varapi.mpi.o file_op.mpi.o vt_mpi.mpi.o
 	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libvartect_ser.so: varapi.ser.o file_op.ser.o
+libvarapi.so: varapi.o file_op.o
 	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
 
 install:
@@ -34,10 +34,10 @@ install:
 	cp ./*.h ./include
 	@echo VarAPI has been installed in ${PREFIX}
 
-%.par.o: %.c
+%.mpi.o: %.c
 	$(MPICC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
-%.ser.o: %.c
+%.o: %.c
 	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
 clean:

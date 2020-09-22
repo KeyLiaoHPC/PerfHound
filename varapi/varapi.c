@@ -329,10 +329,17 @@ vt_init(char *u_data_root, char *u_proj_name) {
 
         sprintf(vt_cfile, "%s/run%d_ctags.csv", projpath, vt_run_id);
         fp = fopen(vt_cfile, "w");
-        fprintf(fp, "group_id,point_id,name\n");
+        fprintf(fp, "group_id,point_id,name\n"
+                "0,1,vt_start\n"
+                "0,2,vt_end\n"
+                "0,3,vt_write_start\n"
+                "0,4,vt_write_end\n"
+                );
         fflush(fp);
         fclose(fp);
     }
+
+
 
 #ifdef __aarch64__
     _vt_cy_init;
@@ -410,7 +417,7 @@ vt_set_grp(uint32_t grp_id, const char *grp_name) {
     if (vt_myrank == 0) {
         FILE *fp;
 
-        fp = fopen(vt_cfile, "w");
+        fp = fopen(vt_cfile, "a");
         fprintf(fp, "%u,0,%s\n", grp_id, grp_name);
         fclose(fp);
         fflush(fp);

@@ -107,7 +107,7 @@
 #ifdef VT_MODE_EV
 /* Parsing string events to hex event code */
 #define _vt_parse_event(_code, _evstr)  \
-    _code = pfcParseCfg(_evstr);
+    _code = pfcParseCfg(_evstr);        \
     if(_code == 0) _code = 0xFFFFFFFF;
 
 /* Set IA32_PERFEVTSELx */
