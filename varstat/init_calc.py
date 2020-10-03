@@ -2,6 +2,21 @@ import os
 import sys
 import pandas as pd
 
+#######
+=== Class VtObject
+== Description
+== Attributes
+== Methods
+== Usages
+= Create a VtObject object
+VtObject builds a data domain based on paticular VarAPI project. One wants to 
+start a VarStat analysis should initialize at least one VtObject using:
+    vtobj = VtObject("/some/data/root", "myproj")
+= Initialize data space
+= 
+
+#######
+
 class VtObject:
     def __new__(cls, data_root, proj_name):
         """

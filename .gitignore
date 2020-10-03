@@ -15,3 +15,10 @@ bin/
 lib/
 include/
 *.host
+*.ipynb
+*.html
+*.jpg
+*.jpeg
+*.tiff
+*.png
+*.bmp
