@@ -2,21 +2,51 @@ import os
 import sys
 import pandas as pd
 
-#######
-=== Class VtObject
+"""
 == Description
-== Attributes
-== Methods
+
+VtObject dominates all data in a specific VarAPI project. It can be used as a
+data driver for loading and performing basic data analysis operations. It provides
+a basic data structure for a VarAPI project. One wants to better utilize the
+VarAPI data can apply this class for locating one or more tracing points/groups.
+
+User can locate any tracing point following 'data root - project - run ID - rank ID - timestamp' 
+structure. Meanwile the hostname, binding cpu, trace point ID, group ID, rank map
+can also be accquire with the VtObject.
+
+VarStat is developed depending on several libraries:
+- DASK-2.29.0
+- Pandas-1.1.2
+- Numpy-1.19.0
+- Holoviews-1.13.4
+- Datashader-0.11.1
+We strongly suggest using Jupyter for data analysis (although it still works in other environments).
+
 == Usages
+
+VarStat helps you to write your own python3 scripts for performance variation analysis.
+You only need to 
+
 = Create a VtObject object
+
 VtObject builds a data domain based on paticular VarAPI project. One wants to 
 start a VarStat analysis should initialize at least one VtObject using:
-    vtobj = VtObject("/some/data/root", "myproj")
+import vtstat
+vtobj = vtstat.VtObject("/some/data/root", "myproj")
+
 = Initialize data space
-= 
 
-#######
+= Reload data
 
+= Export data structure
+
+= Statistical Analysis
+
+== Attributes
+
+== Methods
+
+"""
 class VtObject:
     def __new__(cls, data_root, proj_name):
         """

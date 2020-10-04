@@ -8,7 +8,7 @@ CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
 VARAPI = $(PWD)
-VARAPI_FLAGS = -DUSE_VARAPI -DVT_MODE_EV #-DVT_MODE_SHORT -DVT_UEV_1
+VARAPI_FLAGS = -DUSE_VARAPI 
 LDFLAGS = -lpfc
 # Installing path
 PREFIX ?= .
@@ -17,11 +17,18 @@ VPATH = $(VARAPI)/include
 
 .PHONY: all install clean
 
-all: libvarapi_mpi.so libvarapi.so install
+all: libvtapi_mpi_ts.so libvtapi_mpi_ev.so libvtapi_ts.so libvtapi_ev.so install
 
-libvarapi_mpi.so: varapi.mpi.o file_op.mpi.o vt_mpi.mpi.o
+libvtapi_mpi_ts.so: varapi.mpi_ts.o file_op.mpi_ts.o vt_mpi.mpi_ts.o
 	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libvarapi.so: varapi.o file_op.o
+
+libvtapi_mpi_ev.so: varapi.mpi_ev.o file_op.mpi_ev.o vt_mpi.mpi_ev.o
+	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
+
+libvtapi_ts.so: varapi.ts.o file_op.ts.o
+	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
+
+libvtapi_ev.so: varapi.ev.o file_op.ev.o
 	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
 
 install:
@@ -34,11 +41,17 @@ install:
 	cp ./*.h ./include
 	@echo VarAPI has been installed in ${PREFIX}
 
-%.mpi.o: %.c
-	$(MPICC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
+%.mpi_ts.o: %.c
+	$(MPICC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -DVT_MODE_TS -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
-%.o: %.c
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
+%.mpi_ev.o: %.c
+	$(MPICC) $(CFLAGS) -DUSE_MPI $(STREAM_FLAGS) $(VARAPI_FLAGS) -DVT_MODE_EV -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
+
+%.ts.o: %.c
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -DVT_MODE_TS -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
+
+%.ev.o: %.c
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -DVT_MODE_EV -I$(VARAPI) $(LDFLAGS) -o $@ -c $< 
 
 clean:
 	rm -rf *.o *.x *.so

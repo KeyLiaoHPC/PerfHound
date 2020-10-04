@@ -225,14 +225,10 @@ vt_init(char *u_data_root, char *u_proj_name) {
                 exit(1);
             }
             // Add header.
-#ifdef  VT_MODE_SHORT
-            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,,ev1,ev2,ev3,ev4\n");
-
-#elif   VT_MODE_LONG
-            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
-
+#ifdef  VT_MODE_EV
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4\n");
 #else
-            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,\n");
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval\n");
 
 #endif // END: #ifdef  VT_MODE_SHORT
         }
@@ -246,11 +242,8 @@ vt_init(char *u_data_root, char *u_proj_name) {
         exit(1);
     }
 
-#ifdef  VT_MODE_SHORT
+#ifdef  VT_MODE_EV
     fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4\n");
-
-#elif   VT_MODE_LONG
-    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
 
 #else
     fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval\n");
