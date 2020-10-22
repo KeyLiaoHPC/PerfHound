@@ -43,8 +43,6 @@
 #define _vt_init_ts(_nspt)    \
     uint32_t freq;                                              \
     asm volatile("mrs %0, cntfrq_el0"  "\n\t": "=r" (freq)::); \
-    printf("%lu\n", freq);\
-    fflush(stdout);\
     _nspt = 1 / ((double)freq * 1e-9);
 
 
