@@ -49,7 +49,15 @@
 #include "varapi_core.h"
 #include "vt_etag.h"
 
+#ifdef __x86_64__
+#include "vt_pm_x86_64.h"
+#include "vt_event_x86_64.h"
 
+#elif  __aarch64__
+#include "vt_pm_aarch64.h"
+#include "vt_event_aarch64.h"
+
+#endif // END: #ifdef __x86_64__
 
 /* Variables for Varapi's control */
 int vt_run_id;
@@ -226,7 +234,17 @@ vt_init(char *u_data_root, char *u_proj_name) {
             }
             // Add header.
 #ifdef  VT_MODE_EV
-            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4\n");
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,"
+                "ev1,ev2,ev3,ev4\n");
+#elif   VT_MODE_EVX
+#ifdef  __x86_64__
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,"
+                "ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8\n");
+#elif   __aarch64__
+            fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval,"
+                "ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+#endif
+
 #else
             fprintf(vt_fdata[i], "gid,pid,cycle,nanosec,uval\n");
 
@@ -243,7 +261,17 @@ vt_init(char *u_data_root, char *u_proj_name) {
     }
 
 #ifdef  VT_MODE_EV
-    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,ev1,ev2,ev3,ev4\n");
+    fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,"
+        "ev1,ev2,ev3,ev4\n");
+
+#elif   VT_MODE_EVX
+#ifdef  __x86_64__
+            fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,"\
+                "ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8\n");
+#elif   __aarch64__
+            fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval,"
+                "ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
+#endif
 
 #else
     fprintf(vt_fdata, "gid,pid,cycle,nanosec,uval\n");
@@ -445,8 +473,7 @@ vt_set_tag(uint32_t grp_id, uint32_t p_id, const char *name) {
 /* Get and record an event reading */
 void
 vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev) {
-#ifdef _N_EV
-#endif
+
     pdata[vt_i].ctag[0] = grp_id;
     pdata[vt_i].ctag[1] = p_id;
     _vt_read_cy (pdata[vt_i].cy);
@@ -456,14 +483,47 @@ vt_read(uint32_t grp_id, uint32_t p_id, double uval, int auto_write, int read_ev
     /* Read system event */
 #ifdef _N_EV
     if(read_ev && vt_ev_commited) {
-        if (vt_nev == 1) {
-            _vt_read_pm_1 (pdata[vt_i].ev);
-        } else if(vt_nev == 2) {
-            _vt_read_pm_2 (pdata[vt_i].ev);
-        } else if(vt_nev == 3) {
-            _vt_read_pm_3 (pdata[vt_i].ev);
-        } else if(vt_nev == 4) {
-            _vt_read_pm_4 (pdata[vt_i].ev);
+        switch (vt_nev){
+            case 1: 
+                _vt_read_pm_1 (pdata[vt_i].ev);
+                break;
+            case 2: 
+                _vt_read_pm_2 (pdata[vt_i].ev);
+                break;
+            case 3: 
+                _vt_read_pm_3 (pdata[vt_i].ev);
+                break;
+            case 4: 
+                _vt_read_pm_4 (pdata[vt_i].ev);
+                break;
+            case 5: 
+                _vt_read_pm_5 (pdata[vt_i].ev);
+                break;
+            case 6: 
+                _vt_read_pm_6 (pdata[vt_i].ev);
+                break;
+            case 7: 
+                _vt_read_pm_7 (pdata[vt_i].ev);
+                break;
+            case 8: 
+                _vt_read_pm_8 (pdata[vt_i].ev);
+                break;
+#ifdef __aarch64__
+            case 9: 
+                _vt_read_pm_9 (pdata[vt_i].ev);
+                break;
+            case 10: 
+                _vt_read_pm_10 (pdata[vt_i].ev);
+                break;
+            case 11: 
+                _vt_read_pm_11 (pdata[vt_i].ev);
+                break;
+            case 12: 
+                _vt_read_pm_12 (pdata[vt_i].ev);
+                break;
+#endif // END: #ifdef __aarch64__
+            default:
+                break;
         }
     } 
 #endif
