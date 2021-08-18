@@ -133,12 +133,13 @@
     if(_code == 0) _code = 0xFFFFFFFF;
 
 /* Set IA32_PERFEVTSELx */
-#define _pfh_config_event(_code_arr)  \
+#define _pfh_config_event(_code_arr, _nevt)  \
     do {                                            \
-        const PFC_CNT pfc_zeros[4] = {0, 0, 0, 0};  \
-        pfcWrCfgs(3, 4, _code_arr);                 \
-        pfcWrCnts(3, 4, pfc_zeros);                 \
+        const PFC_CNT pfc_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0};  \
+        pfcWrCfgs(3, _nevt, _code_arr);                 \
+        pfcWrCnts(3, _nevt, pfc_zeros);                 \
     } while(0);
+
 
 /* Read PMC */
 #define _pm_read(rcx, off)                      \
@@ -149,7 +150,7 @@
     "\n\tmov      %%rdx,   "#off"(%0)       "   \
     "\n\t"
 
-#define _pfh_read_pm_1(arr)                      \
+#define _pfh_read_pm_1(arr)                     \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             :                                   \

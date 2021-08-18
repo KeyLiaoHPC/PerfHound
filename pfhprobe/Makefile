@@ -16,7 +16,7 @@ endif
 CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
-PFHPROBE_FLAGS = 
+PFH_FLAGS =  -DPFH_MODE_EVX
 # Installing path
 PREFIX ?= .
 
@@ -28,6 +28,7 @@ all: libpfh.so
 libpfh.so: file_io.o pfh_probe.o
 	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
 
+
 install:
 	mkdir -p ${PREFIX}/lib
 	mkdir -p ${PREFIX}/include
@@ -38,7 +39,8 @@ install:
 	@echo Pfh-Probe has been installed in ${PREFIX}
 
 %.o: %.c
-	$(MPICC) $(CFLAGS) $(STREAM_FLAGS) $(PHPROBE_FLAGS) -DPFH_MODE_TS  $(LDFLAGS) -o $@ -c $< 
+	$(MPICC) $(CFLAGS) $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@ -c $< 
+	$(MPICC) $(CFLAGS) -S -fverbose-asm $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@.s -c $< 
 
 clean:
 	rm -rf *.o *.x *.so

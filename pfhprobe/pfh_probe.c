@@ -168,7 +168,7 @@ pfh_init(char *path) {
 
     /* Set all event codes to 0. */
 #ifdef _N_EV
-    for (i = 0; i < _N_EV; i ++) {
+    for (i = 0; i < 12; i ++) {
         pfh_evcodes[i] = 0;
     }
 #endif
@@ -249,18 +249,17 @@ pfh_set_evt(const char *etag) {
         return 2;     
     }
 
-    int i;
     uint64_t evcode = 0;
 
     _pfh_parse_event (evcode, etag);
 
-    if (ecode <= 0xFFFFFFFF - 1) {
+    if (evcode <= 0xFFFFFFFF - 1) {
         pfh_evcodes[pfh_nevt] = evcode;
         if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] Event %s added. \n", etag);
+            printf("*** [Pfh-Probe] Event %s added, evcode=0x%x. \n", etag, evcode);
         }
         pfh_nevt ++;
-    } else if (pfh_pinfo.rank == 0) {
+    } else {
         printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
     }
     
@@ -278,7 +277,8 @@ void
 pfh_commit() {
     int err;
 #ifdef _N_EV
-    _pfh_config_event (pfh_evcodes);
+    
+    _pfh_config_event (pfh_evcodes, pfh_nevt);
     if (pfh_pinfo.rank == 0) {
         printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
     }
@@ -321,7 +321,7 @@ void
 pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // uint64_t r1 = 0, r2 = 0, r3 = 0;
 
-    //_pfh_reg_save;
+    // _pfh_reg_save;
 
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
@@ -329,54 +329,54 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     _pfh_read_ns (pfh_precs[pfh_irec].ns);
     pfh_precs[pfh_irec].uval = uval;
     
-    //_pfh_reg_restore;
+    // _pfh_reg_restore;
 
     /* Read system event */
 #ifdef _N_EV
-    if(read_ev && vt_ev_commited) {
-        switch (pfh_nevt){
-            case 1: 
-                _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
-                break;
-            case 2: 
-                _pfh_read_pm_2 (pfh_precs[pfh_irec].ev);
-                break;
-            case 3: 
-                _pfh_read_pm_3 (pfh_precs[pfh_irec].ev);
-                break;
-            case 4: 
-                _pfh_read_pm_4 (pfh_precs[pfh_irec].ev);
-                break;
-            case 5: 
-                _pfh_read_pm_5 (pfh_precs[pfh_irec].ev);
-                break;
-            case 6: 
-                _pfh_read_pm_6 (pfh_precs[pfh_irec].ev);
-                break;
-            case 7: 
-                _pfh_read_pm_7 (pfh_precs[pfh_irec].ev);
-                break;
-            case 8: 
-                _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
-                break;
+    switch (pfh_nevt){
+        case 1: 
+            _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
+            break;
+        case 2: 
+            _pfh_read_pm_2 (pfh_precs[pfh_irec].ev);
+            break;
+        case 3: 
+            _pfh_read_pm_3 (pfh_precs[pfh_irec].ev);
+            break;
+        case 4: 
+            _pfh_read_pm_4 (pfh_precs[pfh_irec].ev);
+            break;
+        case 5: 
+            _pfh_read_pm_5 (pfh_precs[pfh_irec].ev);
+            break;
+        case 6: 
+            _pfh_read_pm_6 (pfh_precs[pfh_irec].ev);
+            break;
+        case 7: 
+            _pfh_read_pm_7 (pfh_precs[pfh_irec].ev);
+            break;
+        case 8: 
+            _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
+            break;
 #ifdef __aarch64__
-            case 9: 
-                _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
-                break;
-            case 10: 
-                _pfh_read_pm_10 (pfh_precs[pfh_irec].ev);
-                break;
-            case 11: 
-                _pfh_read_pm_11 (pfh_precs[pfh_irec].ev);
-                break;
-            case 12: 
-                _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
-                break;
+        case 9: 
+            _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
+            break;
+        case 10: 
+            _pfh_read_pm_10 (pfh_precs[pfh_irec].ev);
+            break;
+        case 11: 
+            _pfh_read_pm_11 (pfh_precs[pfh_irec].ev);
+            break;
+        case 12: 
+            _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
+            break;
 #endif // END: #ifdef __aarch64__
-            default:
-                break;
-        }
-    } 
+        default:
+            break;
+    }
+    printf("%llu, %llu, %llu, %llu",
+        pfh_precs[pfh_irec].ev[0], pfh_precs[pfh_irec].ev[1], pfh_precs[pfh_irec].ev[2], pfh_precs[pfh_irec].ev[3]);
 #endif
 
     pfh_irec ++;
@@ -386,7 +386,8 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
 void
 pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] WARNING. Buffer exceeded, record overlapped \n");
+        printf("*** [Pfh-Probe] WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
+            pfh_irec);
     }
     pfh_irec = pfh_irec % buf_nrec;
     pfh_fastread(grp_id, p_id, uval);
@@ -447,12 +448,12 @@ vt_strict_sync() {
 /* Exiting varapi */
 void
 pfh_finalize() {
-    int i = 0, err;
+    int err;
 
-    printf("*** [Pfh-Probe] User invokes finalization. \n", err);
+    printf("*** [Pfh-Probe] User invokes finalization. \n");
 
     pfh_read(0, 2, 0);
-    printf("*** [Pfh-Probe] Writing records. \n", err);
+    printf("*** [Pfh-Probe] Writing records. \n");
     err = pfh_io_wtrec(pfh_irec, pfh_nevt);
     if (err) {
         printf("*** [Pfh-Probe] Exit %d, failed at writing reading records. \n", err);

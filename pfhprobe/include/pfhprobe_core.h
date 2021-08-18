@@ -79,18 +79,24 @@
 #ifdef PFH_MODE_TS
 #undef PFH_MODE_EV
 #undef PFH_MODE_EVX
+#endif
 
-#elif PFH_MODE_EV
+#ifdef PFH_MODE_EV
 #undef PFH_MODE_TS
 #undef PFH_MODE_EVX
 #define _N_EV 4
+#endif
 
-#elif MODE_EVX
+#ifdef PFH_MODE_EVX
 #undef PFH_MODE_TS
 #undef PFH_MODE_EV
-#define _N_EV 12
 
+#ifdef __x86_64__
+#define _N_EV 8
+#elif __aarch64__
+#define _N_EV 12
 #endif // END: #ifdef VT_NODE_TS
+#endif
 
 /* Import performance monitor header after setting mode. */
 #ifdef __x86_64__
@@ -109,8 +115,10 @@ typedef struct {
     uint32_t ctag[2];
     uint64_t cy, ns;    
     double uval;        // 32 Bytes
-#ifdef _N_EV
-    uint64_t    ev[_N_EV];
+#ifdef PFH_MODE_EV
+    uint64_t ev[4];
+#elif PFH_MODE_EVX
+    uint64_t ev[12];
 #endif
 } rec_t;
 
@@ -124,7 +132,7 @@ typedef struct {
 } proc_t;
 
 #ifdef _N_EV 
-uint64_t pfh_evcodes[_N_EV];
+uint64_t pfh_evcodes[12];
 #endif
 extern rec_t *pfh_precs; // raw data.
 extern proc_t pfh_pinfo;

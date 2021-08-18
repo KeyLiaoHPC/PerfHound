@@ -93,7 +93,7 @@
  * reset PMEVCNTR<n>_EL0 to zero. 
  * 
  */
-#define _pfh_config_event(_code_arr)                     \
+#define _pfh_config_event(_code_arr, _nevt)              \
     do {                                                \
         int evt_id = 0;                                 \
         uint32_t _pmu_val0 = 0xFFFFFFFF;                \
@@ -101,6 +101,15 @@
         _pfh_set_pmreg(1, _code_arr[1]);                  \
         _pfh_set_pmreg(2, _code_arr[2]);                  \
         _pfh_set_pmreg(3, _code_arr[3]);                  \
+        _pfh_set_pmreg(4, _code_arr[4]);                  \
+        _pfh_set_pmreg(5, _code_arr[5]);                  \
+        _pfh_set_pmreg(6, _code_arr[6]);                  \
+        _pfh_set_pmreg(7, _code_arr[7]);                  \
+        _pfh_set_pmreg(8, _code_arr[8]);                  \
+        _pfh_set_pmreg(9, _code_arr[9]);                  \
+        _pfh_set_pmreg(10, _code_arr[10]);                  \
+        _pfh_set_pmreg(11, _code_arr[11]);                  \
+        _pfh_set_pmreg(12, _code_arr[12]);                  \
         asm volatile(                                   \
             "mrs x22, pmcr_el0"     "\n\t"              \
             "orr x22, x22, #0x2"    "\n\t"              \
