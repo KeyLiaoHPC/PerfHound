@@ -49,7 +49,7 @@
 MPI_Comm comm_iogrp;
 uint32_t mpi_size, iogrp_size, iogrp_rank, head, my_grank;
 uint32_t *iogrp_grank, *iogrp_gcpu;              // IO group world rank.
-MPI_Datatype vt_mpidata_t;  // MPI datatype for event data.
+MPI_Datatype vt_mpirec_t;  // MPI datatype for event data.
 int64_t bns, wait_ns;                // bns = tx - t0, dnsclock bias to rank 0;
 
 
@@ -201,7 +201,7 @@ vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank,
 
     /* Write to run?_rankmap.csv */
     if (my_grank == 0) {
-        char map_file[_PATH_MAX];
+        char map_file[PATH_MAX];
         FILE *fp;
 
         sprintf(map_file, "%s/run%d_rankmap.csv", projpath, *run_id);
@@ -260,7 +260,7 @@ vt_iogrp_getinfo(uint32_t *nrank, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_g
 void 
 vt_newtype() {
     int nb, err;
-    data_t vtdata;
+    rec_t vtdata;
 #ifdef _N_EV
     int len[5];
     MPI_Aint disp[5];
@@ -292,8 +292,8 @@ vt_newtype() {
     disp[4] = (uint64_t)vtdata.ev - (uint64_t)&vtdata.ns;
 #endif
 
-    err = MPI_Type_create_struct(nb, len, disp, types, &vt_mpidata_t);
-    err = MPI_Type_commit(&vt_mpidata_t);
+    err = MPI_Type_create_struct(nb, len, disp, types, &vt_mpirec_t);
+    err = MPI_Type_commit(&vt_mpirec_t);
     
     MPI_Barrier(MPI_COMM_WORLD);
     return;
@@ -302,7 +302,7 @@ vt_newtype() {
 /* MPI type destroy */
 void 
 vt_freetype() {
-    MPI_Type_free(&vt_mpidata_t);
+    MPI_Type_free(&vt_mpirec_t);
 
     return;
 }
@@ -325,7 +325,7 @@ vt_world_barrier() {
 
 /* IO rank gets vartect data from a group member. */
 int
-vt_get_data(uint32_t rank, uint32_t *count, data_t *data) {
+vt_get_data(uint32_t rank, uint32_t *count, rec_t *data) {
     if (rank) {
         uint32_t remote_cnt;
         int err;
@@ -336,7 +336,7 @@ vt_get_data(uint32_t rank, uint32_t *count, data_t *data) {
             return -1;
         }
         *count = remote_cnt;
-        err = MPI_Recv(data, *count, vt_mpidata_t, rank, rank, comm_iogrp, &st);
+        err = MPI_Recv(data, *count, vt_mpirec_t, rank, rank, comm_iogrp, &st);
         if (err) {
             return -1;
         }
@@ -347,9 +347,9 @@ vt_get_data(uint32_t rank, uint32_t *count, data_t *data) {
 
 /* Send vartect data to io rank. */
 void
-vt_send_data(uint32_t count, data_t *data) {
+vt_send_data(uint32_t count, rec_t *data) {
     MPI_Send(&count, 1, MPI_UINT32_T, 0, iogrp_rank, comm_iogrp);
-    MPI_Send(data, count, vt_mpidata_t, 0, iogrp_rank, comm_iogrp);
+    MPI_Send(data, count, vt_mpirec_t, 0, iogrp_rank, comm_iogrp);
 }
 
 /* Release mpi resource but don't touch main programm ! */
@@ -387,14 +387,14 @@ vt_get_bias(int r0, int r1) {
  *
  */
     // warm icache
-    _vt_read_ns(ns0);
+    _pfh_read_ns(ns0);
 
     if (my_grank == r0) {
-        _vt_read_ns(ns0);
+        _pfh_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 101, MPI_COMM_WORLD);
         // First sync
         MPI_Recv(&ns0, 1, MPI_UINT64_T, r1, 102, MPI_COMM_WORLD, &st);
-        _vt_read_ns(ns0);
+        _pfh_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 103, MPI_COMM_WORLD);
         bns = 0;
     }
@@ -402,10 +402,10 @@ vt_get_bias(int r0, int r1) {
     if (my_grank == r1) {
         MPI_Recv(&ns0, 1, MPI_UINT64_T, r0, 101, MPI_COMM_WORLD, &st);
         // First sync
-        _vt_read_ns(ns0);
+        _pfh_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r0, 102, MPI_COMM_WORLD);
         MPI_Recv(&ns1, 1, MPI_UINT64_T, r0, 103, MPI_COMM_WORLD, &st);
-        _vt_read_ns(ns2);
+        _pfh_read_ns(ns2);
 
         d_bns = (double)ns1 - (double)(ns2 - ns0) * 0.5 - (double)ns0;
         bns = (int64_t)d_bns;
@@ -423,17 +423,17 @@ vt_tsync() {
     struct timespec ts;
 
     MPI_Barrier(MPI_COMM_WORLD);
-    _vt_read_ns(ns);
+    _pfh_read_ns(ns);
     MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
-    _vt_read_ns(ns_mpi);
+    _pfh_read_ns(ns_mpi);
     MPI_Bcast(&ns_mpi, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // Double broadcast to guarantee the offset won't less than the actual bias.
     ns = ns_mpi + (ns_mpi - ns) + _SYNC_NS_OFFSET + bns;
     //ns = bns < 0? (ns - abs(bns)) : (ns + bns);
 
-    _vt_read_ns(ns_new);
+    _pfh_read_ns(ns_new);
     while (ns_new < ns) {
-        _vt_read_ns(ns_new);
+        _pfh_read_ns(ns_new);
     }
 
     return;
@@ -445,7 +445,7 @@ vt_get_cur_bias() {
     uint64_t ns, ns_r0;
     struct timespec ts;
 
-    _vt_read_ns(ns);
+    _pfh_read_ns(ns);
     ns_r0 = ns;
     MPI_Bcast(&ns_r0, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // wait_ns < 0: This rank is running slower (reach the sync point later) than rank 0,
@@ -465,16 +465,16 @@ vt_recover_bias() {
     // How much slower from the slowest rank ? Get the minimum wait_ns;
     MPI_Allreduce(&wait_ns, &wait_ns_min, 1, MPI_INT64_T, MPI_MIN, MPI_COMM_WORLD);
     // Current rank 0 reading
-    _vt_read_ns(ns);
+    _pfh_read_ns(ns);
     MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // offset needs to contain the minimum wait_ns
     tmp = bns + _SYNC_NS_OFFSET - wait_ns_min - wait_ns;
     ns = ns + (uint64_t)tmp;
     // Reset the unbalance
 
-    _vt_read_ns(ns_new);
+    _pfh_read_ns(ns_new);
     while (ns_new < ns) {
-        _vt_read_ns(ns_new);
+        _pfh_read_ns(ns_new);
     }
 
     return;

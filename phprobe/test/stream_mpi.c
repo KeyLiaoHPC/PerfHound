@@ -270,7 +270,7 @@ main()
 	MPI_Comm_size(MPI_COMM_WORLD, &numranks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-	/* VarAPI init. */
+	/* Pfh-Probe init. */
     //if (vt_init("/lustre/home/acct-hpc/hpckey/experiments/test_data", "st_mpi")) {
     if (vt_init("~/experiments/test_data", "st_mpi")) {
         exit(1);

@@ -29,25 +29,25 @@ Both Chinses and English documentation can be found in **docs/**.
 $ git clone https://git.computing.sjtu.edu.cn/keymorrislane/perfhound
 $ cd perfhound/src
 $ make
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ts.so varapi.mpi_ts.o file_op.mpi_ts.o vt_mpi.mpi_ts.o
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DVT_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ev.so varapi.mpi_ev.o file_op.mpi_ev.o vt_mpi.mpi_ev.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DVT_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DVT_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ts.so varapi.ts.o file_op.ts.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DVT_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DVT_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ev.so varapi.ev.o file_op.ev.o
 mkdir -p ./lib
 mkdir -p ./include
 mkdir -p ./bin
 mv ./*.so ./lib
-VarAPI has been installed in .
+Pfh-Probe has been installed in .
 ```
 
 完成后，会在src目录下生成./include/varapi.h和./lib/libvarapi\*.so。需要在环境变量CPATH、LIBRARY\_PATH和LD\_LIBRARY\_PATH中添加对应位置，在之后对被测代码进行插桩的时候，要将这些组件一起编译进被测代码。
@@ -155,7 +155,17 @@ $ cd samples && make
   - run\<RunID\>\_rankmap.csv
   - tstamp.log
 
-#### 2.4.2 PerfHound Statistic
+#### 2.4.2 特殊标记点列表
+
+GID为0的标记组为盘瓠内部定义的特殊标记点，用于盘瓠自身事件追踪。
+
+| GID | CID | 描述 |
+| --- | --- | --- |
+| 0 | 0 | PFH-Probe标记组 |
+| 0 | 1 | PFH-Probe开始运行 |
+| 0 | 2 | PFH-Probe被用户终止 |
+| 0 | 3 | PFH-Probe开始导出收集到的数据 |
+| 0 | 4 | PFH-Probe数据导出完成 |
 
 ## 3 案例
 

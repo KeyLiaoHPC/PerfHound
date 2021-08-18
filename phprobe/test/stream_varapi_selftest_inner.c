@@ -1,5 +1,5 @@
 /**
- *  A altered STREAM-MPI for VarAPI self tests.
+ *  A altered STREAM-MPI for Pfh-Probe self tests.
  *  Scaling up from 1 KiB to 512 MiB per rank.
  */
 # define _XOPEN_SOURCE 600
@@ -114,7 +114,7 @@ main() {
     MPI_Comm_size(MPI_COMM_WORLD, &numranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-    /* VarAPI init. */
+    /* Pfh-Probe init. */
     if (vt_init("./varapi_stream_self", "st_mpi_1node_inner")) {
         exit(1);
     }
@@ -143,7 +143,7 @@ main() {
     }
 
     while (cur_bytes < 10485760) {
-        /* Set tags for VarAPI */
+        /* Set tags for Pfh-Probe */
         char tag_str[256];
         group ++;
         sprintf(tag_str, "%llubytes", cur_bytes);
@@ -291,7 +291,7 @@ main() {
             printf(HLINE);
         }
 
-        /* VarAPI STREAM */
+        /* Pfh-Probe STREAM */
         for (j = 0; j < 4; j ++) {
             avgtime[j] = 0;
             mintime[j] = UINT64_MAX;

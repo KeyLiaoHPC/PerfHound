@@ -5,10 +5,10 @@ import pandas as pd
 """
 == Description
 
-VtObject dominates all data in a specific VarAPI project. It can be used as a
+VtObject dominates all data in a specific Pfh-Probe project. It can be used as a
 data driver for loading and performing basic data analysis operations. It provides
-a basic data structure for a VarAPI project. One wants to better utilize the
-VarAPI data can apply this class for locating one or more tracing points/groups.
+a basic data structure for a Pfh-Probe project. One wants to better utilize the
+Pfh-Probe data can apply this class for locating one or more tracing points/groups.
 
 User can locate any tracing point following 'data root - project - run ID - rank ID - timestamp' 
 structure. Meanwile the hostname, binding cpu, trace point ID, group ID, rank map
@@ -29,7 +29,7 @@ You only need to
 
 = Create a VtObject object
 
-VtObject builds a data domain based on paticular VarAPI project. One wants to 
+VtObject builds a data domain based on paticular Pfh-Probe project. One wants to 
 start a VarStat analysis should initialize at least one VtObject using:
 import vtstat
 vtobj = vtstat.VtObject("/some/data/root", "myproj")
