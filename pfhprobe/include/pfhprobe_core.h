@@ -105,7 +105,7 @@
 
 #elif  __aarch64__
 #include "pfh_pm_aarch64.h"
-#include "pfh_event_aarch64.h"
+#include "pfh_evt_aarch64.h"
 
 #endif // END: #ifdef __x86_64__
 

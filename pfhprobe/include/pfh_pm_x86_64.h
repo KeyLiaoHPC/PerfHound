@@ -49,18 +49,18 @@
 
 /* Init fixed-function registers. */
 // This call is based on https://github.com/obilaniu/libpfc
-#define _pfh_init_ts                                            \
-    do {                                                        \
-        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};            \
-        const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0}; \
-        if (pfcInit() != 0) {                                   \
-            printf("Failed to load pfc file.\n");               \
-            fflush(stdout);                                     \
-            exit(1);                                            \
-        }                                                       \
-        pfcWrCfgs(0, 7, pfc_cfgs);                              \
-        pfcWrCnts(0, 7, pfc_zero_cnts);                         \
-    } while(0);                                                 \
+#define _pfh_init_ts                                                \
+    do {                                                            \
+        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};                \
+        const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0};     \
+        if (pfcInit() != 0) {                                       \
+            printf("*** [Pfh-Probe] Failed to load pfc file.\n");   \
+            fflush(stdout);                                         \
+            exit(1);                                                \
+        }                                                           \
+        pfcWrCfgs(0, 7, pfc_cfgs);                                  \
+        pfcWrCnts(0, 7, pfc_zero_cnts);                             \
+    } while(0);                                                     \
 //    _nspt = 1 / _X86_TSC_GHZ;                            
 
 #define _pfh_fini_ts     \

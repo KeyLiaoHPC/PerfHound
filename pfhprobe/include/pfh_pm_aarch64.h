@@ -62,7 +62,6 @@
 
 #endif
 
-#ifdef PFH_MODE_EV
 
 /* PMU reading */
 #define _PMSET_REG(_id) "pmevtyper"#_id"_el0"
@@ -95,7 +94,6 @@
  */
 #define _pfh_config_event(_code_arr, _nevt)              \
     do {                                                \
-        int evt_id = 0;                                 \
         uint32_t _pmu_val0 = 0xFFFFFFFF;                \
         _pfh_set_pmreg(0, _code_arr[0]);                  \
         _pfh_set_pmreg(1, _code_arr[1]);                  \
@@ -109,7 +107,6 @@
         _pfh_set_pmreg(9, _code_arr[9]);                  \
         _pfh_set_pmreg(10, _code_arr[10]);                  \
         _pfh_set_pmreg(11, _code_arr[11]);                  \
-        _pfh_set_pmreg(12, _code_arr[12]);                  \
         asm volatile(                                   \
             "mrs x22, pmcr_el0"     "\n\t"              \
             "orr x22, x22, #0x2"    "\n\t"              \
@@ -132,4 +129,26 @@
 #define _pfh_read_pm_4(_val_arr)     _pfh_read_pm_3(_val_arr);        \
                                     _pfh_read_pm(3, (_val_arr)[3]);
 
-#endif
+#define _pfh_read_pm_5(_val_arr)     _pfh_read_pm_4(_val_arr);        \
+                                    _pfh_read_pm(4, (_val_arr)[4]);
+
+#define _pfh_read_pm_6(_val_arr)     _pfh_read_pm_5(_val_arr);        \
+                                    _pfh_read_pm(5, (_val_arr)[5]);
+
+#define _pfh_read_pm_7(_val_arr)     _pfh_read_pm_6(_val_arr);        \
+                                    _pfh_read_pm(6, (_val_arr)[6]);
+
+#define _pfh_read_pm_8(_val_arr)     _pfh_read_pm_7(_val_arr);        \
+                                    _pfh_read_pm(7, (_val_arr)[7]);
+
+#define _pfh_read_pm_9(_val_arr)     _pfh_read_pm_8(_val_arr);        \
+                                    _pfh_read_pm(8, (_val_arr)[8]);
+
+#define _pfh_read_pm_10(_val_arr)     _pfh_read_pm_9(_val_arr);        \
+                                    _pfh_read_pm(9, (_val_arr)[9]);
+
+#define _pfh_read_pm_11(_val_arr)     _pfh_read_pm_10(_val_arr);        \
+                                    _pfh_read_pm(10, (_val_arr)[10]);
+
+#define _pfh_read_pm_12(_val_arr)     _pfh_read_pm_11(_val_arr);        \
+                                    _pfh_read_pm(11, (_val_arr)[11]);

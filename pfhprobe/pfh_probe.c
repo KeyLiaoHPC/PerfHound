@@ -174,7 +174,9 @@ pfh_init(char *path) {
 #endif
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
+#ifdef __x86_64__
     _pfh_init_ts;
+#endif
     if (pfh_pinfo.rank == 0) {
         printf("*** [Pfh-Probe] Timer has been set. \n");
         fflush(stdout);
@@ -375,8 +377,6 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
         default:
             break;
     }
-    printf("%llu, %llu, %llu, %llu",
-        pfh_precs[pfh_irec].ev[0], pfh_precs[pfh_irec].ev[1], pfh_precs[pfh_irec].ev[2], pfh_precs[pfh_irec].ev[3]);
 #endif
 
     pfh_irec ++;

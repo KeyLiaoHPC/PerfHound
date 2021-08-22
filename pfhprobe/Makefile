@@ -39,8 +39,8 @@ install:
 	@echo Pfh-Probe has been installed in ${PREFIX}
 
 %.o: %.c
-	$(MPICC) $(CFLAGS) $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@ -c $< 
-	$(MPICC) $(CFLAGS) -S -fverbose-asm $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@.s -c $< 
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@ -c $< 
+	$(CC) $(CFLAGS) -S -fverbose-asm $(STREAM_FLAGS) $(PFH_FLAGS)  $(LDFLAGS) -o $@.s -c $< 
 
 clean:
 	rm -rf *.o *.x *.so
