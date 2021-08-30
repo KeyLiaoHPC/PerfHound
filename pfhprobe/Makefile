@@ -16,7 +16,7 @@ endif
 CFLAGS += -fPIC
 # 
 #VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
-PFH_FLAGS =  -DPFH_MODE_EVX
+PFH_FLAGS =  -DPFH_MODE_TS
 # Installing path
 PREFIX ?= .
 

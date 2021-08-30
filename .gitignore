@@ -24,3 +24,5 @@ lib/
 *.so
 *.a
 *.s
+*.log
+*.btr
