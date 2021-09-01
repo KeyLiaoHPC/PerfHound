@@ -6,23 +6,33 @@
 #include <gsl/gsl_randist.h>
 #include <mpi.h>
 
-#define Tf1 50
-#define Tf3 50
-#define Tk1 0.2 
-#define Tk3 0.1
-#define Ti  0.0002
+/**
+ * Pareto
+ * K =      50           40         30      20      10
+ * 0.90 - 1.0470    -   1.0592  -   1.0792  1.1210  1.2592
+ * 0.95 - 1.0616    -   1.0777  -   1.1052  1.1606  1.3494
+ * 0.99 - 1.0958    -   1.1225  -   1.1659  1.2583  1.5802
+ * 0.999 - 1.1495   -   1.1893  -   1.2664  1.4074  1.9809
+ */
+
+#define Tf1 10
+#define Tf3 0
+#define Tk1 0.1 
+#define Tk3 0
+#define Ti  0.0001
 #define Lf  10
 #define Lk  100
 #define Li  1000
 #define NRUN 500
-#define NP_NODE 40               // # of cores per node.
-#define NNODE 32                 // # of nodes.
+#define NP_NODE 32               // # of cores per node.
+#define NNODE 4                 // # of nodes.
 #define NORM_SIGMA 0.016666667
 #define NORM_CUT 0.1
 #define PARETO_K 49
-#define SYSVAR_P 2              // Invoking period (sec) of os noise.
-#define SYSVAR_T 0.0002         // Time(sec) consumed by the os noise.
+#define SYSVAR_P 5              // Invoking period (sec) of os noise.
+#define SYSVAR_T 0.2         // Time(sec) consumed by the os noise.
 
+int nproc, myrank;
 
 
 int 
@@ -107,36 +117,89 @@ add_osnoise(float *p_alltime, int nnode, int ppn, float p, float t, float *final
     int i, j, k, core;
     int nnoise, passed_noise;
     uint64_t r;
-    float tmax, off, final;
+    float tmax, final = 0, node_off;
+    float *ptr, *ptime;
 
-    final = 0;
+    int myjob, njobp0, njobp1;
+    int modu, real_nproc, off, err;
+    MPI_Status mpistat;
 
-    for (i = 0; i < nnode; i ++) {
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    modu = nnode % nproc;
+    njobp0 = (nnode - modu) / nproc;
+    njobp1 = njobp0 + 1;
+    if (njobp0 == 0) {
+        real_nproc = modu;
+    } else {
+        real_nproc = nproc;
+    }
+    // allocate sim rank to mpi rank;
+    if (myrank < modu) {
+        // 除不尽
+        myjob = njobp1;
+    } else {
+        myjob = njobp0;
+    }
+    if (myjob) {
+        ptime = (float*)malloc(myjob * ppn * sizeof(float));
+    }
+
+    if (myrank == 0) {
+        for (i = 1; i < real_nproc; i ++) {
+            if (i < modu) {
+                off = njobp1 * i * ppn;
+            } else {
+                off = ppn * (modu * njobp1 + (i - modu) * njobp0);
+            }
+            if (i < modu) {
+                MPI_Send(p_alltime + off, ppn * njobp1, MPI_FLOAT, i, i, MPI_COMM_WORLD);
+            } else {
+                MPI_Send(p_alltime + off, ppn * njobp0, MPI_FLOAT, i, i, MPI_COMM_WORLD);
+            }
+            
+        }
+        for (j = 0; j < myjob * ppn; j ++) {
+                ptime[j] = p_alltime[j];
+        }
+    } else {
+        if (myjob != 0) {
+            MPI_Recv(ptime, ppn * myjob, MPI_FLOAT, 0, myrank, MPI_COMM_WORLD, &mpistat);
+        }
+    }
+
+
+    for (i = 0; i < myjob; i ++) {
         // hypothesis: each node start at a random time in a period.
         get_urandom(&r);
         // How many seconds from the starting point to next interrupt.
-        off = p * ((float)r / (float)UINT64_MAX);
+        ptr = ptime + ppn * i;
+        node_off = p * ((float)r / (float)UINT64_MAX);
         tmax = 0;
-        for (j = i * ppn; j < (i + 1) * ppn; j ++) {
-            tmax = tmax < p_alltime[j] ? p_alltime[j] : tmax;
+        for (j = 0; j < ppn; j ++) {
+            tmax = tmax < ptr[j] ? ptr[j] : tmax;
         }
-        nnoise = (tmax - off) / p;
+
+        nnoise = (tmax - node_off) / p;
         passed_noise = 0;
 
-        do {
+        while(nnoise > passed_noise){
             for (k = 0; k < nnoise - passed_noise; k ++) {
                 get_urandom(&r);
                 core = r % ppn;
-                p_alltime[i*nnode+core] += t;
-                tmax = tmax < p_alltime[i*nnode+core]? p_alltime[i*nnode+core] : tmax;
+                ptr[core] += t;
+                tmax = tmax < ptr[core]? ptr[core] : tmax;
             }
+
             passed_noise += k;
-            nnoise = (tmax - off) / p;
-        } while(nnoise > passed_noise);
+            nnoise = (tmax - node_off) / p;
+        }
         final = final < tmax ? tmax : final;
+        
     }
 
-    *final_time = final;
+    MPI_Reduce(&final, final_time, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
 }
 
 int
@@ -153,10 +216,9 @@ main(int argc, char **argv){
     float tau_f, tau_k, tau_i;
     float arr_tau_f[Lf], arr_tau_k[Lf][Lk], arr_tau_i[Lf][Lk][Li];
     float node_perf[NNODE];
-    int *pnode_id, *p_allnjob; // ADJ factor for node performance variation.
-    // printf("Theoretical execution time: %f seconds \n", stdtime);
+    int *p_allnjob; // ADJ factor for node performance variation.
     int i, j;
-    int nproc, myrank, err, simrank_st, simrank_en;
+    int err, simrank_st, simrank_en;
     FILE *fp;
 
     err = MPI_Init(NULL, NULL);
@@ -207,14 +269,13 @@ main(int argc, char **argv){
         fp = fopen("data.log", "w");
     }
     // allocate node id to each rank
-    pnode_id = (int *)malloc(myjob*sizeof(int));
     p_allnjob = (int *)malloc(nproc * sizeof(int));
-    if (pnode_id == NULL || p_allnjob == NULL) {
-        printf("Rank %d failed to alloc pnode_id.\n", myrank);
+    if (p_allnjob == NULL) {
+        printf("Rank %d failed to alloc p_allnjob.\n", myrank);
         fflush(stdout);
         exit(-1);
     }
-    for (i = 1; i < modu; i ++) {
+    for (i = 0; i < modu; i ++) {
         p_allnjob[i] = njobp1;
     }
     for (i = modu; i < nproc; i ++) {
@@ -225,34 +286,27 @@ main(int argc, char **argv){
     if (myrank < modu) {
         // The rank which has one more job.
         simrank_st = myrank * njobp1;
-        simrank_en = simrank_st + myjob - 1;
     } else {
         simrank_st = modu * njobp1 + (myrank - modu) * njobp0;
-        simrank_en = simrank_st + myjob - 1;
     }
-    for (i = 0; i < myjob; i ++) {
-        pnode_id[i] = (simrank_st + i) / NP_NODE;
+    simrank_en = simrank_st + myjob - 1;
 #ifdef DEBUG
-        do {
-            int flag = 1;
-            if (myrank == 0) {
-                printf( "rank=%d, simrank=%d, node_id=%d\n", 
-                        myrank, simrank_st + i, pnode_id[i]);
-                fflush(stdout);
-            } else {
-                MPI_Status mpistat;
-                MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, MPI_COMM_WORLD, &mpistat);
-                printf( "rank=%d, simrank=%d, node_id=%d\n",
-                        myrank, simrank_st + i, pnode_id[i]);
-                fflush(stdout);
-            }
-            if (myrank + 1 < nproc) {
-                MPI_Send(&flag, 1, MPI_INT, myrank + 1, myrank, MPI_COMM_WORLD);
-            }
-            MPI_Barrier(MPI_COMM_WORLD);
-        } while (0);
+    do {
+        int flag = 1;
+        if (myrank == 0) {
+            printf( "rank=%d, simrank=%d-%d\n", myrank, simrank_st, simrank_en);
+            fflush(stdout);
+        } else {
+            MPI_Status mpistat;
+            MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, MPI_COMM_WORLD, &mpistat);
+            printf( "rank=%d, simrank=%d-%d\n", myrank, simrank_st, simrank_en);
+            fflush(stdout);
+        }
+        if (myrank + 1 < nproc) {
+            MPI_Send(&flag, 1, MPI_INT, myrank + 1, myrank, MPI_COMM_WORLD);
+        }
+    } while (0);
 #endif // #ifdef DEBUG
-    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -260,18 +314,33 @@ main(int argc, char **argv){
         char name[256];
         FILE *fnode;
 
-        sprintf(name, "node_perf_%d.log", NNODE);
+        sprintf(name, "./node_perf_%d.log", NNODE);
         fnode = fopen(name, "r");
         if (fnode == NULL) {
             get_nodevar(node_perf, NNODE);
+            printf("Generating node variation.\n");
+            fflush(stdout);
         } else {
+            printf("Using existed node variation factor. %s\n", name);
             for (i = 0; i < NNODE; i ++) {
-                fscanf(fnode, "%f\n", node_perf[i]);
+                fscanf(fnode, "%f\n", node_perf+i);
+#ifdef DEBUG
+                printf("%d, %f\n", i, node_perf[i]);
+                fflush(stdout);
+#endif
             }
             fclose(fnode);
         }
+        printf("Start simulation.\nPerformance factor for node 0-%d: ", NNODE-1);
+        for (i = 0; i < NNODE; i ++) {
+            printf("%f, ", node_perf[i]);
+        }
+        printf("\n");
+        printf("Theoretical execution time: %f seconds \n", stdtime);
+        fflush(stdout);
     } 
 
+    MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Bcast(node_perf, NNODE, MPI_FLOAT, 0, MPI_COMM_WORLD);
     
@@ -281,19 +350,6 @@ main(int argc, char **argv){
     r = gsl_rng_alloc(T);
 
     
-#ifdef DEBUG
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (myrank == 0) {
-        printf("Start simulation.\nPerformance factor for node 0-%d: ", NNODE-1);
-        for (i = 0; i < NNODE; i ++) {
-            printf("%f, ", node_perf[i]);
-        }
-        printf("\n");
-        fflush(stdout);
-    }
-#endif // #ifdef DEBUG
-
-
 #ifdef OSNOISE
         // arrays for OS noise
         float *p_alltime, *p_mytime;
@@ -305,25 +361,24 @@ main(int argc, char **argv){
             printf("Failed to allocate os noise helper arrays.\n");
             exit(-1);
         }
+        
         p_displ[0] = 0;
-        for (i = 1; i <= modu; i ++) {
-            p_displ[i] = p_displ[i-1] + njobp1;
-            p_allnjob[i] = njobp1;
-        }
-        for (i = modu + 1; i < nproc; i ++) {
-            p_displ[i] = p_displ[i-1] + njobp0;
-            p_allnjob[i] = njobp0;
+        for (i = 1; i < nproc; i ++) {
+            p_displ[i] = p_displ[i-1] + p_allnjob[i-1];
         }
 #endif // #ifdef OSNOISE
     /* Start simulation */
     for (i = 0; i < NRUN; i++) {
         float time = 0, max_time = 0;
         float tau_i, tau_k, tau_f;
-        int li, lf, lk;
+        int li, lf, lk, simnode;
+
+        get_nodevar(node_perf, NNODE);
 
         for (j = 0; j < myjob; j++) {
             register float s = 1.0;
-            s = 1 + node_perf[pnode_id[j]];
+            simnode = (simrank_st + j) / NP_NODE;
+            s = 1 + node_perf[simnode];
 
             ti = (float)Ti / s;
             tk1 = (float)Tk1 / s;
@@ -335,15 +390,21 @@ main(int argc, char **argv){
             gsl_rng_set(r, seed);
 
             for (lf = 0; lf < Lf; lf ++) {
-#ifndef NO_FVAR
+#ifdef NO_FVAR
+                arr_tau_f[lf] = tf1; //gsl_ran_pareto(r, PARETO_K, 1);
+#else
                 arr_tau_f[lf] = tf1 * gsl_ran_pareto(r, PARETO_K, 1);
 #endif
                 for (lk = 0; lk < Lk; lk ++) {
-#ifndef NO_KVAR
+#ifdef NO_KVAR
+                    arr_tau_k[lf][lk] = tk1; //gsl_ran_pareto(r, PARETO_K, 1);
+#else
                     arr_tau_k[lf][lk] = tk1 * gsl_ran_pareto(r, PARETO_K, 1);
 #endif
                     for (li = 0; li < Li; li ++) {
-#ifndef NO_IVAR
+#ifdef NO_IVAR
+                        arr_tau_i[lf][lk][li] = ti; //gsl_ran_pareto(r, PARETO_K, 1);
+#else                    
                         arr_tau_i[lf][lk][li] = ti * gsl_ran_pareto(r, PARETO_K, 1);
 #endif
                     }
@@ -354,33 +415,19 @@ main(int argc, char **argv){
             for (lf = 0; lf < Lf; lf ++) {
                 tau_k = 0;
                 for (lk = 0; lk < Lk; lk ++) {
-#ifndef NO_IVAR
                     tau_i = 0;
                     for (li = 0; li < Li; li ++) {
                         tau_i += arr_tau_i[lf][lk][li];
                     }
-#else
-                    tau_i = Li * ti;
-#endif
                     tau_k += tau_i;
-#ifndef NO_KVAR
                     tau_k += arr_tau_k[lf][lk];
-#else
-                    tau_k += tk1;
-#endif
                     tau_k += tk3;
                 }
-                tau_f = 0;
-#ifndef NO_FVAR
-                tau_f += arr_tau_f[lf];
-#else
-                tau_f += tf1;
-#endif
-                tau_f += tau_k;
-                tau_f += tf3;
-
-                time += tau_f;
+                time += arr_tau_f[lf];
+                time += tau_k;
+                time += tf3;
             }
+
 #ifdef OSNOISE
             p_mytime[j] = time;
 #else
@@ -389,27 +436,29 @@ main(int argc, char **argv){
         }
         float final_time;
 #ifdef OSNOISE
-        MPI_Gatherv(p_mytime, myjob, MPI_FLOAT, 
-                    p_alltime, p_allnjob, p_displ, MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
-        // Spreading again
+        //MPI_Gatherv(p_mytime, myjob, MPI_FLOAT, 
+        //            p_alltime, p_allnjob, p_displ, MPI_FLOAT, 0, MPI_COMM_WORLD);
         if (myrank == 0) {
-            add_osnoise(p_alltime, NNODE, NP_NODE, SYSVAR_P, SYSVAR_T, &final_time);
+            int iii, in, kkk;
+            MPI_Status mpistat;
+            for (iii = 0; iii < myjob; iii++) {
+                p_alltime[iii] = p_mytime[iii];
+            }
+            for (in = 1; in < nproc; in ++) {
+
+                MPI_Recv(p_alltime + p_displ[in], p_allnjob[in], MPI_FLOAT, in, in, MPI_COMM_WORLD, &mpistat);
+            }
+        } else {
+            int in;
+            MPI_Send(p_mytime, myjob, MPI_FLOAT, 0, myrank, MPI_COMM_WORLD);
         }
+        add_osnoise(p_alltime, NNODE, NP_NODE, SYSVAR_P, SYSVAR_T, &final_time);
 #else
         MPI_Reduce(&max_time, &final_time, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
 #endif // #ifdef OSNOISE
 
         if (myrank == 0) {
-            if (i) {
-                int s = i;
-                do {
-                    printf("\b");
-                    s /= 10;
-                } while (s);
-                fflush(stdout);
-            }
-            printf("%d", i);
+            printf("%d, %f\n", i, final_time);
             fprintf(fp, "%.12f\n", final_time);
             fflush(stdout);
         }
@@ -425,7 +474,6 @@ main(int argc, char **argv){
     if (myrank == 0) {
         fclose(fp);
     }
-    free(pnode_id);
     free(p_allnjob);
 
     gsl_rng_free(r);
