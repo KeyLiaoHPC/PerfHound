@@ -23,12 +23,26 @@
 #define Lf  10
 #define Lk  100
 #define Li  1000
+
+#ifndef NRUN
 #define NRUN 500
-#define NP_NODE 32               // # of cores per node.
-#define NNODE 4                 // # of nodes.
+#endif
+
+#ifndef NP_NODE
+#define NP_NODE 64               // # of cores per node.
+#endif
+
+#ifndef NNODE
+#define NNODE 512                 // # of nodes.
+#endif
+
 #define NORM_SIGMA 0.016666667
 #define NORM_CUT 0.1
-#define PARETO_K 49
+
+#ifndef PARETO_K
+#define PARETO_K 10
+#endif
+
 #define SYSVAR_P 5              // Invoking period (sec) of os noise.
 #define SYSVAR_T 0.2         // Time(sec) consumed by the os noise.
 
@@ -87,16 +101,16 @@ get_nodevar(float *pnode, int n) {
     printf("Start genrating Gaussian noise.\n");
     fflush(stdout);
 #endif // #ifdef DEBUG
-    if (n == 1) {
-        // No variation for single node.
-        pnode[0] = 0; 
-    } else {
+    //if (n == 1) {
+    //    // No variation for single node.
+    //    pnode[0] = 0; 
+    //} else {
         for (i = 0; i < n; i ++) {
             pnode[i] = gsl_ran_gaussian(r, sigma);
             pnode[i] = pnode[i] > ucut? ucut: pnode[i];
             pnode[i] = pnode[i] < dcut? dcut: pnode[i];
         } 
-    }
+    //}
     gsl_rng_free(r);
 
     return 0;
@@ -337,6 +351,7 @@ main(int argc, char **argv){
         }
         printf("\n");
         printf("Theoretical execution time: %f seconds \n", stdtime);
+        printf("NP_NODE=%d, NNODE=%d, PARETO_K=%d\n", NP_NODE, NNODE, PARETO_K);
         fflush(stdout);
     } 
 
