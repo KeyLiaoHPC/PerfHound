@@ -429,21 +429,33 @@ main(int argc, char **argv){
 
         // Regenerate node performance bias at each run.
         if (myrank == 0) {
+#ifdef NO_NODEVAR
+#else
             get_nodevar(node_perf, NNODE);
+#endif
+#ifdef OSNOISE
             init_osbias(node_osbias, NNODE, SYSVAR_P);
+#endif
         }
         MPI_Bcast(node_perf, NNODE, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
         for (j = 0; j < myjob; j++) {
             register float s = 1.0;
             simnode = (simrank_st + j) / NP_NODE;
+#ifdef NO_NODEVAR
+            p_vtime[j].ti = (float)Ti;
+            p_vtime[j].tk1 = (float)Tk1;
+            p_vtime[j].tk3 = (float)Tk3;
+            p_vtime[j].tf1 = (float)Tf1;
+            p_vtime[j].tf3 = (float)Tf3;
+#else
             s = 1 + node_perf[simnode];
-
             p_vtime[j].ti = (float)Ti / s;
             p_vtime[j].tk1 = (float)Tk1 / s;
             p_vtime[j].tk3 = (float)Tk3 / s;
             p_vtime[j].tf1 = (float)Tf1 / s;
             p_vtime[j].tf3 = (float)Tf3 / s;
+#endif
 
             get_urandom(&seed);
             gsl_rng_set(r, seed);

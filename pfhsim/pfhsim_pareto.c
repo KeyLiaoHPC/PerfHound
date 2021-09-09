@@ -5,22 +5,38 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
-#define Tf1 50
-#define Tf3 50
-#define Tk1 0.2 
-#define Tk3 0.1
-#define Ti  0.0002
+#define Tf1 10
+#define Tf3 0
+#define Tk1 0.1 
+#define Tk3 0
+#define Ti  0.0001
 #define Lf  10
 #define Lk  100
 #define Li  1000
+
+#ifndef NRUN
 #define NRUN 500
+#endif
+
+#ifndef NP_NODE
 #define NP_NODE 64               // # of cores per node.
-#define NNODE 4                 // # of nodes.
+#endif
+
+#ifndef NNODE
+#define NNODE 512                 // # of nodes.
+#endif
+
 #define NORM_SIGMA 0.016666667
 #define NORM_CUT 0.1
-#define PARETO_K 40
-#define SYSVAR_P 2              // Invoking period (sec) of os noise.
-#define SYSVAR_T 0.0002         // Time(sec) consumed by the os noise.
+
+#ifndef PARETO_K
+#define PARETO_K 10
+#endif
+
+#define PARETO_CUT 2
+
+#define SYSVAR_P 5              // Invoking period (sec) of os noise.
+#define SYSVAR_T 0.2         // Time(sec) consumed by the os noise.
 
 
 
@@ -39,116 +55,17 @@ get_urandom(uint64_t *x) {
     return 0;
 }
 
-/**
- * 
- * Node performance variation
- * @param pnode  pointers to node var perf factor
- * @param n      # of nodes.
- * @return int 
- */
-int
-get_nodevar(float *pnode, int n) {
-    if (n == 0) {
-        return 0;
-    }
-    int i;
-    float sigma, ucut, dcut;
-    const gsl_rng_type *T = gsl_rng_ranlux389;
-    uint64_t seed;
-    gsl_rng * r;
-
-#ifdef DEBUG
-    printf("Initializing random generator.\n");
-    fflush(stdout);
-#endif // #ifdef DEBUG
-
-    gsl_rng_env_setup();
-    r = gsl_rng_alloc(T);
-    get_urandom(&seed);
-    gsl_rng_set(r, seed);
-
-
-    sigma = 3 * NORM_SIGMA; // 3sigma for +-5% of 99.9% ndoes.
-    ucut = 0 + NORM_CUT;  // Cutoff at +NORM_CUT
-    dcut = 0 - NORM_CUT;  // Cutoff at -NORM_CUT
-
-#ifdef DEBUG
-    printf("Start genrating Gaussian noise.\n");
-    fflush(stdout);
-#endif // #ifdef DEBUG
-    if (n == 1) {
-        // No variation for single node.
-        pnode[0] = 0; 
-    } else {
-        for (i = 0; i < n; i ++) {
-            pnode[i] = gsl_ran_gaussian(r, sigma);
-            pnode[i] = pnode[i] > ucut? ucut: pnode[i];
-            pnode[i] = pnode[i] < dcut? dcut: pnode[i];
-        } 
-    }
-    gsl_rng_free(r);
-
-    return 0;
-}
-
-/**
- * Add noise to simulated run time
- * @param p_alltime 
- * @param nnode 
- * @param ppn 
- * @param p 
- * @param t 
- * @param final_time 
- */
-void
-add_osnoise(float *p_alltime, int nnode, int ppn, float p, float t, float *final_time) {
-    int simnp = NP_NODE * NNODE;
-    int i, j, k, core;
-    int nnoise, passed_noise;
-    uint64_t r;
-    float tmax, off, final;
-
-    final = 0;
-
-    for (i = 0; i < nnode; i ++) {
-        // hypothesis: each node start at a random time in a period.
-        get_urandom(&r);
-        // How many seconds from the starting point to next interrupt.
-        off = p * ((float)r / (float)UINT64_MAX);
-        tmax = 0;
-        for (j = i * ppn; j < (i + 1) * ppn; j ++) {
-            tmax = tmax < p_alltime[j] ? p_alltime[j] : tmax;
-        }
-        nnoise = (tmax - off) / p;
-        passed_noise = 0;
-
-        do {
-            for (k = 0; k < nnoise - passed_noise; k ++) {
-                get_urandom(&r);
-                core = r % ppn;
-                p_alltime[i*nnode+core] += t;
-                tmax = tmax < p_alltime[i*nnode+core]? p_alltime[i*nnode+core] : tmax;
-            }
-            passed_noise += k;
-            nnoise = (tmax - off) / p;
-        } while(nnoise > passed_noise);
-        final = final < tmax ? tmax : final;
-    }
-
-    *final_time = final;
-}
-
 int
 main(int argc, char **argv){
 
-    FILE *fp = fopen("pareto.log", "w");
+    FILE *fp;
+    char fname[1024];
 
     int i;
-    float sigma, ucut, dcut;
     const gsl_rng_type *T = gsl_rng_ranlux389;
     uint64_t seed;
     gsl_rng * r;
-    float x[100000];
+    float x[100000], tau_i_arr[100000], tau_k_arr[100000], tau_f_arr[100000];
 
     gsl_rng_env_setup();
     r = gsl_rng_alloc(T);
@@ -156,10 +73,39 @@ main(int argc, char **argv){
     gsl_rng_set(r, seed);
 
     for (i = 0; i < 100000; i ++) {
-        x[i] = gsl_ran_pareto(r, 1, 1);
-        fprintf(fp, "%f\n", x[i]);
+        x[i] = gsl_ran_pareto(r, PARETO_K, 1);
+        x[i] = x[i] > PARETO_CUT ? PARETO_CUT : x[i];
+        tau_i_arr[i] = Ti * x[i];
+        tau_k_arr[i] = Tk1 * x[i];
+        tau_f_arr[i] = Tf1 * x[i];
+    }
+
+    sprintf(fname, "k%dti.log", PARETO_K);
+    fp = fopen(fname, "w");
+    for (i = 0; i < 100000; i ++) {
+        fprintf(fp, "%.12f\n", tau_i_arr[i]);
     }
     fclose(fp);
+    sprintf(fname, "k%dtk.log", PARETO_K);
+    fp = fopen(fname, "w");
+    for (i = 0; i < 100000; i ++) {
+        fprintf(fp, "%.12f\n", tau_k_arr[i]);
+    }
+    fclose(fp);
+    sprintf(fname, "k%dtf.log", PARETO_K);
+    fp = fopen(fname, "w");
+    for (i = 0; i < 100000; i ++) {
+        fprintf(fp, "%.12f\n", tau_f_arr[i]);
+    }
+    fclose(fp);
+    sprintf(fname, "k%ds.log", PARETO_K);
+    fp = fopen(fname, "w");
+    for (i = 0; i < 100000; i ++) {
+        fprintf(fp, "%.12f\n", x[i]);
+    }
+    fclose(fp);
+
+    gsl_rng_free(r);
     return 0; 
 }
 
