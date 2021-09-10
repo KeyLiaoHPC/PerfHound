@@ -104,7 +104,8 @@
 /* Read virtual timer */
 #ifdef USE_SYSCALL_TS
 #include <sys/syscall.h>
-#define _pfh_read_ns(_ns)    syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
+#define _pfh_read_ns(_ns)   struct timespec ts;                                 \
+                            syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
                             
 #else
