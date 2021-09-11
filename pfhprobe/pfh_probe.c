@@ -312,21 +312,22 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
 void
 pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
-            pfh_irec);
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
+        pfh_pinfo.rank, pfh_irec);
+        fflush(stdout);
+        pfh_irec = 0;
     }
-    pfh_irec = pfh_irec % buf_nrec;
     pfh_fastread(grp_id, p_id, uval);
 }
 
 
 void pfh_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] WARNING. Buffer exceeded, record overlapped \n");
-    }
-    pfh_irec = pfh_irec % buf_nrec;
     pfh_fastread(grp_id, p_id, uval);
-    pfh_dump(buf_nrec - PFH_BUF_NMARGIN);
+
+    if (pfh_irec == buf_nrec - 1) {
+        printf("*** [Pfh-Probe] Rank %d: Auto dumping. \n", pfh_pinfo.rank);
+    }
+    pfh_dump();
 }
 
 /**
@@ -335,35 +336,26 @@ void pfh_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
  * The function returns directly if pfh_irec == 0.
  */
 void
-pfh_dump(int nrec) {
-    int n;
+pfh_dump() {
 
     if (pfh_irec == 0) {
         // Return without timing.
         return;
     }
 
-    if (nrec == 0) {
-        n = pfh_irec + 1;
-    } else {
-        n = nrec > buf_nrec? buf_nrec: nrec;
-    } 
-
-#ifndef USE_MPI
-    if (pfh_irec + 1 + PFH_BUF_NMARGIN >= n) {
-        pfh_read(0, 3, 0);
-        pfh_io_wtrec(n, pfh_nevt);
-        pfh_read(0, 4, 0);
+    if (pfh_irec == buf_nrec) {
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
+        pfh_pinfo.rank, pfh_irec);
+        pfh_irec --; // Step back for recording writing time.
     }
+
+    pfh_fastread(0, 3, 0);
+    pfh_io_wtrec(pfh_irec, pfh_nevt);
     pfh_irec = 0;
-
-#else
+    pfh_fastread(0, 4, 0);
     
-        
-#endif
-
+    return;
 }
-
 
 /* Exiting varapi */
 void
@@ -379,7 +371,7 @@ pfh_finalize() {
         printf("*** [Pfh-Probe] Exit %d, failed at writing reading records. \n", err);
         fflush(stdout);
     }
-    printf("*** [Pfh-Probe] Writing running info. \n", err);
+    printf("*** [Pfh-Probe] Writing running info. \n");
     err = pfh_io_wtinfo();
     if (err) {
         printf("*** [Pfh-Probe] Exit %d, failed at writing run info. \n", err);

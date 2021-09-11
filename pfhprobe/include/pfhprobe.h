@@ -66,7 +66,7 @@ int pfh_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
  * @param bufsize	uint64. The buffer size in Bytes. Write when the size of data
  * 			fills the buffer. Force write when bufsize=0.
  */
-void pfh_dump(const int nrec);
+void pfh_dump();
 
 
 /**

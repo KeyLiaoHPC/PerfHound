@@ -359,7 +359,6 @@ pfhmpi_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
  */
 void
 pfhmpi_dump() {
-    int n;
 
     if (pfh_irec == 0) {
         // Return without timing.
@@ -394,7 +393,7 @@ pfhmpi_finalize() {
         printf("*** [Pfh-Probe] Rank %d Exit %d, failed at writing reading records. \n", pfh_pinfo.rank, err);
         fflush(stdout);
     }
-    PFH_PRINTF ("*** [Pfh-Probe] Writing running info. \n", err);
+    PFH_PRINTF ("*** [Pfh-Probe] Writing running info. \n");
 
     if (pfh_pinfo.rank == 0) {
         err = pfh_io_wtinfo();
