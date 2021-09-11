@@ -284,7 +284,8 @@ pfh_io_init(char *root, char *host) {
      *  without actually creating.
      */
     sprintf(pfh_paths.host_dir, "%s/%s", pfh_paths.run_dir, pfh_pinfo.host);
-    sprintf(pfh_paths.rec, "%s/rank_%d.csv", pfh_paths.host_dir, pfh_pinfo.rank);
+    sprintf(pfh_paths.rec, "%s/r%dc%d.csv", 
+        pfh_paths.host_dir, pfh_pinfo.rank, pfh_pinfo.cpu);
 
     /* Get start timestamp. */
     do{
