@@ -69,7 +69,7 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
 
 /* Sync and init Varapi MPI map info. */
 int 
-vt_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank, 
+pfhmpi_rankinfo( uint32_t *head, int *iorank, 
                  uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu) {
     int i, j;
     int *cpu_all = NULL, mycpu;
