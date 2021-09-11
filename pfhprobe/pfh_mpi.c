@@ -22,7 +22,6 @@
 
 extern int pfh_io_mkname(char *root);
 extern int pfh_io_mkfile();
-extern int pfh_io_mkhost();
 extern int pfh_io_mkrec(char *rec_path);
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
 extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);

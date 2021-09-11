@@ -58,7 +58,8 @@ rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
 int pfh_nevt;
 
-extern int pfh_io_init(char *root);
+extern int pfh_io_mkname(char *root);
+extern int pfh_io_mkfile();
 extern int pfh_io_mkhost();
 extern int pfh_io_mkrec(char *rec_path);
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
@@ -100,15 +101,19 @@ pfh_init(char *path) {
 
     /* Initializing run directory tree */
     printf("*** [Pfh-Probe] Creating data directory tree. \n");
-    fflush(stdout);   
-    if (pfh_pinfo.rank == 0) {
-        err = pfh_io_init(root);
-        if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to create directory tree.\n", err);
-            fflush(stdout);
-            exit(1);
-        }
+    err = pfh_io_mkname(root);
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
+        fflush(stdout);
+        exit(1);
     }
+    err = pfh_io_mkfile();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+
 
     /* Initializing host directory tree */
     err = pfh_io_mkhost();
@@ -141,10 +146,8 @@ pfh_init(char *path) {
 #ifdef __x86_64__
     _pfh_init_ts;
 #endif
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Timer has been set. \n");
-        fflush(stdout);
-    }
+    printf("*** [Pfh-Probe] Timer has been set. \n");
+    fflush(stdout);
     /* Initial time reading. */
     pfh_io_wtrankmap(&pfh_pinfo);
 
@@ -154,9 +157,7 @@ pfh_init(char *path) {
     pfh_set_tag(0, 3, "PFH Wt Start");
     pfh_set_tag(0, 4, "PFH Wt End");
     pfh_ready = 0;
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Directory tree initialized. \n");
-    }
+    printf("*** [Pfh-Probe] Directory tree initialized. \n");
 
 #ifdef __aarch64__
     _pfh_cy_init;
@@ -172,27 +173,21 @@ int
 pfh_set_evt(const char *etag) {
     // Unavailable in TS dode.
 #ifndef _N_EV
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] WARNING. Performance event is unavailable in TS mode. Your setting wiil be omitted. \n");
-        fflush(stdout);
-    }
+    printf("*** [Pfh-Probe] WARNING. Performance event is unavailable in TS mode. Your setting wiil be omitted. \n");
+    fflush(stdout);
     return 0;
 
 #else
     // We do not support redefine events for now.
     if (pfh_ready) {
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] WARNING. Your setting has been committed, please set events before pfh_commit. \n");
-            fflush(stdout);
-        }
+        printf("*** [Pfh-Probe] WARNING. Your setting has been committed, please set events before pfh_commit. \n");
+        fflush(stdout);
         return 1;
     }
     
     if (pfh_nevt >= _N_EV) {
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] WARNING. Too many events (Max: %d), this event will be omitted. \n", _N_EV);
-            fflush(stdout);
-        }
+        printf("*** [Pfh-Probe] WARNING. Too many events (Max: %d), this event will be omitted. \n", _N_EV);
+        fflush(stdout);
         return 2;     
     }
 
@@ -202,19 +197,13 @@ pfh_set_evt(const char *etag) {
 
     if (evcode <= 0xFFFFFFFF - 1) {
         pfh_evcodes[pfh_nevt] = evcode;
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] Event %s added, evcode=0x%x. \n", etag, evcode);
-        }
+        printf("*** [Pfh-Probe] Event %s added, evcode=0x%x. \n", etag, evcode);
         pfh_nevt ++;
     } else {
         printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
     }
-    
-
-    if (pfh_pinfo.rank == 0) {
-        pfh_io_wtetag(pfh_nevt, etag, pfh_evcodes[pfh_nevt-1]);
+    pfh_io_wtetag(pfh_nevt, etag, pfh_evcodes[pfh_nevt-1]);
         
-    }
 #endif // END: #ifndef _N_EV
     return 0;
 } // END: int vt_set_evt
@@ -225,9 +214,7 @@ pfh_commit() {
     int err;
 #ifdef _N_EV
     _pfh_config_event (pfh_evcodes, pfh_nevt);
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
-    }
+    printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
 #endif
 
     err = pfh_io_mkrec(NULL);
@@ -245,17 +232,14 @@ pfh_commit() {
 /* Set counting points' tag. */
 int 
 pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
-    if (pfh_pinfo.rank == 0) {
-        pfh_io_wtctag(gid, pid, tagstr);
+    pfh_io_wtctag(gid, pid, tagstr);
+    if (pid) {
+        printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n",
+            gid, pid, tagstr);
+    } else {
+        printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
     }
-    if (pfh_pinfo.rank == 0) {
-        if (pid) {
-            printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n",
-                gid, pid, tagstr);
-        } else {
-            printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
-        }
-    } 
+    fflush(stdout);
     return 0;
 }
 
