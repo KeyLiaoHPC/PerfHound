@@ -81,17 +81,6 @@ pfh_init(char *path) {
     char root[PATH_MAX]; // data root path, hostname.
     int i, err = 0;
 
-#ifdef USE_MPI
-    // Get process information.
-    uint32_t vt_iogrp_grank[_RANK_PER_IO];
-    uint32_t vt_iogrp_gcpu[_RANK_PER_IO];
-    vt_get_rank(&nrank, &vt_myrank);
-    /* Notice user for vartect environment */
-    if (vt_myrank == 0) {
-        printf("*** [Pfh-Probe] You are running in Vartect environment. "
-               "Your code has been compiled with Pfh-Probe-MPI. \n");
-    }
-#else
     printf("*** [Pfh-Probe] Pfh-Probe is initializing. \n");
     fflush(stdout);
     pfh_pinfo.nrank = 1;
@@ -100,7 +89,6 @@ pfh_init(char *path) {
     pfh_pinfo.head = 0;
     pfh_pinfo.iorank = 0;
     gethostname(pfh_pinfo.host, _HOST_MAX);
-#endif
 
     /* Gnerate path. */
     if (path == NULL) {
@@ -131,30 +119,6 @@ pfh_init(char *path) {
     }
 
 
-#ifdef USE_MPI
-    vt_world_barrier();
-    // Get and sync process information. Print process map in the root of project.
-    // <projpath>/run<run_id>_rankmap.csv
-    // 
-    err = vt_sync_mpi_info(projpath, &vt_run_id, &vt_head, &vt_iorank,
-                             &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
-    //if (vt_myrank == vt_iorank)
-    //    printf("%d: %d\n", vt_myrank, vt_iogrp_gcpu[0]);
-
-#else
-
-#endif
-
-#ifdef USE_MPI
-    vt_world_barrier();
-#endif
-
-
-    /* Init data space. */
-#ifdef USE_MPI
-    vt_world_barrier();
-    vt_newtype();
-#endif 
     buf_nbyte = PFH_RECBUF_KIB * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
     pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
@@ -182,25 +146,6 @@ pfh_init(char *path) {
         fflush(stdout);
     }
     /* Initial time reading. */
-#ifdef USE_MPI
-    vt_world_barrier();
-    if (vt_myrank == vt_head) {
-        vt_log(vt_flog, "[vt_init] Time sync started.\n");
-    }
-    for (i = 1; i < nrank; i ++) {
-        vt_get_bias(0, i);
-    }
-    
-    if (vt_myrank == vt_head) {
-        vt_log(vt_flog, "[vt_init] Time sync finished.\n");
-    }
-#endif
-    
-#ifdef USE_MPI
-    //vt_world_barrier();
-    vt_tsync();
-#endif
-    /* Recording mappings between processes and CPUs. */
     pfh_io_wtrankmap(&pfh_pinfo);
 
     pfh_set_tag(0, 0, "PFHGroup");
@@ -279,15 +224,12 @@ void
 pfh_commit() {
     int err;
 #ifdef _N_EV
-    
     _pfh_config_event (pfh_evcodes, pfh_nevt);
     if (pfh_pinfo.rank == 0) {
         printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
     }
 #endif
-#ifdef USE_MPI
-    pfh_mpi_barrier();
-#endif
+
     err = pfh_io_mkrec(NULL);
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create record file.\n", err);
@@ -438,12 +380,6 @@ pfh_dump(int nrec) {
 
 }
 
-#ifdef USE_MPI
-void
-vt_strict_sync() {
-    vt_tsync();
-}
-#endif
 
 /* Exiting varapi */
 void
@@ -466,22 +402,6 @@ pfh_finalize() {
         fflush(stdout);
     }
     
-#ifdef USE_MPI
-    if (vt_myrank == vt_iorank) {
-        for (i = 0; i < vt_iogrp_nrank; i ++) {
-            fclose(rec_file[i]);
-        }
-        free(rec_file);
-    }
-    if (vt_myrank == 0) {
-        printf("*** [Pfh-Probe] Pfh-Probe Exited. \n");
-        fclose(vt_flog);
-    }
-#else
     printf("*** [Pfh-Probe] Pfh-Probe Exited. \n");
-#endif
     _pfh_fini_ts;
-#ifdef USE_MPI
-    vt_mpi_clean();
-#endif
 }
