@@ -312,7 +312,7 @@ pfh_io_mkhost() {
         ioerr = mkdir(pfh_paths.host_dir, S_IRWXU);
         if (ioerr) {
             if(errno != EEXIST) {
-                printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);
+                printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", pfh_paths.host_dir);
                 fflush(stdout);
                 return errno;
             }
