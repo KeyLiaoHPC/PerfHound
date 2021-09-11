@@ -63,9 +63,6 @@
 
 #define ALIGN           64
 
-#define _MSG_BUF_N      512      // 256 records
-#define _MSG_LEN        256
-#define _CTAG_LEN       16
 /* ======== The END of user config area ======== */
 
 
@@ -131,6 +128,15 @@ typedef struct {
     char host[_HOST_MAX];
 } proc_t;
 
+/**
+ * Host list and nranks on a host
+ */
+typedef struct {
+    int nrank;
+    char host[_HOST_MAX];
+    int *prank;
+} hinfo_t;
+
 #ifdef _N_EV 
 uint64_t pfh_evcodes[12];
 #endif
@@ -138,23 +144,5 @@ extern rec_t *pfh_precs; // raw data.
 extern proc_t pfh_pinfo;
 extern int pfh_nevt;
 
-
-/* MPI Wrapper in vt_mpi.c */
-#ifdef USE_MPI
-void pfh_recover_bias();
-void pfh_bcast_tstamp(char *timestr);
-void pfh_get_cur_bias();
-void pfh_get_bias(int r0, int r1);
-int  pfh_get_data(uint32_t rank, uint32_t *count, rec_t *data);
-void pfh_get_rank(uint32_t *nrank, uint32_t *myrank);
-void pfh_io_barrier();
-void pfh_mpi_clean();
-void pfh_newtype();
-void pfh_send_data(uint32_t count, rec_t *data);
-int  pfh_sync_mpi_info(char *projpath, int *run_id, uint32_t *head, int *iorank, 
-                      uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu);
-void pfh_tsync();
-void pfh_world_barrier();
-#endif
 
 #endif // END: #ifndef __VARAPI_CORE_H__

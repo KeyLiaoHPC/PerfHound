@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+#define _ISOC11_SOURCE#include <stdio.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -9,15 +12,16 @@
 #include <errno.h>
 #include <mpi.h>
 
-#include "pfh_mpi.h"
-#include "pfhprobe.h"
 #include "pfhprobe_core.h"
 
-#define _GNU_SOURCE
-#define _ISOC11_SOURCE
 
+#define PFH_PRINTF(_msg)    if(pfh_pinfo.rank == 0) {  \
+                                printf(_msg);          \
+                                fflush(stdout);         \
+                            }  
 
-extern int pfh_io_init(char *root);
+extern int pfh_io_mkname(char *root);
+extern int pfh_io_mkfile();
 extern int pfh_io_mkhost();
 extern int pfh_io_mkrec(char *rec_path);
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
@@ -25,6 +29,10 @@ extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);
 extern int pfh_io_wtrankmap(proc_t *pinfo);
 extern int pfh_io_wtrec(int nrec, int nev);
 extern int pfh_io_wtinfo();
+
+extern int pfh_mpi_rank_init(proc_t *pinfo);
+extern void pfh_mpi_barrier(MPI_Comm comm);
+extern int pfh_mpi_mkhost(int myrank, int nrank);
 
 /* Local Global */
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
@@ -34,9 +42,7 @@ static int pfh_ready;
 /* Global */
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
-proc_t *pfh_pinfoall;
 int pfh_nevt;
-int *pfh_hid, pfh_hn; // rank list on the same host
 
 
 
@@ -54,16 +60,16 @@ pfhmpi_init(char *path) {
     char root[PATH_MAX]; // data root path, hostname.
     int i, err = 0;
 
-    fflush(stdout);
-    MPI_Comm_size(MPI_COMM_WORLD, &pfh_pinfo.nrank);
-	MPI_Comm_rank(MPI_COMM_WORLD, &pfh_pinfo.rank);
-	if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Pfh-Probe is initializing. \n");
+    /* Init basic rank information */
+    err = pfh_mpi_rank_init(&pfh_pinfo);
+    if (pfh_mpi_rank_init(&pfh_pinfo)) {
+        printf("*** [Pfh-Probe] EXIT. Failed to init MPI.\n");
+        exit(1);
     }
-    pfh_pinfo.cpu = sched_getcpu();
-    pfh_pinfo.head = 0;
-    pfh_pinfo.iorank = pfh_pinfo.rank;
-    gethostname(pfh_pinfo.host, _HOST_MAX);
+
+    /* Grouping ranks on the same host and get group information. */
+    //err = pfh_mpi_host_init(&pfh_pinfo);
+
 
 
     /* Gnerate path. */
@@ -75,43 +81,31 @@ pfhmpi_init(char *path) {
     }
 
     /* Initializing run directory tree */
-    printf("*** [Pfh-Probe] Creating data directory tree. \n");
+    PFH_PRINTF ("*** [Pfh-Probe] Creating data directory tree. \n");
     fflush(stdout);   
+    err = pfh_io_mkname(root);
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
     if (pfh_pinfo.rank == 0) {
-        err = pfh_io_init(root);
+        err = pfh_io_mkfile();
         if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to create directory tree.\n", err);
+            printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
             fflush(stdout);
             exit(1);
         }
     }
 
     /* Initializing host directory tree */
-    err = pfh_io_mkhost();
+    err = pfh_mpi_mkhost(pfh_pinfo.rank, pfh_pinfo.nrank);
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
         fflush(stdout);
         exit(1);
     }
-
-
-#ifdef USE_MPI
-    vt_world_barrier();
-    // Get and sync process information. Print process map in the root of project.
-    // <projpath>/run<run_id>_rankmap.csv
-    // 
-    err = vt_sync_mpi_info(projpath, &vt_run_id, &vt_head, &vt_iorank,
-                             &vt_iogrp_nrank, vt_iogrp_grank, vt_iogrp_gcpu);
-    //if (vt_myrank == vt_iorank)
-    //    printf("%d: %d\n", vt_myrank, vt_iogrp_gcpu[0]);
-
-#else
-
-#endif
-
-#ifdef USE_MPI
-    vt_world_barrier();
-#endif
+    pfh_mpi_barrier(MPI_COMM_WORLD);
 
 
     /* Init data space. */
@@ -127,8 +121,10 @@ pfhmpi_init(char *path) {
         fflush(stdout);
         exit(1);
     }
-    printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
-    fflush(stdout);
+    if (pfh_pinfo.rank == 0) {
+        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
+        fflush(stdout);
+    }
 
     /* Set all event codes to 0. */
 #ifdef _N_EV
@@ -145,27 +141,6 @@ pfhmpi_init(char *path) {
         printf("*** [Pfh-Probe] Timer has been set. \n");
         fflush(stdout);
     }
-    /* Initial time reading. */
-#ifdef USE_MPI
-    vt_world_barrier();
-    if (vt_myrank == vt_head) {
-        vt_log(vt_flog, "[vt_init] Time sync started.\n");
-    }
-    for (i = 1; i < nrank; i ++) {
-        vt_get_bias(0, i);
-    }
-    
-    if (vt_myrank == vt_head) {
-        vt_log(vt_flog, "[vt_init] Time sync finished.\n");
-    }
-#endif
-    
-#ifdef USE_MPI
-    //vt_world_barrier();
-    vt_tsync();
-#endif
-    /* Recording mappings between processes and CPUs. */
-    pfh_io_wtrankmap(&pfh_pinfo);
 
     pfh_set_tag(0, 0, "PFHGroup");
     pfh_set_tag(0, 1, "PFH Start");
@@ -182,13 +157,17 @@ pfhmpi_init(char *path) {
 #endif
     pfh_irec = 0;
     pfh_nevt = 0;
+
+    pfh_mpi_barrier(MPI_COMM_WORLD);
+    pfh_mpi_barrier(MPI_COMM_WORLD);
     pfh_read(0, 1, 0);
+
     return 0;
 } // END: int vt_init()
 
 /* Set system events. */
 int
-pfh_set_evt(const char *etag) {
+pfhmpi_set_evt(const char *etag) {
     // Unavailable in TS dode.
 #ifndef _N_EV
     if (pfh_pinfo.rank == 0) {
@@ -226,7 +205,10 @@ pfh_set_evt(const char *etag) {
         }
         pfh_nevt ++;
     } else {
-        printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
+        if (pfh_pinfo.rank == 0) {
+            printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
+            fflush(stdout);
+        }
     }
     
 
@@ -240,7 +222,7 @@ pfh_set_evt(const char *etag) {
 
 /* Commit events and configure event registers. */
 void
-pfh_commit() {
+pfhmpi_commit() {
     int err;
 #ifdef _N_EV
     
@@ -266,7 +248,7 @@ pfh_commit() {
 
 /* Set counting points' tag. */
 int 
-pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
+pfhmpi_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
     if (pfh_pinfo.rank == 0) {
         pfh_io_wtctag(gid, pid, tagstr);
     }
@@ -278,13 +260,15 @@ pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
             printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
         }
     } 
+
+    pfh_mpi_barrier(MPI_COMM_WORLD);
     return 0;
 }
 
 
 /* Get and record an event reading without boundary check. */
 void
-pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
+pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // uint64_t r1 = 0, r2 = 0, r3 = 0;
 
     // _pfh_reg_save;
@@ -348,23 +332,25 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
 }
 
 void
-pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
+pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
     if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
-            pfh_irec);
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
+        pfh_pinfo.rank, pfh_irec);
+        fflush(stdout);
+        pfh_irec = 0;
     }
-    pfh_irec = pfh_irec % buf_nrec;
     pfh_fastread(grp_id, p_id, uval);
 }
 
 
-void pfh_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] WARNING. Buffer exceeded, record overlapped \n");
-    }
-    pfh_irec = pfh_irec % buf_nrec;
+void 
+pfhmpi_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
     pfh_fastread(grp_id, p_id, uval);
-    pfh_dump(buf_nrec - PFH_BUF_NMARGIN);
+
+    if (pfh_irec == buf_nrec - 1) {
+        printf("*** [Pfh-Probe] Rank %d: Auto dumping. \n", pfh_pinfo.rank);
+    }
+    pfh_dump();
 }
 
 /**
@@ -373,7 +359,7 @@ void pfh_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
  * The function returns directly if pfh_irec == 0.
  */
 void
-pfh_dump(int nrec) {
+pfhmpi_dump() {
     int n;
 
     if (pfh_irec == 0) {
@@ -381,73 +367,50 @@ pfh_dump(int nrec) {
         return;
     }
 
-    if (nrec == 0) {
-        n = pfh_irec + 1;
-    } else {
-        n = nrec > buf_nrec? buf_nrec: nrec;
-    } 
-
-#ifndef USE_MPI
-    if (pfh_irec + 1 + PFH_BUF_NMARGIN >= n) {
-        pfh_read(0, 3, 0);
-        pfh_io_wtrec(n, pfh_nevt);
-        pfh_read(0, 4, 0);
+    if (pfh_irec == buf_nrec) {
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
+        pfh_pinfo.rank, pfh_irec);
+        pfh_irec --; // Step back for recording writing time.
     }
+
+    pfh_fastread(0, 3, 0);
+    pfh_io_wtrec(pfh_irec, pfh_nevt);
     pfh_irec = 0;
-
-#else
+    pfh_fastread(0, 4, 0);
     
-        
-#endif
-
+    return;
 }
-
-#ifdef USE_MPI
-void
-vt_strict_sync() {
-    vt_tsync();
-}
-#endif
 
 /* Exiting varapi */
 void
-pfh_finalize() {
+pfhmpi_finalize() {
     int err;
 
-    printf("*** [Pfh-Probe] User invokes finalization. \n");
+    PFH_PRINTF ("*** [Pfh-Probe] User invokes finalization. \n");
 
     pfh_read(0, 2, 0);
-    printf("*** [Pfh-Probe] Writing records. \n");
+    PFH_PRINTF ("*** [Pfh-Probe] Writing records. \n");
     err = pfh_io_wtrec(pfh_irec, pfh_nevt);
     if (err) {
-        printf("*** [Pfh-Probe] Exit %d, failed at writing reading records. \n", err);
+        printf("*** [Pfh-Probe] Rank %d Exit %d, failed at writing reading records. \n", pfh_pinfo.rank, err);
         fflush(stdout);
     }
-    printf("*** [Pfh-Probe] Writing running info. \n", err);
-    err = pfh_io_wtinfo();
-    if (err) {
-        printf("*** [Pfh-Probe] Exit %d, failed at writing run info. \n", err);
-        fflush(stdout);
-    }
-    
-#ifdef USE_MPI
-    if (vt_myrank == vt_iorank) {
-        for (i = 0; i < vt_iogrp_nrank; i ++) {
-            fclose(rec_file[i]);
+    PFH_PRINTF ("*** [Pfh-Probe] Writing running info. \n", err);
+
+    if (pfh_pinfo.rank == 0) {
+        err = pfh_io_wtinfo();
+        if (err) {
+            printf("*** [Pfh-Probe] Exit %d, failed at writing run info. \n", err);
+            fflush(stdout);
         }
-        free(rec_file);
     }
-    if (vt_myrank == 0) {
-        printf("*** [Pfh-Probe] Pfh-Probe Exited. \n");
-        fclose(vt_flog);
-    }
-#else
-    printf("*** [Pfh-Probe] Pfh-Probe Exited. \n");
-#endif
+
+    PFH_PRINTF ("*** [Pfh-Probe] Pfh-Probe Exited. \n");
     _pfh_fini_ts;
-#ifdef USE_MPI
-    vt_mpi_clean();
-#endif
+
+    pfh_mpi_barrier(MPI_COMM_WORLD);
+    free(pfh_precs);
+
 }
 
 

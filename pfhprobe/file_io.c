@@ -110,26 +110,7 @@ pfh_io_mkdir(char *path){
     return 0;
 }
 
-int
-pfh_io_mkrun() {
-    int nrun = 0, ioerr = 0;
-    char tmp_path[PATH_MAX];
-    while (1) {
-        nrun += 1;
-        sprintf(tmp_path, "%s/run_%d", pfh_paths.proj_dir, nrun);
-        ioerr = mkdir(tmp_path, S_IRWXU);
-        if (ioerr) {
-            if (errno == EEXIST) {
-                continue;
-            } else {
-                break;
-            }
-        }
-        break;
-    }
-    runid = nrun;
-    return ioerr;
-}
+
 
 
 
@@ -213,17 +194,14 @@ pfh_io_log(FILE *fp, char *fmt, ...) {
 
 int
 pfh_io_init(char *root, char *host) {
-    int ioerr;
+    int ioerr, nrun;
+    char tmp_path[PATH_MAX];
     char *p_realpath = NULL;
     FILE *fp = fopen(pfh_paths.etag, "w");
 
     nrec_tot = 0;
 
     /* Root path. */
-    ioerr = pfh_io_mkdir(root);
-    if (ioerr) {
-        return ioerr;
-    }
     p_realpath = realpath(root, p_realpath);
     if (p_realpath == NULL) {
         return errno;
@@ -231,54 +209,29 @@ pfh_io_init(char *root, char *host) {
     strcpy(pfh_paths.proj_dir, p_realpath);
     free(p_realpath);
 
-    /* Run path. */
-    ioerr = pfh_io_mkrun();
-    if (ioerr) {
-        return ioerr;
+    /* Run path */
+    nrun = 0;    
+    while (1) {
+        nrun += 1;
+        sprintf(tmp_path, "%s/run_%d", pfh_paths.proj_dir, nrun);
+        if( access( tmp_path, F_OK ) != 0 ) {
+            break;
+        } 
     }
+    runid = nrun;
     sprintf(pfh_paths.run_dir, "%s/run_%d", pfh_paths.proj_dir, runid);
 
     /* run_info.csv */
     sprintf(pfh_paths.runinfo, "%s/run_info.csv", pfh_paths.proj_dir); 
-    fp = fopen(pfh_paths.runinfo, "a");
-    if (fp == NULL) {
-        return -1;
-    }
-    fseek(fp, 0L, SEEK_END);
-    if (ftell(fp) == 0) {
-        // Write headers to an empty file.
-        fprintf(fp, "id,mode,nrank,nevent,ngroup,npoint,start_time,end_time,description\n");
-    }
-    fclose(fp);
 
     /* Creating ctags.csv. Write headers to ctags.csv */
     sprintf(pfh_paths.ctag, "%s/ctag.csv", pfh_paths.run_dir);
-    pfh_io_touch(pfh_paths.ctag, "w");
-
-    fp = fopen(pfh_paths.ctag, "w");
-    if (fp == NULL) {
-        return -1;
-    }
-    fprintf(fp, "gid,pid,description\n");
-    fclose(fp);
 
     /* etag.csv */
     sprintf(pfh_paths.etag, "%s/etag.csv", pfh_paths.run_dir);
-    fp = fopen(pfh_paths.etag, "w");
-    if (fp == NULL) {
-        return -1;
-    }
-    fprintf(fp, "id,name,code\n");
-    fclose(fp);
-
+    
     /* rankmap.csv */
     sprintf(pfh_paths.rankmap, "%s/rankmap.csv", pfh_paths.run_dir);
-    fp = fopen(pfh_paths.etag, "w");
-    if (fp == NULL) {
-        return -1;
-    }
-    fprintf(fp, "rank,hostname,cpu,hosthead,iorank\n");
-    fclose(fp);
 
     /** Considering parallel PerfHound, fill host directory and record file 
      *  without actually creating.
@@ -299,6 +252,53 @@ pfh_io_init(char *root, char *host) {
     return 0;
 }
 
+int
+pfh_io_mkfile() {
+    int ioerr;
+    FILE *fp;
+
+    ioerr = pfh_io_mkdir(pfh_paths.proj_dir);
+    if (ioerr) {
+        return ioerr;
+    }
+
+    /* Run path. */
+    ioerr = pfh_io_mkrun();
+    if (ioerr) {
+        return ioerr;
+    }
+
+    fp = fopen(pfh_paths.runinfo, "a");
+    if (fp == NULL) {
+        return -1;
+    }
+    fseek(fp, 0L, SEEK_END);
+    if (ftell(fp) == 0) {
+        // Write headers to an empty file.
+        fprintf(fp, "id,mode,nrank,nevent,ngroup,npoint,start_time,end_time,description\n");
+    }
+    fclose(fp);
+
+    fp = fopen(pfh_paths.ctag, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+    fprintf(fp, "gid,pid,description\n");
+    fclose(fp);
+
+    fp = fopen(pfh_paths.etag, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+    fprintf(fp, "id,name,code\n");
+    fclose(fp);
+    fp = fopen(pfh_paths.rankmap, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+    fprintf(fp, "rank,hostname,cpu,hosthead,iorank\n");
+    fclose(fp);
+}
 
 /**
  * Wrapper for creating host directory.
@@ -307,7 +307,17 @@ pfh_io_init(char *root, char *host) {
 int
 pfh_io_mkhost() {
     int ioerr = 0;
-    ioerr = pfh_io_mkdir(pfh_paths.host_dir);
+
+    if (access(pfh_paths.host_dir, F_OK) != 0) {
+        ioerr = mkdir(pfh_paths.host_dir, S_IRWXU);
+        if (ioerr) {
+            if(errno != EEXIST) {
+                printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);
+                fflush(stdout);
+                return errno;
+            }
+        }
+    }
 
     return ioerr;
 }
