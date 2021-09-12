@@ -12,7 +12,7 @@ Pfhsim是一个大规模并行应用性能模拟器。可以通过配置文件�
 
 #### 1.1 编译
 
-**依赖：**openmp、openblas、gsl
+**依赖：**openmpi、openblas、gsl
 
 **编译步骤：**cd pfhsim && make
 
