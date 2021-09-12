@@ -5,6 +5,7 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <mpi.h>
+#include "include/variables.h"
 
 /**
  * Pareto
@@ -14,40 +15,6 @@
  * 0.99 - 1.0958    -   1.1225  -   1.1659  1.2583  1.5802
  * 0.999 - 1.1495   -   1.1893  -   1.2664  1.4074  1.9809
  */
-
-#define Tf1 10
-#define Tf3 0
-#define Tk1 0.1 
-#define Tk3 0
-#define Ti  0.0001
-#define Lf  10
-#define Lk  100
-#define Li  1000
-
-#ifndef NRUN
-#define NRUN 500
-#endif
-
-#ifndef NP_NODE
-#define NP_NODE 64               // # of cores per node.
-#endif
-
-#ifndef NNODE
-#define NNODE 512                 // # of nodes.
-#endif
-
-#define NORM_SIGMA 0.016666667
-#define NORM_CUT 0.1
-
-#ifndef PARETO_K
-#define PARETO_K 10
-#endif
-
-#define SYSVAR_P 5              // Invoking period (sec) of os noise.
-#define SYSVAR_T 0.2         // Time(sec) consumed by the os noise.
-
-int nproc, myrank;
-
 
 int 
 get_urandom(uint64_t *x) {
@@ -249,6 +216,30 @@ add_osnoise(float *p_alltime, float *node_osbias, int nnode, int ppn, float p, f
 
 int
 main(int argc, char **argv){
+
+    int err = MPI_Init(NULL, NULL);
+    if (err) {
+        printf("Failed to initilize MPI environemnt.\n");
+
+        exit(-1);
+    }
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    parameters mparameters;
+    if(myrank == 0){
+        if(argc == 2){
+            if(Parse(&mparameters,argv[1]) == 1)
+                printf("Parse done.\n\n");
+            else{
+                printf("Error: Please check your config file.\n\n");
+                exit(-1);
+            }
+        }else{
+            printf("Error: Please add config file.\n\n");
+            exit(-1);
+        }
+    }
+    init_varilabes(mparameters);
     // Variates for random samples
     const gsl_rng_type *T;
     gsl_rng *r;
@@ -263,7 +254,7 @@ main(int argc, char **argv){
     float final_time;
     int *p_allnjob; // ADJ factor for node performance variation.
     int i, j;
-    int err, simrank_st, simrank_en;
+    int simrank_st, simrank_en;
     FILE *fp;
 
     typedef struct {
@@ -272,15 +263,6 @@ main(int argc, char **argv){
     } vartime_t;
 
     vartime_t *p_vtime;
-
-    err = MPI_Init(NULL, NULL);
-    if (err) {
-        printf("Failed to initilize MPI environemnt.\n");
-
-        exit(-1);
-    }
-    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     if (simnp == 0) {
         printf("# of ranks = 0. EXIT.\n");
         return 0;
