@@ -64,7 +64,7 @@ extern int pfh_io_mkhost();
 extern int pfh_io_mkrec(char *rec_path);
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
 extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);
-extern int pfh_io_wtrankmap(proc_t *pinfo);
+extern int pfh_io_wtrankmap();
 extern int pfh_io_wtrec(int nrec, int nev);
 extern int pfh_io_wtinfo();
 
@@ -80,7 +80,7 @@ int
 pfh_init(char *path) {
     // User-defined data root and project name.
     char root[PATH_MAX]; // data root path, hostname.
-    int i, err = 0;
+    int err = 0;
 
     printf("*** [Pfh-Probe] Pfh-Probe is initializing. \n");
     fflush(stdout);
@@ -101,12 +101,7 @@ pfh_init(char *path) {
 
     /* Initializing run directory tree */
     printf("*** [Pfh-Probe] Creating data directory tree. \n");
-    err = pfh_io_mkname(root);
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
+    pfh_io_mkname(root);
     err = pfh_io_mkfile();
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
@@ -137,7 +132,7 @@ pfh_init(char *path) {
 
     /* Set all event codes to 0. */
 #ifdef _N_EV
-    for (i = 0; i < 12; i ++) {
+    for (int i = 0; i < 12; i ++) {
         pfh_evcodes[i] = 0;
     }
 #endif
@@ -149,7 +144,7 @@ pfh_init(char *path) {
     printf("*** [Pfh-Probe] Timer has been set. \n");
     fflush(stdout);
     /* Initial time reading. */
-    pfh_io_wtrankmap(&pfh_pinfo);
+    pfh_io_wtrankmap();
 
     pfh_set_tag(0, 0, "PFHGroup");
     pfh_set_tag(0, 1, "PFH Start");

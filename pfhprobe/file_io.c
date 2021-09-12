@@ -193,11 +193,10 @@ pfh_io_log(FILE *fp, char *fmt, ...) {
 
 
 int
-pfh_io_init(char *root, char *host) {
-    int ioerr, nrun;
+pfh_io_mkname(char *root) {
+    int nrun;
     char tmp_path[PATH_MAX];
     char *p_realpath = NULL;
-    FILE *fp = fopen(pfh_paths.etag, "w");
 
     nrec_tot = 0;
 
@@ -263,7 +262,7 @@ pfh_io_mkfile() {
     }
 
     /* Run path. */
-    ioerr = pfh_io_mkrun();
+    ioerr = mkdir(pfh_paths.run_dir, S_IRWXU);
     if (ioerr) {
         return ioerr;
     }
@@ -298,6 +297,8 @@ pfh_io_mkfile() {
     }
     fprintf(fp, "rank,hostname,cpu,hosthead,iorank\n");
     fclose(fp);
+
+    return 0;
 }
 
 /**
@@ -390,11 +391,11 @@ pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode) {
 }
 
 
-int pfh_io_wtrankmap(proc_t *pinfo) {
+int pfh_io_wtrankmap() {
     FILE *fp;
     fp = fopen(pfh_paths.rankmap, "a");
 
-    fprintf(fp, "%d,%s,%d,%d,%d,%d\n", pinfo->rank, pinfo->host, pinfo->cpu, pinfo->head, pinfo->iorank);
+    fprintf(fp, "%d,%s,%d,%d,%d,%d\n", pfh_pinfo.rank, pfh_pinfo.host, pfh_pinfo.cpu, pfh_pinfo.head, pfh_pinfo.iorank);
 
     fflush(fp);
     fclose(fp);

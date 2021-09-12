@@ -49,20 +49,20 @@ extern int pfh_io_mkhost();
 extern int pfh_io_wtrankmap();
 
 int
-pfh_mpi_rank_init(proc_t *pinfo) {
+pfh_mpi_rank_init() {
     int np, in;
     char hname[_HOST_MAX];
     if (MPI_Comm_size(MPI_COMM_WORLD, &np)) {
         return 1;
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &in);
-    pinfo->rank = in;
-    pinfo->nrank = np;
-    pinfo->cpu = sched_getcpu();
-    pinfo->head = 0;
-    pinfo->iorank = pfh_pinfo.rank;
+    pfh_pinfo.rank = in;
+    pfh_pinfo.nrank = np;
+    pfh_pinfo.cpu = sched_getcpu();
+    pfh_pinfo.head = 0;
+    pfh_pinfo.iorank = pfh_pinfo.rank;
     gethostname(hname, _HOST_MAX);
-    memcpy(pinfo->host, hname, _HOST_MAX*sizeof(char));
+    memcpy(pfh_pinfo.host, hname, _HOST_MAX*sizeof(char));
 
     return 0;
 }
@@ -75,29 +75,34 @@ pfh_mpi_barrier(MPI_Comm comm) {
 }
 
 int
-pfh_mpi_mkhost(proc_t *pinfo) {
+pfh_mpi_mkhost() {
     int flag = 0, ioerr;
+    int myrank, nrank;
+    myrank = pfh_pinfo.rank;
+    nrank = pfh_pinfo.nrank;
     MPI_Status stat;
 
-    if (pinfo.rank == 0) {
+    if (myrank == 0) {
         ioerr = pfh_io_mkhost();
         if (ioerr) {
             return ioerr;
         }
-        MPI_Recv(&flag, 1, MPI_INT, pinfo->nrank-1, pinfo->nrank-1,
+        MPI_Recv(&flag, 1, MPI_INT, nrank-1, nrank-1,
             MPI_COMM_WORLD, &stat);
     } else {
-        MPI_Recv(&flag, 1, MPI_INT, pinfo->rank-1, pinfo->rank-1, 
+        MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, 
             MPI_COMM_WORLD, &stat);
         ioerr = pfh_io_mkhost();
         if (ioerr) {
             return ioerr;
         }
-        ioerr = pfh_io_wtrankmap(pinfo);
+        ioerr = pfh_io_wtrankmap();
         if (ioerr) {
             return ioerr;
         }
         MPI_Send(&flag, 1, MPI_INT, (myrank+1)%nrank, myrank, MPI_COMM_WORLD);
     }
+
+    return 0;
 }
 

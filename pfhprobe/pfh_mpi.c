@@ -25,13 +25,13 @@ extern int pfh_io_mkfile();
 extern int pfh_io_mkrec(char *rec_path);
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
 extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);
-extern int pfh_io_wtrankmap(proc_t *pinfo);
+extern int pfh_io_wtrankmap();
 extern int pfh_io_wtrec(int nrec, int nev);
 extern int pfh_io_wtinfo();
 
-extern int pfh_mpi_rank_init(proc_t *pinfo);
+extern int pfh_mpi_rank_init();
 extern void pfh_mpi_barrier(MPI_Comm comm);
-extern int pfh_mpi_mkhost(int myrank, int nrank);
+extern int pfh_mpi_mkhost();
 
 /* Local Global */
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
@@ -60,8 +60,8 @@ pfhmpi_init(char *path) {
     int i, err = 0;
 
     /* Init basic rank information */
-    err = pfh_mpi_rank_init(&pfh_pinfo);
-    if (pfh_mpi_rank_init(&pfh_pinfo)) {
+    err = pfh_mpi_rank_init();
+    if (err) {
         printf("*** [Pfh-Probe] EXIT. Failed to init MPI.\n");
         exit(1);
     }
@@ -98,7 +98,7 @@ pfhmpi_init(char *path) {
     }
 
     /* Initializing host directory tree */
-    err = pfh_mpi_mkhost(pfh_pinfo.rank, pfh_pinfo.nrank);
+    err = pfh_mpi_mkhost();
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
         fflush(stdout);
