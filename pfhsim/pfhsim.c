@@ -25,7 +25,7 @@
 #define Li  1000
 
 #ifndef NRUN
-#define NRUN 500
+#define NRUN 1000
 #endif
 
 #ifndef NP_NODE
@@ -33,7 +33,7 @@
 #endif
 
 #ifndef NNODE
-#define NNODE 512                 // # of nodes.
+#define NNODE 1                 // # of nodes.
 #endif
 
 #define NORM_SIGMA 0.016666667
@@ -41,6 +41,18 @@
 
 #ifndef PARETO_K
 #define PARETO_K 10
+#endif
+
+#ifndef IK
+#define IK 3
+#endif
+
+#ifndef KK
+#define KK 3
+#endif
+
+#ifndef FK
+#define FK 3
 #endif
 
 #define SYSVAR_P 5              // Invoking period (sec) of os noise.
@@ -464,8 +476,8 @@ main(int argc, char **argv){
 #ifdef NO_FVAR
                 p_vtime[j].arr_tau_f[lf] = p_vtime[j].tf1; 
 #else
-                s = gsl_ran_pareto(r, PARETO_K, 1);
-                s = s > 2? 2: s;
+                s = gsl_ran_pareto(r, FK, 1);
+                //s = s > 2? 2: s;
                 p_vtime[j].arr_tau_f[lf] = p_vtime[j].tf1 * s;
 #endif
             }
@@ -474,8 +486,8 @@ main(int argc, char **argv){
 #ifdef NO_KVAR
                     p_vtime[j].arr_tau_k[lf][lk] = p_vtime[j].tk1; 
 #else
-                    s = gsl_ran_pareto(r, PARETO_K, 1);
-                    s = s > 2? 2: s;
+                    s = gsl_ran_pareto(r, KK, 1);
+                    //s = s > 2? 2: s;
                     p_vtime[j].arr_tau_k[lf][lk] = p_vtime[j].tk1 * s;
 #endif
                 }
@@ -486,8 +498,8 @@ main(int argc, char **argv){
 #ifdef NO_IVAR
                         p_vtime[j].arr_tau_i[lf][lk][li] = p_vtime[j].ti; 
 #else                    
-                        s = gsl_ran_pareto(r, PARETO_K, 1);
-                        s = s > 2? 2: s;
+                        s = gsl_ran_pareto(r, IK, 1);
+                        //s = s > 2? 2: s;
                         p_vtime[j].arr_tau_i[lf][lk][li] = p_vtime[j].ti * s;
 #endif
                     }
