@@ -1,6 +1,6 @@
 /*
  * =================================================================================
- * VarTect - Detecting and analyzing performance variation in parallel program
+ * PerfHound - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
  * 
@@ -17,7 +17,7 @@
  * 
  * =================================================================================
  * file_io.c
- * Description: File operations for Vartect.
+ * Description: File operations for PerfHound.
  * Author: Key Liao
  * Modified: May. 28th, 2020
  * Email: keyliaohpc@gmail.com

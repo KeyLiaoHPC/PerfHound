@@ -1,6 +1,6 @@
 /*
  * =================================================================================
- * VarTect - Detecting and analyzing performance variation in parallel program
+ * PerfHound - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
  * 
@@ -17,7 +17,7 @@
  * 
  * =================================================================================
  * varapi.h
- * Description: API for vartect
+ * Description: API for PerfHound
  * Author: Key Liao
  * Modified: May. 28th, 2020
  * Email: keyliaohpc@gmail.com
@@ -66,7 +66,7 @@
 
 /* API: Varapi application interfaces */
 /**
- * @brief Initialise vartect api. This function must be called exactly once before the 
+ * @brief Initialise PerfHound api. This function must be called exactly once before the 
  * variation detection.
  * @param data_dir      Root dir for output data.
  * @param proj_name     Project name, for intra-project data comparison.

@@ -2,7 +2,7 @@
 CC = mpicc
 CFLAGS = -O3 -fno-builtin -DUSE_MPI 
 # 
-#VARAPI = /chpc/home/stf-keyliao-a/proj/Vartect/varapi
+#VARAPI = /chpc/home/stf-keyliao-a/proj/PerfHound/varapi
 VARAPI = $(PWD)/..
 #
 STREAM_FLAGS = -DSTREAM_ARRAY_SIZE=16384 -DNTIMES=10000

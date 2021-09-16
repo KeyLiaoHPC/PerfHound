@@ -1,6 +1,6 @@
 /*
  * =================================================================================
- * VarTect - Detecting and analyzing performance variation in parallel program
+ * PerfHound - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
  * 

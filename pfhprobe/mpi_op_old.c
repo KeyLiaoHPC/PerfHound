@@ -1,6 +1,6 @@
 /*
  * =================================================================================
- * VarTect - Detecting and analyzing performance variation in parallel program
+ * PerfHound - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
  * 
@@ -341,7 +341,7 @@ vt_world_barrier() {
     return;
 }
 
-/* IO rank gets vartect data from a group member. */
+/* IO rank gets PerfHound data from a group member. */
 int
 vt_get_data(uint32_t rank, uint32_t *count, rec_t *data) {
     if (rank) {
@@ -363,7 +363,7 @@ vt_get_data(uint32_t rank, uint32_t *count, rec_t *data) {
     return 0;
 }
 
-/* Send vartect data to io rank. */
+/* Send PerfHound data to io rank. */
 void
 vt_send_data(uint32_t count, rec_t *data) {
     MPI_Send(&count, 1, MPI_UINT32_T, 0, iogrp_rank, comm_iogrp);

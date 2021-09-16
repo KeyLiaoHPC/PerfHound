@@ -216,7 +216,7 @@ main()
     STREAM_TYPE		scalar;
     double		t, times[4][NTIMES];
 
-    /* Vartect: Init varapi */
+    /* PerfHound: Init varapi */
     vt_init("./data", "varapi_test");
     /* --- SETUP --- determine precision and check timing --- */
 
@@ -310,7 +310,7 @@ main()
     scalar = 3.0;
     for (k=0; k<NTIMES; k++)
 	{
-    /* Vartect: Tag: copy, get timestamp. */
+    /* PerfHound: Tag: copy, get timestamp. */
     vt_read("copy", 4, 0, 0, 0);
 	times[0][k] = mysecond();
 #ifdef TUNED
@@ -322,7 +322,7 @@ main()
 #endif
 	times[0][k] = mysecond() - times[0][k];
 	
-    /* Vartect: Tag: scale, get timestamp. */
+    /* PerfHound: Tag: scale, get timestamp. */
     vt_read("scale", 5, 0, 0, 0);
 	times[1][k] = mysecond();
 #ifdef TUNED
@@ -334,7 +334,7 @@ main()
 #endif
 	times[1][k] = mysecond() - times[1][k];
 
-	/* Vartect: Tag: add, get timestamp. */
+	/* PerfHound: Tag: add, get timestamp. */
     vt_read("add", 3, 0, 0, 0);
 	times[2][k] = mysecond();
 #ifdef TUNED
@@ -346,7 +346,7 @@ main()
 #endif
 	times[2][k] = mysecond() - times[2][k];
 	
-	/* Vartect: Tag: triad, get timestamp. */
+	/* PerfHound: Tag: triad, get timestamp. */
     vt_read("triad", 5, 0, 0, 0);
 	times[3][k] = mysecond();
 #ifdef TUNED
@@ -387,7 +387,7 @@ main()
     checkSTREAMresults();
     printf(HLINE);
 
-    /* Vartect: varapi finalize */
+    /* PerfHound: varapi finalize */
     vt_finalize();
     return 0;
 }

@@ -54,7 +54,7 @@ class VtObject:
         
         Parameters
         ----------
-        data_root: Root path of vartect data.
+        data_root: Root path of PerfHound data.
         proj_name: Project name.
         
         Returns
@@ -75,7 +75,7 @@ class VtObject:
         
         Parameters
         ----------
-        data_root: Root path of vartect data.
+        data_root: Root path of PerfHound data.
         proj_name: Project name.
         """
 

@@ -1,6 +1,6 @@
 /*
  * =================================================================================
- * VarTect - Detecting and analyzing performance variation in parallel program
+ * PerfHound - Detecting and analyzing performance variation in parallel program
  * 
  * Copyright (C) 2020 Key Liao (Liao Qiucheng)
  * 
@@ -17,7 +17,7 @@
  * 
  * =================================================================================
  * varapi.c
- * Description: API for vartect
+ * Description: API for PerfHound
  * Author: Key Liao
  * Modified: May. 28th, 2020
  * Email: keyliaohpc@gmail.com
