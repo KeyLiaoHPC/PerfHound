@@ -25,16 +25,28 @@ PFHFLAGS=-DPFH_RECBUF_KIB=$(BUF)
 all: libpfh_ts.so libpfh_evx.so libpfhmpi_ts.so libpfhmpi_evx.so
 
 
-libpfh_ts.so: libpfh_ts.o file_io.o 
-	$(CC) $(LDFLAGS) -shared -o $@ $^
-libpfh_evx.so: libpfh_evx.o file_io.o 
-	$(CC) $(LDFLAGS) -shared -o $@ $^
-
-libpfhmpi_ts.so: libpfhmpi_ts.o file_io.o  mpi_op.o
-	$(MPICC) $(LDFLAGS) -shared -o $@ $^ 
-libpfhmpi_evx.so: libpfhmpi_evx.o  file_io.o  mpi_op.o
-	$(MPICC) $(LDFLAGS) -shared -o $@ $^
-
+libpfh_ts.so: pfh_probe.c file_io.c 
+	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
+	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
+	$(CC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o  file_io.o 
+	rm *.o
+libpfh_evx.so: pfh_probe.c file_io.c 
+	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
+	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
+	$(CC) $(LDFLAGS) -DPFH_MODE_EVX -shared -o $@ pfh_probe.o  file_io.o 
+	rm *.o
+libpfhmpi_ts.so: mpi_op.c pfh_mpi.c file_io.c 
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_mpi.o -c pfh_mpi.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
+	$(MPICC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_mpi.o mpi_op.o  file_io.o 
+	rm *.o
+libpfhmpi_evx.so: mpi_op.c pfh_mpi.c file_io.c 
+	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o pfh_mpi.o -c pfh_mpi.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
+	$(MPICC) $(LDFLAGS) -DPFH_MODE_EVX -shared -o $@ pfh_mpi.o mpi_op.o  file_io.o 
+	rm *.o
 
 install:
 	mkdir -p ${PREFIX}/lib
@@ -56,9 +68,9 @@ libpfh_evx.o: pfh_probe.c
 	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 
 libpfhmpi_ts.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 libpfhmpi_evx.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
+	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 
 clean:
 	rm -rf *.o *.x *.so

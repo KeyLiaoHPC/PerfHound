@@ -53,6 +53,7 @@
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
 static uint32_t pfh_irec;            // Index for counter readings.
 static int pfh_ready;
+static uint64_t pfh_evcodes[12];
 
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
@@ -61,11 +62,11 @@ int pfh_nevt;
 extern int pfh_io_mkname(char *root);
 extern int pfh_io_mkfile();
 extern int pfh_io_mkhost();
-extern int pfh_io_mkrec(char *rec_path);
+extern int pfh_io_mkrec();
 extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
 extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);
 extern int pfh_io_wtrankmap();
-extern int pfh_io_wtrec(int nrec, int nev);
+extern int pfh_io_wtrec(int nrec);
 extern int pfh_io_wtinfo();
 
 /**
@@ -108,6 +109,8 @@ pfh_init(char *path) {
         fflush(stdout);
         exit(1);
     }
+    printf("*** [Pfh-Probe] Data directory: %s\n", root);
+    fflush(stdout);
 
 
     /* Initializing host directory tree */
@@ -131,11 +134,9 @@ pfh_init(char *path) {
     fflush(stdout);
 
     /* Set all event codes to 0. */
-#ifdef _N_EV
     for (int i = 0; i < 12; i ++) {
         pfh_evcodes[i] = 0;
     }
-#endif
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
 #ifdef __x86_64__
@@ -167,7 +168,7 @@ pfh_init(char *path) {
 int
 pfh_set_evt(const char *etag) {
     // Unavailable in TS dode.
-#ifndef _N_EV
+#ifdef PFH_MODE_TS
     printf("*** [Pfh-Probe] WARNING. Performance event is unavailable in TS mode. Your setting wiil be omitted. \n");
     fflush(stdout);
     return 0;
@@ -179,9 +180,14 @@ pfh_set_evt(const char *etag) {
         fflush(stdout);
         return 1;
     }
-    
-    if (pfh_nevt >= _N_EV) {
-        printf("*** [Pfh-Probe] WARNING. Too many events (Max: %d), this event will be omitted. \n", _N_EV);
+#ifdef __x86_64__
+    if (pfh_nevt >= 8) {
+#elif  __aarch64__
+    if (pfh_nevt >= 12) {
+#else
+    if (pfh_nevt >= 12) {
+#endif
+        printf("*** [Pfh-Probe] WARNING. Too many events , this event will be omitted. \n");
         fflush(stdout);
         return 2;     
     }
@@ -192,14 +198,14 @@ pfh_set_evt(const char *etag) {
 
     if (evcode <= 0xFFFFFFFF - 1) {
         pfh_evcodes[pfh_nevt] = evcode;
-        printf("*** [Pfh-Probe] Event %s added, evcode=0x%x. \n", etag, evcode);
         pfh_nevt ++;
+        printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nevt, etag, evcode);
     } else {
         printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
     }
     pfh_io_wtetag(pfh_nevt, etag, pfh_evcodes[pfh_nevt-1]);
         
-#endif // END: #ifndef _N_EV
+#endif // END: #ifndef PFH_MODE_EVX
     return 0;
 } // END: int vt_set_evt
 
@@ -207,12 +213,13 @@ pfh_set_evt(const char *etag) {
 void
 pfh_commit() {
     int err;
-#ifdef _N_EV
-    _pfh_config_event (pfh_evcodes, pfh_nevt);
-    printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
-#endif
 
-    err = pfh_io_mkrec(NULL);
+    if (pfh_nevt) {
+        _pfh_config_event (pfh_evcodes, pfh_nevt);
+        printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
+    }
+
+    err = pfh_io_mkrec();
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create record file.\n", err);
         fflush(stdout);
@@ -255,7 +262,6 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // _pfh_reg_restore;
 
     /* Read system event */
-#ifdef _N_EV
     switch (pfh_nevt){
         case 1: 
             _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
@@ -281,7 +287,6 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
         case 8: 
             _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
             break;
-#ifdef __aarch64__
         case 9: 
             _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
             break;
@@ -294,11 +299,9 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
         case 12: 
             _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
             break;
-#endif // END: #ifdef __aarch64__
         default:
             break;
     }
-#endif
 
     pfh_irec ++;
        
@@ -345,7 +348,7 @@ pfh_dump() {
     }
 
     pfh_fastread(0, 3, 0);
-    pfh_io_wtrec(pfh_irec, pfh_nevt);
+    pfh_io_wtrec(pfh_irec);
     pfh_irec = 0;
     pfh_fastread(0, 4, 0);
     
@@ -361,7 +364,7 @@ pfh_finalize() {
 
     pfh_read(0, 2, 0);
     printf("*** [Pfh-Probe] Writing records. \n");
-    err = pfh_io_wtrec(pfh_irec, pfh_nevt);
+    err = pfh_io_wtrec(pfh_irec);
     if (err) {
         printf("*** [Pfh-Probe] Exit %d, failed at writing reading records. \n", err);
         fflush(stdout);

@@ -274,7 +274,7 @@ pfh_io_mkfile() {
     fseek(fp, 0L, SEEK_END);
     if (ftell(fp) == 0) {
         // Write headers to an empty file.
-        fprintf(fp, "id,mode,nrank,nevent,ngroup,npoint,start_time,end_time,description\n");
+        fprintf(fp, "id,nrank,nevent,ngroup,npoint,start_time,end_time,description\n");
     }
     fclose(fp);
 
@@ -324,36 +324,23 @@ pfh_io_mkhost() {
 }
 
 int
-pfh_io_mkrec(char *rec_path) {
+pfh_io_mkrec() {
     FILE *fp = NULL;
     
     // NULL for single-process run, import the record file address for
     // processing IO for multiple processes.
-    if (rec_path == NULL) {
-        fp = fopen(pfh_paths.rec, "w");
-    } else {
-        fp = fopen(rec_path, "w");
-    }
-
+    fp = fopen(pfh_paths.rec, "w");
     if (fp == NULL) {
         return errno;
     }
 
-#ifdef  PFH_MODE_EV
-    fprintf(fp, "gid,pid,cycle,nanosec,uval,"
-        "ev1,ev2,ev3,ev4\n");
+    fprintf(fp, "gid,pid,cycle,nanosec,uval");
+    for (int i = 1; i <= pfh_nevt; i ++) {
+        fprintf(fp, ",ev%d", i);
+    }
+    fprintf(fp, "\n");
 
-#elif   PFH_MODE_EVX
-    fprintf(fp, "gid,pid,cycle,nanosec,uval,"
-        "ev1,ev2,ev3,ev4,ev5,ev6,ev7,ev8,ev9,ev10,ev11,ev12\n");
 
-#endif
-
-#ifndef _N_EV
-    fprintf(fp, "gid,pid,cycle,nanosec,uval\n");
-#else
-
-#endif
     fclose(fp);
 
     return 0;
@@ -420,16 +407,8 @@ int pfh_io_wtinfo() {
     if (fp == NULL) {
         return 1;
     }
-#ifdef PFH_MODE_TS
-    fprintf(fp, "%d,TS,%d,%d,%d,%s,%s,\n",
+    fprintf(fp, "%d,%d,%d,%d,%s,%s,\n",
         runid, pfh_pinfo.nrank, nevt, nrec_tot, st_timestr, en_timestr);
-#elif PFH_MODE_EV
-    fprintf(fp, "%d,EV,%d,%d,%d,%s,%s,\n",
-        runid, pfh_pinfo.nrank, nevt, nrec_tot, st_timestr, en_timestr);
-#elif PFH_MODE_EVX
-    fprintf(fp, "%d,EVX,%d,%d,%d,%s,%s,\n",
-        runid, pfh_pinfo.nrank, nevt, nrec_tot, st_timestr, en_timestr);
-#endif
 
     fflush(fp);
     fclose(fp);
@@ -440,11 +419,8 @@ int pfh_io_wtinfo() {
  * @brief 
  */
 int
-pfh_io_wtrec(int nrec, int nev) {
-    int i;
+pfh_io_wtrec(int nrec) {
     FILE *p_recfile;
-
-    nevt = nev;
 
     nrec_tot += nrec;
 
@@ -454,17 +430,14 @@ pfh_io_wtrec(int nrec, int nev) {
         return 1;
     }
 
-    for (i = 0; i < nrec; i ++) {
+    for (int i = 0; i < nrec; i ++) {
         fprintf(p_recfile, "%u,%u,%llu,%llu,%f", 
                 pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
                 pfh_precs[i].cy, pfh_precs[i].ns, pfh_precs[i].uval);
-#ifdef _N_EV
-    int j;
-    for (j = 0; j < nev; j++) {
-        fprintf(p_recfile, ",%llu", pfh_precs[i].ev[j]);
-    }
-#endif
-    fprintf(p_recfile, "\n");
+        for (int j = 0; j < pfh_nevt; j++) {
+            fprintf(p_recfile, ",%llu", pfh_precs[i].ev[j]);
+        }
+        fprintf(p_recfile, "\n");
     }
 
     fflush(p_recfile);

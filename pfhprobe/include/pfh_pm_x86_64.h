@@ -127,7 +127,6 @@
 #endif
 
 /* Macros for reading x86_64 events */
-#ifdef _N_EV
 /* Parsing string events to hex event code */
 #define _pfh_parse_event(_code, _evstr)  \
     _code = pfcParseCfg(_evstr);        \
@@ -244,4 +243,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
 
-#endif
+#define _pfh_read_pm_9(arr)
+#define _pfh_read_pm_10(arr)
+#define _pfh_read_pm_11(arr)
+#define _pfh_read_pm_12(arr)

@@ -72,28 +72,6 @@
  * PFH_MODE_EVX: Up to 12 Events.
  */
 
-#ifdef PFH_MODE_TS
-#undef PFH_MODE_EV
-#undef PFH_MODE_EVX
-#endif
-
-#ifdef PFH_MODE_EV
-#undef PFH_MODE_TS
-#undef PFH_MODE_EVX
-#define _N_EV 4
-#endif
-
-#ifdef PFH_MODE_EVX
-#undef PFH_MODE_TS
-#undef PFH_MODE_EV
-
-#ifdef __x86_64__
-#define _N_EV 8
-#elif __aarch64__
-#define _N_EV 12
-#endif // END: #ifdef VT_NODE_TS
-#endif
-
 /* Import performance monitor header after setting mode. */
 #ifdef __x86_64__
 #include "pfh_pm_x86_64.h"
@@ -107,14 +85,15 @@
 
 
 /* Pfh-Probe record data type */
-typedef struct {
+typedef struct __attribute__((packed)){
     uint32_t ctag[2];
     uint64_t cy, ns;    
     double uval;        // 32 Bytes
-#ifdef PFH_MODE_EV
-    uint64_t ev[4];
-#elif PFH_MODE_EVX
+#ifdef PFH_MODE_EVX
     uint64_t ev[12];
+#else
+    uint64_t ev[4];
+
 #endif
 } rec_t;
 
@@ -136,9 +115,6 @@ typedef struct {
     int *prank;
 } hinfo_t;
 
-#ifdef _N_EV 
-uint64_t pfh_evcodes[12];
-#endif
 extern rec_t *pfh_precs; // raw data.
 extern proc_t pfh_pinfo;
 extern int pfh_nevt;

@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
     char dirname[256];
     sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210909/NINS=%d", mode, op, NINS);
 
-    if (pfh_init(dirname)) {
+    if (pfh_init("../data/pfh_0917")) {
         printf("Failed at initailizing PerfHound.\n");
         exit(1);
     }

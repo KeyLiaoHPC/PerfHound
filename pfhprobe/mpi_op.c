@@ -87,11 +87,14 @@ pfh_mpi_mkhost() {
         if (ioerr) {
             return ioerr;
         }
-        MPI_Recv(&flag, 1, MPI_INT, nrank-1, nrank-1,
-            MPI_COMM_WORLD, &stat);
+        ioerr = pfh_io_wtrankmap();
+        if (ioerr) {
+            return ioerr;
+        }
+        MPI_Send(&flag, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(&flag, 1, MPI_INT, nrank-1, nrank-1, MPI_COMM_WORLD, &stat);
     } else {
-        MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, 
-            MPI_COMM_WORLD, &stat);
+        MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, MPI_COMM_WORLD, &stat);
         ioerr = pfh_io_mkhost();
         if (ioerr) {
             return ioerr;

@@ -37,7 +37,6 @@ int pfh_init(char *path);
 /**
  * Register system events which will be recorded. 
  * @param etags         Array of event names.
- * @param n             Actual number of events, should be less or equal to _N_EV.
  */
 int pfh_set_evt(const char *etags);
 

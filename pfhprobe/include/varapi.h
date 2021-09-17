@@ -77,7 +77,6 @@ int vt_init(char *u_data_root, char *u_proj_name);
 /**
  * @brief Register system events which will be recorded. 
  * @param etags         Array of event names.
- * @param n             Actual number of events, should be less or equal to _N_EV.
  */
 int vt_set_evt(const char *etags);
 
