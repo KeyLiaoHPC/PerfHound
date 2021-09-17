@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#define _ISOC11_SOURCE#include <stdio.h>
+#define _ISOC11_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +13,7 @@
 #include <mpi.h>
 
 #include "pfhprobe_core.h"
+#include "pfh_mpi.h"
 
 
 #define PFH_PRINTF(_msg)    if(pfh_pinfo.rank == 0) {  \
@@ -141,11 +142,11 @@ pfhmpi_init(char *path) {
         fflush(stdout);
     }
 
-    pfh_set_tag(0, 0, "PFHGroup");
-    pfh_set_tag(0, 1, "PFH Start");
-    pfh_set_tag(0, 2, "PFH End");
-    pfh_set_tag(0, 3, "PFH Wt Start");
-    pfh_set_tag(0, 4, "PFH Wt End");
+    pfhmpi_set_tag(0, 0, "PFHGroup");
+    pfhmpi_set_tag(0, 1, "PFH Start");
+    pfhmpi_set_tag(0, 2, "PFH End");
+    pfhmpi_set_tag(0, 3, "PFH Wt Start");
+    pfhmpi_set_tag(0, 4, "PFH Wt End");
     pfh_ready = 0;
     if (pfh_pinfo.rank == 0) {
         printf("*** [Pfh-Probe] Directory tree initialized. \n");
@@ -159,7 +160,7 @@ pfhmpi_init(char *path) {
 
     pfh_mpi_barrier(MPI_COMM_WORLD);
     pfh_mpi_barrier(MPI_COMM_WORLD);
-    pfh_read(0, 1, 0);
+    pfhmpi_fastread(0, 1, 0);
 
     return 0;
 } // END: int vt_init()
@@ -240,7 +241,7 @@ pfhmpi_commit() {
         exit(1);
     }
     pfh_ready = 1;
-    pfh_read(0, 1, 0);
+    pfhmpi_fastread(0, 1, 0);
     return;
 }
 
@@ -338,18 +339,18 @@ pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
         fflush(stdout);
         pfh_irec = 0;
     }
-    pfh_fastread(grp_id, p_id, uval);
+    pfhmpi_fastread(grp_id, p_id, uval);
 }
 
 
 void 
 pfhmpi_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
-    pfh_fastread(grp_id, p_id, uval);
+    pfhmpi_fastread(grp_id, p_id, uval);
 
     if (pfh_irec == buf_nrec - 1) {
         printf("*** [Pfh-Probe] Rank %d: Auto dumping. \n", pfh_pinfo.rank);
     }
-    pfh_dump();
+    pfhmpi_dump();
 }
 
 /**
@@ -371,10 +372,10 @@ pfhmpi_dump() {
         pfh_irec --; // Step back for recording writing time.
     }
 
-    pfh_fastread(0, 3, 0);
+    pfhmpi_fastread(0, 3, 0);
     pfh_io_wtrec(pfh_irec, pfh_nevt);
     pfh_irec = 0;
-    pfh_fastread(0, 4, 0);
+    pfhmpi_fastread(0, 4, 0);
     
     return;
 }
@@ -386,7 +387,7 @@ pfhmpi_finalize() {
 
     PFH_PRINTF ("*** [Pfh-Probe] User invokes finalization. \n");
 
-    pfh_read(0, 2, 0);
+    pfhmpi_read(0, 2, 0);
     PFH_PRINTF ("*** [Pfh-Probe] Writing records. \n");
     err = pfh_io_wtrec(pfh_irec, pfh_nevt);
     if (err) {

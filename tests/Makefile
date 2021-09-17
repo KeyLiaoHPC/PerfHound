@@ -1,53 +1,53 @@
 #!/bin/sh
-
 CC = gcc
-PERFHOUND = "PERFHOUND"
-PAPI = PAPI
-PROF ?= $(PERFHOUND)
-NMEASURE ?= 100
-CFLAGS=-O2
+MPICC = mpicc
+CFLAGS = -O2 -fno-builtin -DUSE_MPI 
+# 
+#
+STREAM_FLAGS = -DSTREAM_ARRAY_SIZE=16384 -DNTIMES=10000
+VARAPI_FLAGS = -DUSE_VARAPI #-DVT_MODE_SHORT -DVT_UEV_1
+LDFLAGS = 
 
-$(info PROF is $(PROF))
+VPATH = ../pfhprobe
 
-ifeq ($(PROF),PERFHOUND)
-PROF_FLAGS = -I$(PERFHOUND)/include
-# Modify this for appropriate mode you want.
-# -lpfhprobe_ts: Timestamp mode
-# -lpfhprobe_ev: 4-event mode
-# -lpfhprobe_evx: Extended-event  mode (12 for AArch64, 8 for Cascade Lake X)
-PROF_LINK = -L$(PERFHOUND)/lib -lpfhprobe_ts
+.PHONY: test1 test2 test3 clean
 
-else 
-ifeq ($(PROF),PAPI)
-PROF_FLAGS = -I$(PAPI)/include
-PROF_LINK = -L$(PAP)/lib -lpapi
+test1: test1_asm_x86.x test1_asm_x86_mpi.x
 
-else
-PROF_FLAGS = 
-PROF_LINK = 
-endif
+test2: test2_asm_armv8.x test1_asm_armv8_mpi.x
 
-endif
+test1_asm_x86_ts.x: test1_asm_x86.c
+	$(CC) $(CFLAGS) -o ^@ $^ -lpfh_ts 
+test1_asm_x86_evx.x: test1_asm_x86.c
+	$(CC) $(CFLAGS) -o ^@ $^ -lpfh_evx
+test1_asm_x86_ts_mpi.x: test1_asm_x86.c
+	$(MPICC) $(CFLAGS) -o ^@ $^ -lpfh_ts 
+test1_asm_x86_evx_mpi.x: test1_asm_x86.c
+	$(MPICC) $(CFLAGS) -o ^@ $^ -lpfh_evx 
 
-CFLAGS += $(PROF_FLAGS)
-LDFLAGS += $(PROF_LINK)
+test2_asm_armv8_ts.x: test2_asm_armv8.c
+test2_asm_armv8_evx.x: test2_asm_armv8.c
+test2_asm_armv8_ts_mpi.x: test2_asm_armv8.c
+test2_asm_armv8_evx_mpi.x: test2_asm_armv8.c
 
-# Specify profiler, PAPI or PERFHOUND
+stream.x: stream.c 
+	$(CC) $(CFLAGS) $(LDFLAGS) -o  ^@ $^
 
-# Modify this for kernel's length
-NADD ?= 10
+stream_varapi.x: stream_varapi.o varapi.o file_op.o varapi.o
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
 
-PRED = -DNADD=$(NADD) -DNMEASURE=$(NMEASURE) -D$(PROF)
+st_mpi_varapi.x: st_mpi_varapi.o varapi.o file_op.o varapi.o vt_mpi.o
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
 
-.PHONY: clean all
+st_mpi_varapi.o: stream_mpi.c
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
 
-all: test-1
+stream_varapi.o: stream.c 
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
 
-test-1: test1_3regs_add
-
-test1_3regs_add : test1_3regs_add.c
-	$(CC) $(CFLAGS) $(PRED) -funroll-all-loops -o $@_$(PROF).x $^ $(LDFLAGS)
-	$(CC) $(CFLAGS) $(PRED) -c -funroll-all-loops -S -fverbose-asm -o $@_$(PROF).s $^ 
+%.o: %.c
+	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c $< 
 
 clean:
-	rm -r ./*.x  ./*.s
+	rm -rf *.o stream_varapi.x stream.x
+	rm -rf ./data

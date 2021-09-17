@@ -1,10 +1,14 @@
+#define _GNU_SOURCE
+#define _ISOC11_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <sched.h>
 
-#define _GNU_SOURCE
-#define _ISOC11_SOURCE
+
 
 #ifdef PFH
 #include "pfhprobe.h"
@@ -138,12 +142,12 @@ main(int argc, char **argv) {
 
 #pragma GCC unroll 1024
         for (int kk = 0; kk < NADD; kk ++) {
-             asm volatile(
-                    DEP_ADD 
-                    :
-                    :
-                    : "r11", "r12", "r13", "memory"
-                    );
+            asm volatile (
+                DEP_ADD 
+                :
+                :
+                : "r11", "r12", "r13", "memory"
+            );
         }
 #ifdef PFH
         pfh_read(1, 2, 0);
@@ -176,13 +180,17 @@ main(int argc, char **argv) {
     
 #ifdef PAPI
     /*=== Dump PAPI result to file.  ===*/
-    FILE *fp = fopen("./papi_out.txt", "w");
+    FILE *fp;
+    char fname[1024];
+    int cpu = sched_getcpu();
+    sprintf(fname, "./papi_out_c%d.csv", cpu);
+    fp = fopen(fname, "w");
     for (i = 0; i < NMEASURE*2; i ++) {
         fprintf(fp, "%lld, %lld", cyc[i], us[i]);
-	for (int j = 0; j < 8; j ++) {
+	    for (int j = 0; j < 8; j ++) {
             fprintf(fp, ", %lld", papi_evt[i][j]);
-	}
-	fprintf(fp, "\n");
+	    }
+	    fprintf(fp, "\n");
     }
     fclose(fp);
     PAPI_shutdown();

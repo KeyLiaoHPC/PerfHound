@@ -51,15 +51,14 @@
 #define _NETAG_MAX   8       // Max number of self-defined etag.
 
 /* MPI and IO settings. */
-#define _AUTO_WRITE     1
 #define _RANK_PER_IO    20
 #define _SYNC_NS_OFFSET 1e4     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
 #ifndef PFH_RECBUF_KIB 
 #define PFH_RECBUF_KIB  2048      // 4 KiB
-#define PFH_BUF_NMARGIN 4
 #endif
+#define PFH_BUF_NMARGIN 4
 
 #define ALIGN           64
 

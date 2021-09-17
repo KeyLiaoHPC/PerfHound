@@ -17,31 +17,23 @@ endif
 CFLAGS += -fPIC
 # Installing path
 PREFIX ?= .
+BUF=4
+PFHFLAGS=-DPFH_RECBUF_KIB=$(BUF)
 
 .PHONY: all install clean
 
-all: libpfh.so libpfh_evx.so libpfh_sys.so libpfh_sys_evx.so \
-		libpfhmpi.so libpfhmpi_evx.so \
-		libpfhmpi_sys.so libpfhmpi_sys_evx.so
+all: libpfh_ts.so libpfh_evx.so libpfhmpi_ts.so libpfhmpi_evx.so
 
 
-libpfh.so: file_io.o 
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfh_evx.so: file_io.o 
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfh_sys.so: file_io.o 
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfh_sys_evx.so: file_io.o 
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
+libpfh_ts.so: libpfh_ts.o file_io.o 
+	$(CC) $(LDFLAGS) -shared -o $@ $^
+libpfh_evx.so: libpfh_evx.o file_io.o 
+	$(CC) $(LDFLAGS) -shared -o $@ $^
 
-libpfhmpi.so: file_io.o  mpi_op.o
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfhmpi_evx.so: file_io.o  mpi_op.o
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfhmpi_sys.so: file_io.o  mpi_op.o
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
-libpfhmpi_sys_evx.so: file_io.o  mpi_op.o
-	$(LINK.c) $(LDFLAGS) -shared -o $@ $^
+libpfhmpi_ts.so: libpfhmpi_ts.o file_io.o  mpi_op.o
+	$(MPICC) $(LDFLAGS) -shared -o $@ $^ 
+libpfhmpi_evx.so: libpfhmpi_evx.o  file_io.o  mpi_op.o
+	$(MPICC) $(LDFLAGS) -shared -o $@ $^
 
 
 install:
@@ -58,23 +50,15 @@ file_io.o: file_io.c
 mpi_op.o: mpi_op.c
 	$(MPICC) $(CFLAGS)  $(LDFLAGS) -o $@ -c $< 
 
-libpfh.o: pfh_probe.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS  $(LDFLAGS) -o $@ -c $< 
+libpfh_ts.o: pfh_probe.c
+	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 libpfh_evx.o: pfh_probe.c
-	$(CC) $(CFLAGS) -DPFH_MODE_EVX  $(LDFLAGS) -o $@ -c $< 
-libpfh_sys.o: pfh_probe.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS -DUSE_SYSCALL_TS  $(LDFLAGS) -o $@ -c $< 
-libpfh_sys_evx.o: pfh_probe.c
-	$(CC) $(CFLAGS) -DPFH_MODE_EVX -DUSE_SYSCALL_TS  $(LDFLAGS) -o $@ -c $< 
+	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 
-libpfhmpi.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS  $(LDFLAGS) -o $@ -c $< 
+libpfhmpi_ts.o: pfh_mpi.c
+	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 libpfhmpi_evx.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_EVX  $(LDFLAGS) -o $@ -c $< 
-libpfhmpi_sys.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS -DUSE_SYSCALL_TS  $(LDFLAGS) -o $@ -c $< 
-libpfhmpi_sys_evx.o: pfh_mpi.c
-	$(CC) $(CFLAGS) -DPFH_MODE_EVX -DUSE_SYSCALL_TS  $(LDFLAGS) -o $@ -c $< 
+	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o $@ -c $< 
 
 clean:
 	rm -rf *.o *.x *.so
