@@ -382,7 +382,7 @@ int pfh_io_wtrankmap() {
     FILE *fp;
     fp = fopen(pfh_paths.rankmap, "a");
 
-    fprintf(fp, "%d,%s,%d,%d,%d,%d\n", pfh_pinfo.rank, pfh_pinfo.host, pfh_pinfo.cpu, pfh_pinfo.head, pfh_pinfo.iorank);
+    fprintf(fp, "%d,%s,%d,%d,%d\n", pfh_pinfo.rank, pfh_pinfo.host, pfh_pinfo.cpu, pfh_pinfo.head, pfh_pinfo.iorank);
 
     fflush(fp);
     fclose(fp);
