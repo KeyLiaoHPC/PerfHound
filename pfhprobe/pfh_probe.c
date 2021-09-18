@@ -182,8 +182,6 @@ pfh_set_evt(const char *etag) {
     }
 #ifdef __x86_64__
     if (pfh_nevt >= 8) {
-#elif  __aarch64__
-    if (pfh_nevt >= 12) {
 #else
     if (pfh_nevt >= 12) {
 #endif
@@ -309,24 +307,24 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
 
 void
 pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
-        pfh_pinfo.rank, pfh_irec);
+    if (pfh_irec+1 >= buf_nrec) {
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+            pfh_pinfo.rank, pfh_irec);
         fflush(stdout);
+        pfh_dump();
         pfh_irec = 0;
+        pfh_fastread(grp_id, p_id, uval);
+    } else {
+        pfh_fastread(grp_id, p_id, uval);
+        if (pfh_irec+1 >= buf_nrec) {
+            printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+                pfh_pinfo.rank, pfh_irec);
+            fflush(stdout);
+            pfh_dump();
+        }
     }
-    pfh_fastread(grp_id, p_id, uval);
 }
 
-
-void pfh_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
-    pfh_fastread(grp_id, p_id, uval);
-
-    if (pfh_irec == buf_nrec - 1) {
-        printf("*** [Pfh-Probe] Rank %d: Auto dumping. \n", pfh_pinfo.rank);
-    }
-    pfh_dump();
-}
 
 /**
  * Dumping collected records if the number has larger than nrec. 

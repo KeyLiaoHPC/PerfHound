@@ -178,6 +178,7 @@ pfhmpi_init(char *path) {
     return 0;
 } // END: int vt_init()
 
+
 /* Set system events. */
 int
 pfhmpi_set_evt(const char *etag) {
@@ -201,8 +202,6 @@ pfhmpi_set_evt(const char *etag) {
     
 #ifdef __x86_64__
     if (pfh_nevt >= 8) {
-#elif  __aarch64__
-    if (pfh_nevt >= 12) {
 #else
     if (pfh_nevt >= 12) {
 #endif
@@ -346,24 +345,22 @@ pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
 
 void
 pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded, record overlapped \n", 
-        pfh_pinfo.rank, pfh_irec);
+    if (pfh_irec+1 >= buf_nrec) {
+        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+            pfh_pinfo.rank, pfh_irec);
         fflush(stdout);
+        pfhmpi_dump();
         pfh_irec = 0;
+        pfhmpi_fastread(grp_id, p_id, uval);
+    } else {
+        pfhmpi_fastread(grp_id, p_id, uval);
+        if (pfh_irec+1 >= buf_nrec) {
+            printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+                pfh_pinfo.rank, pfh_irec);
+            fflush(stdout);
+            pfhmpi_dump();
+        }
     }
-    pfhmpi_fastread(grp_id, p_id, uval);
-}
-
-
-void 
-pfhmpi_saferead(uint32_t grp_id, uint32_t p_id, double uval) {
-    pfhmpi_fastread(grp_id, p_id, uval);
-
-    if (pfh_irec == buf_nrec - 1) {
-        printf("*** [Pfh-Probe] Rank %d: Auto dumping. \n", pfh_pinfo.rank);
-    }
-    pfhmpi_dump();
 }
 
 /**
@@ -375,14 +372,14 @@ void
 pfhmpi_dump() {
 
     if (pfh_irec == 0) {
-        // Return without timing.
+        // Return empty request.
         return;
     }
 
-    if (pfh_irec == buf_nrec) {
+    if (pfh_irec >= buf_nrec) {
         printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
         pfh_pinfo.rank, pfh_irec);
-        pfh_irec --; // Step back for recording writing time.
+        pfh_irec = buf_nrec - 1; // Step back for recording writing time.
     }
 
     pfhmpi_fastread(0, 3, 0);

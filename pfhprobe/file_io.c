@@ -51,7 +51,7 @@ typedef struct {
     char rec[PATH_MAX]; // Records file.
 } pfh_path_t;
 
-static int runid, nevt;
+static int runid;
 static uint64_t nrec_tot;
 static pfh_path_t pfh_paths;
 static char st_timestr[16], en_timestr[16]; // Timestamp in YYYYMMDDTHHmmss.
@@ -408,7 +408,7 @@ int pfh_io_wtinfo() {
         return 1;
     }
     fprintf(fp, "%d,%d,%d,%d,%s,%s,\n",
-        runid, pfh_pinfo.nrank, nevt, nrec_tot, st_timestr, en_timestr);
+        runid, pfh_pinfo.nrank, pfh_nevt, nrec_tot, st_timestr, en_timestr);
 
     fflush(fp);
     fclose(fp);

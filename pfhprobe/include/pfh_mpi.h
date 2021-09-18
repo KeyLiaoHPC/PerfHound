@@ -52,7 +52,6 @@ void pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval);
 
 void pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval);
 
-void pfhmpi_saferead(uint32_t grp_id, uint32_t p_id, double uval);
 
 /**
  * Creating tag for a collecting point.

@@ -70,11 +70,11 @@
 #define _pfh_read_pm(_id, _val)      asm volatile("mrs %0, " _PMVAL_REG(_id) "\n\t": "=r" (_val));
 
 /* Parsing string events to hex event code. */
-#define _pfh_parse_event(_code, _evstr)                                      \
+#define _pfh_parse_event(_code, _evstr)                                     \
     do {                                                                    \
         int ii = 0, len;                                                    \
         _code = 0xFFFFFFFF;                                                 \
-        while(len = strlen(aarch64_events[ii].name)) {                      \
+        while (( len = strlen(aarch64_events[ii].name) )) {                 \
             if (len != strlen(_evstr)) {                                    \
                 ii ++;                                                      \
                 continue;                                                   \
