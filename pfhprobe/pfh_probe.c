@@ -342,6 +342,7 @@ pfh_dump() {
     if (pfh_irec == buf_nrec) {
         printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
         pfh_pinfo.rank, pfh_irec);
+        fflush(stdout);
         pfh_irec --; // Step back for recording writing time.
     }
 

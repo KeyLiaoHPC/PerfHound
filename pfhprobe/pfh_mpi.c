@@ -396,6 +396,8 @@ pfhmpi_finalize() {
     int err;
 
     PFH_PRINTF ("*** [Pfh-Probe] User invokes finalization. \n");
+    PFH_PRINTF ("*** [Pfh-Probe] Waiting for all finish. \n");
+    pfh_mpi_barrier(MPI_COMM_WORLD);
 
     pfhmpi_read(0, 2, 0);
     PFH_PRINTF ("*** [Pfh-Probe] Writing records. \n");
