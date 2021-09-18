@@ -138,6 +138,8 @@ int main(int argc, char** argv) {
 #endif
 
     // Warm up
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &tv);
     sec = tv.tv_sec;
     nsec = tv.tv_nsec;
@@ -148,6 +150,9 @@ int main(int argc, char** argv) {
         srand(tv.tv_nsec);
         res += rand() % 2 + tv.tv_nsec;
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     asm volatile (
         "mov $1, %%r11 \n\t"
@@ -163,6 +168,7 @@ int main(int argc, char** argv) {
         :
         : "r10", "r11", "r12", "xmm0", "xmm1"
     );
+
 
     // Measure kernel
     while ((measure_counter++) < NMEASURE) {

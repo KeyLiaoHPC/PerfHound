@@ -134,6 +134,8 @@ int main(int argc, char** argv) {
 #endif
 
     // Warm up
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &tv);
     sec = tv.tv_sec;
     nsec = tv.tv_nsec;
@@ -144,6 +146,9 @@ int main(int argc, char** argv) {
         srand(tv.tv_nsec);
         res += rand() % 2 + tv.tv_nsec;
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     asm volatile (
         "fmov v0.4s, #1.00000000 \n\t"
