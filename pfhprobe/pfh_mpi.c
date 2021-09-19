@@ -105,6 +105,7 @@ pfhmpi_init(char *path) {
         fflush(stdout);
         exit(1);
     }
+    MPI_Barrier(MPI_COMM_WORLD);
     if (pfh_pinfo.rank == 0) {
         err = pfh_io_mkfile();
         if (err) {
