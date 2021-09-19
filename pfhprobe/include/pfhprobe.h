@@ -25,6 +25,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+
+#endif
+
 /** 
  * Initialise PFH-Probe. This function must be called exactly once before the 
  * variation detection.
@@ -73,3 +78,7 @@ void pfh_dump();
 void pfh_finalize();
 
 
+
+#ifdef __cplusplus
+}
+#endif
