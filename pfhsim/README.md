@@ -157,7 +157,7 @@ runTime表示执行计算所需的标准时间。
 
 **2）添加循环**
 
-循环位置可以添加在"functions"中定义的函数中，例如
+循环位置可以添加在"functions"中定义的函数中，也可以添加在"kernel"中例如
 
 ```json
 "functions":{
@@ -189,6 +189,25 @@ runTime表示执行计算所需的标准时间。
 ```
 
 表示"k1"的计算时间波动符合帕累托分布且k值为10。
+
+**4）添加同步点**
+
+同步点可以添加到“function”中也可以添加到“kernel”中，例如
+
+```json
+"kernels":{
+    "k1":{
+        "runTime": 0.1s,
+        "noise":{
+        	"noiseType": "pareto",
+        	"noiseParameters":[10]
+    	},
+		"sync": "yes"
+    }
+}
+```
+
+表示执行完"k1"的计算后，会进行一次全局的同步。
 
 ### 注意事项
 
