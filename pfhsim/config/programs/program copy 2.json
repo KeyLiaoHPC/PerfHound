@@ -1,0 +1,57 @@
+{
+	"program":["mainfun"],
+
+
+	"functions":{
+		"mainfun":{
+			"loop":{
+				"loopNum": 10,
+				"call": ["func1","func2"]
+			}
+		},
+		"func1":{
+			"call":["k4"]
+		},
+		"func2":{
+			"call":["kernelfun"],
+			"sync": "yes"
+		},
+		"kernelfun":{
+			"loop":{
+				"loopNum":100,
+				"call":["k1","k2"]
+			}
+		}
+	},
+
+
+	"kernels":{
+		"k1":{
+			"runTime": "0.1s",
+			"noise":{
+				"noiseType": "pareto",
+				"noiseParameters":[10]
+			}
+		},
+		"k2":{
+			"loop":{
+				"loopNum":1000,
+				"call":["k3"]
+			}
+		},
+		"k3":{
+			"runTime": "0.0001s",
+			"noise":{
+				"noiseType": "pareto",
+				"noiseParameters":[10]
+			}
+		},
+		"k4":{
+			"runTime": "10s",
+			"noise":{
+				"noiseType": "pareto",
+				"noiseParameters":[10]
+			}
+		}
+	}
+}

@@ -1,0 +1,12 @@
+{
+	"node":{
+		"nodeNum": 40,
+		"noise":{
+			"noiseType": "normal",
+			"noiseParameters":[0.016666667,0.1]
+		}
+	},
+	"core":{
+		"coreNum": 64
+	}
+}

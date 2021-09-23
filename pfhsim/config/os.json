@@ -1,0 +1,6 @@
+{
+	"osNoise":{
+		"period": "5s",
+		"detour": "0.2s"
+	}
+}
