@@ -97,10 +97,10 @@ static int pfh_nev_max = 4;
 /* Pfh-Probe record data type */
 typedef struct __attribute__((packed)){
     uint32_t ctag[2];
-    uint64_t cy, ns;    
+    int64_t cy, ns;    
     double uval;        // 32 Bytes
 #ifdef USE_PAPI
-    long long int ev[_N_EVARR];
+    int64_t ev[_N_EVARR];
 #else
     uint64_t ev[_N_EVARR];
 #endif

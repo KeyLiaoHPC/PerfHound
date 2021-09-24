@@ -35,10 +35,11 @@ libpfh.so: pfh_probe.c file_io.c
 	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
 	$(CC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o  file_io.o 
 	rm *.o
-libpfh_mpi.so: pfh_probe.c file_io.c 
-	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
-	$(CC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o  file_io.o 
+libpfh_mpi.so: mpi_op.c pfh_mpi.c file_io.c 
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
+	$(MPICC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
+	$(MPICC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o  file_io.o 
 	rm *.o
 #libpfh_evx.so: pfh_probe.c file_io.c 
 #	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c

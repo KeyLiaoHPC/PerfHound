@@ -429,7 +429,18 @@ pfh_io_wtrec(int nrec) {
     if (p_recfile == NULL) {
         return 1;
     }
+#ifdef USE_PAPI
 
+    for (int i = 0; i < nrec; i ++) {
+        fprintf(p_recfile, "%u,%u,%lld,%lld,%f", 
+                pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
+                pfh_precs[i].cy, pfh_precs[i].ns, pfh_precs[i].uval);
+        for (int j = 0; j < pfh_nev; j++) {
+            fprintf(p_recfile, ",%lld", pfh_precs[i].ev[j]);
+        }
+        fprintf(p_recfile, "\n");
+    }
+#else
     for (int i = 0; i < nrec; i ++) {
         fprintf(p_recfile, "%u,%u,%llu,%llu,%f", 
                 pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
@@ -439,6 +450,7 @@ pfh_io_wtrec(int nrec) {
         }
         fprintf(p_recfile, "\n");
     }
+#endif
 
     fflush(p_recfile);
     fclose(p_recfile);

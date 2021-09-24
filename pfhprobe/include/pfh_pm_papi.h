@@ -33,7 +33,7 @@ static int evset = PAPI_NULL;
     PAPI_library_init(PAPI_VER_CURRENT);    \
     PAPI_create_eventset(&evset);
 
-#define _pfh_fini_ts    \     
+#define _pfh_fini_ts    \
     PAPI_shutdown();
 
 #define _pfh_init_cy
