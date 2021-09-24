@@ -38,25 +38,14 @@ libpfh.so: pfh_probe.c file_io.c
 libpfh_mpi.so: mpi_op.c pfh_mpi.c file_io.c 
 	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
 	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
-	$(MPICC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
+	$(MPICC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
 	$(MPICC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o  file_io.o 
 	rm *.o
-#libpfh_evx.so: pfh_probe.c file_io.c 
-#	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
-#	$(CC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
-#	$(CC) $(LDFLAGS) -DPFH_MODE_EVX -shared -o $@ pfh_probe.o  file_io.o 
-#	rm *.o
 libpfh_papi.so: pfh_probe.c file_io.c 
 	$(CC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o pfh_probe.o -c pfh_probe.c
 	$(CC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
 	$(CC) $(LDFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI -shared -o $@ pfh_probe.o  file_io.o  $(PAPI_LIB)
 	rm *.o
-#libpfhmpi_evx.so: mpi_op.c pfh_mpi.c file_io.c 
-#	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o pfh_mpi.o -c pfh_mpi.c
-#	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
-#	$(MPICC) $(CFLAGS) -DPFH_MODE_EVX $(PFHFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
-#	$(MPICC) $(LDFLAGS) -DPFH_MODE_EVX -shared -o $@ pfh_mpi.o mpi_op.o  file_io.o 
-#	rm *.o
 libpfh_papi_mpi.so: mpi_op.c pfh_mpi.c file_io.c 
 	$(MPICC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o pfh_mpi.o -c pfh_mpi.c
 	$(MPICC) $(CFLAGS) $(PAPI_INC) -DPFH_MODE_TS -DUSE_PAPI $(PFHFLAGS) $(LDFLAGS) -o file_io.o -c file_io.c
