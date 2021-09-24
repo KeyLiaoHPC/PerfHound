@@ -39,12 +39,11 @@ extern int pfh_mpi_mkhost();
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
 static uint32_t pfh_irec;            // Index for counter readings.
 static int pfh_ready;
-static uint64_t pfh_evcodes[12];
 
 /* Global */
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
-int pfh_nevt;
+int pfh_nev;
 
 
 
@@ -126,10 +125,7 @@ pfhmpi_init(char *path) {
 
 
     /* Init data space. */
-#ifdef USE_MPI
-    vt_world_barrier();
-    vt_newtype();
-#endif 
+
     buf_nbyte = PFH_RECBUF_KIB * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
     pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
@@ -168,7 +164,7 @@ pfhmpi_init(char *path) {
     }
 
     pfh_irec = 0;
-    pfh_nevt = 0;
+    pfh_nev = 0;
 
     pfh_mpi_barrier(MPI_COMM_WORLD);
     pfh_mpi_barrier(MPI_COMM_WORLD);
@@ -180,15 +176,6 @@ pfhmpi_init(char *path) {
 /* Set system events. */
 int
 pfhmpi_set_evt(const char *etag) {
-    // Unavailable in TS dode.
-#ifdef PFH_MODE_TS
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] WARNING. Performance event is unavailable in TS mode. Your setting wiil be omitted. \n");
-        fflush(stdout);
-    }
-    return 0;
-
-#else
     // We do not support redefine events for now.
     if (pfh_ready) {
         if (pfh_pinfo.rank == 0) {
@@ -198,11 +185,7 @@ pfhmpi_set_evt(const char *etag) {
         return 1;
     }
     
-#ifdef __x86_64__
-    if (pfh_nevt >= 8) {
-#else
-    if (pfh_nevt >= 12) {
-#endif
+    if (pfh_nev >= pfh_nev_max) {
         if (pfh_pinfo.rank == 0) {
             printf("*** [Pfh-Probe] WARNING. Too many events, this event will be omitted. \n");
             fflush(stdout);
@@ -215,10 +198,10 @@ pfhmpi_set_evt(const char *etag) {
     _pfh_parse_event (evcode, etag);
 
     if (evcode <= 0xFFFFFFFF - 1) {
-        pfh_evcodes[pfh_nevt] = evcode;
-        pfh_nevt ++;
+        pfh_evcodes[pfh_nev] = evcode;
+        pfh_nev ++;
         if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nevt, etag, evcode);
+            printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nev, etag, evcode);
         }
     } else {
         if (pfh_pinfo.rank == 0) {
@@ -229,10 +212,9 @@ pfhmpi_set_evt(const char *etag) {
     
 
     if (pfh_pinfo.rank == 0) {
-        pfh_io_wtetag(pfh_nevt, etag, pfh_evcodes[pfh_nevt-1]);
+        pfh_io_wtetag(pfh_nev, etag, pfh_evcodes[pfh_nev-1]);
         
     }
-#endif 
     return 0;
 } // END: int vt_set_evt
 
@@ -240,10 +222,10 @@ pfhmpi_set_evt(const char *etag) {
 void
 pfhmpi_commit() {
     int err;
-    if (pfh_nevt) {
-        _pfh_config_event (pfh_evcodes, pfh_nevt);
+    if (pfh_nev) {
+        _pfh_config_event (pfh_evcodes, pfh_nev);
         if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
+            printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nev);
         }
     } 
 
@@ -297,7 +279,7 @@ pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // _pfh_reg_restore;
 
     /* Read system event */
-    switch (pfh_nevt){
+    switch (pfh_nev){
         case 1: 
             _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
             break;

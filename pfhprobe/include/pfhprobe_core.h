@@ -73,27 +73,36 @@
  */
 
 /* Import performance monitor header after setting mode. */
+
+
+
+#ifdef PFH_MODE_EVX
+
 #ifdef __x86_64__
-#include "pfh_pm_x86_64.h"
-#include "pfh_evt_clx.h"
+static int pfh_nev_max = 8;
+#else
+static int pfh_nev_max = 12;
+#endif
 
-#elif  __aarch64__
-#include "pfh_pm_aarch64.h"
-#include "pfh_evt_aarch64.h"
+#else
+static int pfh_nev_max = 4;
+#endif
 
-#endif // END: #ifdef __x86_64__
-
+#ifdef PFH_MODE_EVX
+#define _N_EVARR 12
+#else
+#define _N_EVARR 4
+#endif
 
 /* Pfh-Probe record data type */
 typedef struct __attribute__((packed)){
     uint32_t ctag[2];
     uint64_t cy, ns;    
     double uval;        // 32 Bytes
-#ifdef PFH_MODE_EVX
-    uint64_t ev[12];
+#ifdef USE_PAPI
+    long long int ev[_N_EVARR];
 #else
-    uint64_t ev[4];
-
+    uint64_t ev[_N_EVARR];
 #endif
 } rec_t;
 
@@ -117,7 +126,27 @@ typedef struct {
 
 extern rec_t *pfh_precs; // raw data.
 extern proc_t pfh_pinfo;
-extern int pfh_nevt;
+extern int pfh_nev;
+
+#ifdef USE_PAPI
+#include "pfh_pm_papi.h"
+
+static int pfh_evcodes[12];
+
+#else
+#ifdef __x86_64__
+#include "pfh_pm_x86_64.h"
+#include "pfh_evt_clx.h"
+
+#elif  __aarch64__
+#include "pfh_pm_aarch64.h"
+#include "pfh_evt_aarch64.h"
+
+#endif // END: #ifdef __x86_64__
+
+
+static uint64_t pfh_evcodes[12];
+#endif // END: #ifdef USE_PAPI
 
 
 #endif // END: #ifndef __VARAPI_CORE_H__

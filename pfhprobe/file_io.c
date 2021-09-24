@@ -335,7 +335,7 @@ pfh_io_mkrec() {
     }
 
     fprintf(fp, "gid,pid,cycle,nanosec,uval");
-    for (int i = 1; i <= pfh_nevt; i ++) {
+    for (int i = 1; i <= pfh_nev; i ++) {
         fprintf(fp, ",ev%d", i);
     }
     fprintf(fp, "\n");
@@ -408,7 +408,7 @@ int pfh_io_wtinfo() {
         return 1;
     }
     fprintf(fp, "%d,%d,%d,%d,%s,%s,\n",
-        runid, pfh_pinfo.nrank, pfh_nevt, nrec_tot, st_timestr, en_timestr);
+        runid, pfh_pinfo.nrank, pfh_nev, nrec_tot, st_timestr, en_timestr);
 
     fflush(fp);
     fclose(fp);
@@ -434,7 +434,7 @@ pfh_io_wtrec(int nrec) {
         fprintf(p_recfile, "%u,%u,%llu,%llu,%f", 
                 pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
                 pfh_precs[i].cy, pfh_precs[i].ns, pfh_precs[i].uval);
-        for (int j = 0; j < pfh_nevt; j++) {
+        for (int j = 0; j < pfh_nev; j++) {
             fprintf(p_recfile, ",%llu", pfh_precs[i].ev[j]);
         }
         fprintf(p_recfile, "\n");

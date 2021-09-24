@@ -27,14 +27,16 @@
 
 #include "papi.h"
 
-static int evtset = PAPI_NULL;
+static int evset = PAPI_NULL;
 
 #define _pfh_init_ts    \
     PAPI_library_init(PAPI_VER_CURRENT);    \
-    PAPI_create_eventset(&evtset);
+    PAPI_create_eventset(&evset);
 
 #define _pfh_fini_ts    \     
     PAPI_shutdown();
+
+#define _pfh_init_cy
 
 #define _pfh_reg_save                                  
 
@@ -56,12 +58,12 @@ static int evtset = PAPI_NULL;
     (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
                             
 #else
-#define _pfh_read_ns(_ns)                               
+#define _pfh_read_ns(_ns)   \
     (_ns) = PAPI_get_real_nsec();
 #endif
 
 #define _pfh_parse_event(_code, _evstr)     \
-    if (PAPI_query_named_event(const char *EventName)) {    \
+    if (PAPI_query_named_event(_evstr)) {                   \
         (_code) = 0xFFFFFFFF;                               \
     } else {                                                \
         PAPI_event_name_to_code((_evstr), &(_code));        \
@@ -72,46 +74,43 @@ static int evtset = PAPI_NULL;
     if ((_nevt)) {                                      \
         PAPI_add_events(evset, (_code_arr), (_nevt));   \
     }                                                   \
-    PAPI_start();                                           
+    PAPI_start(evset);                                           
 
 
 /* Read PMC */
-#define _pm_read(_arr)  \
-    PAPI_read(EventSet, (_arr));
-
 
 #define _pfh_read_pm_1(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_2(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
         
 #define _pfh_read_pm_3(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_4(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_5(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_6(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_7(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_8(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_9(_arr)    \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_10(_arr)   \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_11(_arr)   \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);
 
 #define _pfh_read_pm_12(_arr)   \
-        _pm_read(_arr)
+        PAPI_read(evset, _arr);

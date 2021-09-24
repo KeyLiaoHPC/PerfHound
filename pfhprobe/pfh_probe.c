@@ -53,11 +53,10 @@
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
 static uint32_t pfh_irec;            // Index for counter readings.
 static int pfh_ready;
-static uint64_t pfh_evcodes[12];
 
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
-int pfh_nevt;
+int pfh_nev;
 
 extern int pfh_io_mkname(char *root);
 extern int pfh_io_mkfile();
@@ -155,7 +154,10 @@ pfh_init(char *path) {
     printf("*** [Pfh-Probe] Directory tree initialized. \n");
 
     pfh_irec = 0;
-    pfh_nevt = 0;
+    pfh_nev = 0;
+#ifdef __x86_64__
+    pfh_nev_max = pfh_nev_max > 8 ? 8 : pfh_nev_max;
+#endif
     return 0;
 } // END: int vt_init()
 
@@ -163,23 +165,14 @@ pfh_init(char *path) {
 int
 pfh_set_evt(const char *etag) {
     // Unavailable in TS dode.
-#ifdef PFH_MODE_TS
-    printf("*** [Pfh-Probe] WARNING. Performance event is unavailable in TS mode. Your setting wiil be omitted. \n");
-    fflush(stdout);
-    return 0;
 
-#else
     // We do not support redefine events for now.
     if (pfh_ready) {
         printf("*** [Pfh-Probe] WARNING. Your setting has been committed, please set events before pfh_commit. \n");
         fflush(stdout);
         return 1;
     }
-#ifdef __x86_64__
-    if (pfh_nevt >= 8) {
-#else
-    if (pfh_nevt >= 12) {
-#endif
+    if (pfh_nev > pfh_nev_max) {
         printf("*** [Pfh-Probe] WARNING. Too many events , this event will be omitted. \n");
         fflush(stdout);
         return 2;     
@@ -190,15 +183,14 @@ pfh_set_evt(const char *etag) {
     _pfh_parse_event (evcode, etag);
 
     if (evcode <= 0xFFFFFFFF - 1) {
-        pfh_evcodes[pfh_nevt] = evcode;
-        pfh_nevt ++;
-        printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nevt, etag, evcode);
+        pfh_evcodes[pfh_nev] = evcode;
+        pfh_nev ++;
+        printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nev, etag, evcode);
     } else {
         printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
     }
-    pfh_io_wtetag(pfh_nevt, etag, pfh_evcodes[pfh_nevt-1]);
+    pfh_io_wtetag(pfh_nev, etag, pfh_evcodes[pfh_nev-1]);
         
-#endif // END: #ifndef PFH_MODE_EVX
     return 0;
 } // END: int vt_set_evt
 
@@ -207,8 +199,8 @@ void
 pfh_commit() {
     int err;
 
-    _pfh_config_event (pfh_evcodes, pfh_nevt);
-    printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
+    _pfh_config_event (pfh_evcodes, pfh_nev);
+    printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nev);
 
     err = pfh_io_mkrec();
     if (err) {
@@ -254,7 +246,9 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // _pfh_reg_restore;
 
     /* Read system event */
-    switch (pfh_nevt){
+    switch (pfh_nev){
+        case 0:
+            break;
         case 1: 
             _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
             break;
