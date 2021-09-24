@@ -149,9 +149,9 @@ pfhmpi_init(char *path) {
     }
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
-#ifdef __x86_64__
     _pfh_init_ts;
-#endif
+    _pfh_init_cy;
+
     if (pfh_pinfo.rank == 0) {
         printf("*** [Pfh-Probe] Timer has been set. \n");
         fflush(stdout);
@@ -167,9 +167,6 @@ pfhmpi_init(char *path) {
         printf("*** [Pfh-Probe] Directory tree initialized. \n");
     }
 
-#ifdef __aarch64__
-    _pfh_cy_init;
-#endif
     pfh_irec = 0;
     pfh_nevt = 0;
 
@@ -257,6 +254,7 @@ pfhmpi_commit() {
         exit(1);
     }
     pfh_ready = 1;
+    pfh_irec = 0;
     pfh_mpi_barrier(MPI_COMM_WORLD);
     pfhmpi_fastread(0, 1, 0);
     return;

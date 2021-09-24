@@ -66,6 +66,8 @@
 #define _pfh_fini_ts     \
     pfcFini()
 
+#define _pfh_init_cy
+
 #define _pfh_reg_save                                   \
     asm volatile(                                       \
             "\n\tmov %%rax, %0"                         \
@@ -134,11 +136,13 @@
 
 /* Set IA32_PERFEVTSELx */
 #define _pfh_config_event(_code_arr, _nevt)  \
-    do {                                            \
-        const PFC_CNT pfc_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0};  \
-        pfcWrCfgs(3, _nevt, _code_arr);                 \
-        pfcWrCnts(3, _nevt, pfc_zeros);                 \
-    } while(0);
+    if ((_nevt)) {                                                  \
+        do {                                                        \
+            const PFC_CNT pfc_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0};  \
+            pfcWrCfgs(3, _nevt, _code_arr);                         \
+            pfcWrCnts(3, _nevt, pfc_zeros);                         \
+        } while(0);                                                 \
+    }
 
 
 /* Read PMC */

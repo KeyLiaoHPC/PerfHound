@@ -139,9 +139,8 @@ pfh_init(char *path) {
     }
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
-#ifdef __x86_64__
     _pfh_init_ts;
-#endif
+    _pfh_init_cy;
     printf("*** [Pfh-Probe] Timer has been set. \n");
     fflush(stdout);
     /* Initial time reading. */
@@ -155,12 +154,8 @@ pfh_init(char *path) {
     pfh_ready = 0;
     printf("*** [Pfh-Probe] Directory tree initialized. \n");
 
-#ifdef __aarch64__
-    _pfh_cy_init;
-#endif
     pfh_irec = 0;
     pfh_nevt = 0;
-    pfh_read(0, 1, 0);
     return 0;
 } // END: int vt_init()
 
@@ -212,10 +207,8 @@ void
 pfh_commit() {
     int err;
 
-    if (pfh_nevt) {
-        _pfh_config_event (pfh_evcodes, pfh_nevt);
-        printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
-    }
+    _pfh_config_event (pfh_evcodes, pfh_nevt);
+    printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nevt);
 
     err = pfh_io_mkrec();
     if (err) {
@@ -224,7 +217,8 @@ pfh_commit() {
         exit(1);
     }
     pfh_ready = 1;
-    pfh_read(0, 1, 0);
+    pfh_irec = 0;
+    pfh_fastread(0, 1, 0);
     return;
 }
 
