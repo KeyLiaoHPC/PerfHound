@@ -472,10 +472,10 @@ calc_interval(arg_t *arg) {
             pout = pout + scount;
 
             // Next couple
-            if (myid == 0) {
-                printf("%d\n", id);
-                fflush(stdout);
-            }
+            // if (myid == 0) {
+            //     printf("%d\n", id);
+            //     fflush(stdout);
+            // }
             id ++;
             // pst = pen + 1;
         }
@@ -483,17 +483,7 @@ calc_interval(arg_t *arg) {
         fflush(fp);
         fclose(fp);
         /* Write to all.csv */
-        // fp = fopen(fname, "r");
-        // fseek(fp, 0, SEEK_END);
-        // fsize = ftell(fp);
-        // rewind(fp);
-        // recstr = (char *)realloc(recstr, fsize+1);
-        // fread(recstr, 1, fsize, fp);
-        // fclose(fp);
-        // recstr[fsize] = '\0';
-        // pst = recstr;
-        // step_to(pst, '\n', &pen);
-        // pst = pen + 1;
+
         if (myid != 0) {
             MPI_Recv(&flag, 1, MPI_INT, myid - 1, myid, MPI_COMM_WORLD, &mpistat);
         }
