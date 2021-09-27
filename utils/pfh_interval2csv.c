@@ -410,51 +410,46 @@ calc_interval(arg_t *arg) {
         /* Start calculating */
         while (*pst) {
             // Search for start line
-            gid = strtol(pst, &pen, 10);
-            pst = pen + 1;
-            pid = strtol(pst, &pen, 10);
-            pst = pen + 1;
+            gid = strtol(pst+1, &pst, 10);
+            pid = strtol(pst+1, &pst, 10);
             if (gid != arg->sgid || pid != arg->spid) {
-                step_to(pst, '\n', &pen);
-                pst = pen + 1;
+                step_to(pst+1, '\n', &pst);
+                // pst += 1;
                 continue;
             }
             
             // Extract start values.
-            cy = strtoull(pst, &pen, 10);
-            pst = pen + 1;
-            ns = strtoull(pst, &pen, 10);
-            pst = pen + 1;
-            uval = strtod(pst, &pen);
-            pst = pen + 1;
+            cy = strtoull(pst+1, &pst, 10);
+            ns = strtoull(pst+1, &pst, 10);
+            uval = strtod(pst+1, &pst);
             for (int j = 0; j < nev; j ++) {
-                evs[j] = strtoull(pst, &pen, 10);
-                pst = pen + 1;
+                evs[j] = strtoull(pst+1, &pst, 10);
+                // pst = pen + 1;
             }
             // Search for end line.
-            gid = strtol(pst, &pen, 10);
-            pst = pen + 1;
-            pid = strtol(pst, &pen, 10);
-            pst = pen + 1;
+            gid = strtol(pst+1, &pst, 10);
+            // pst = pen + 1;
+            pid = strtol(pst+1, &pst, 10);
+            // pst = pen + 1;
             if (gid != arg->egid || pid != arg->epid) {
-                step_to(pst, '\n', &pen);
-                pst = pen + 1;
+                step_to(pst+1, '\n', &pst);
+                // pst += 1;
                 continue;
             }
 
-            cy = strtoull(pst, &pen, 10) - cy;
-            pst = pen + 1;
-            ns = strtoull(pst, &pen, 10) - ns;
-            pst = pen + 1;
+            cy = strtoull(pst+1, &pst, 10) - cy;
+            // pst = pen + 1;
+            ns = strtoull(pst+1, &pst, 10) - ns;
+            // pst = pen + 1;
 #ifdef RDTSCP
             ns = ns * 1e6 / 2494103;
 #endif
 
-            strtod(pst, &pen); // Skip this uval
-            pst = pen + 1;
+            strtod(pst+1, &pst); // Skip this uval
+            // pst = pen + 1;
             for (int j = 0; j < nev; j ++) {
-                evs[j] = strtoull(pst, &pen, 10) - evs[j];
-                pst = pen + 1;
+                evs[j] = strtoull(pst+1, &pst, 10) - evs[j];
+                // pst = pen + 1;
             }
 
             // Write out.
