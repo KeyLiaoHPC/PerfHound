@@ -282,14 +282,15 @@ init_arg(int argc, char **argv, arg_t *arg) {
     return 0;
 }
 
-void
+inline void
 step_to(char *str, char ch, char **p) {
-    int len = strlen(str);
-    for (int i = 0; i < len; i ++) {
-        if (str[i] == ch) {
+    int i = 0;
+    while (1) {
+        if (str[i] == ch || str[i] == '\0') {
             *p = str + i;
             break;
         }
+        i ++;
     }
 }
 
@@ -297,14 +298,14 @@ int
 calc_interval(arg_t *arg) {
     long fsize;
     int ncol, gid, pid, nev, id, myid, np;
-    int myjob, nextjob, flag = 0;
+    int myjob, nextjob, flag = 0, scount;
     MPI_Status mpistat;
     uint64_t cy, ns;
     double uval;
     char fname[10240], fnameall[10240];
     FILE *fp, *fpall;
-    char *recstr = NULL, *pst = NULL, *pen = NULL;
-    uint64_t *evs;
+    char *recstr = NULL, *outstr = NULL, *pst = NULL, *pen = NULL, *pout = NULL;
+    uint64_t evs[12];
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &np);
@@ -336,9 +337,6 @@ calc_interval(arg_t *arg) {
         pen ++;
     }
     nev = ncol - 5;
-    if (nev) {
-        evs = (uint64_t *)malloc(nev*sizeof(uint64_t));
-    }
 
     /* Rank 0 writes headers to all.vsb */
     sprintf(fnameall, "%s/all.csv", arg->opath);
@@ -380,6 +378,8 @@ calc_interval(arg_t *arg) {
         fsize = ftell(fp);
         rewind(fp);
         recstr = (char *)realloc(recstr, fsize+1);
+        outstr = (char *)realloc(outstr, fsize+1);
+        pout = outstr;
         fread(recstr, 1, fsize, fp);
         recstr[fsize] = '\0';
         pst = recstr;
@@ -410,120 +410,90 @@ calc_interval(arg_t *arg) {
         /* Start calculating */
         while (*pst) {
             // Search for start line
-            pen = pst;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            gid = strtol(pst, NULL, 10);
-            //printf("%d\n", gid);
-
-            if (gid != arg->sgid) {
-                step_to(pen+1, '\n', &pen);
-                pst = pen + 1;
-                continue;
-            }
+            gid = strtol(pst, &pen, 10);
             pst = pen + 1;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pid = strtol(pst, NULL, 10);
-            if (pid != arg->spid) {
-                step_to(pen+1, '\n', &pen);
-                pst = pen + 1;
-                continue;
-            }
-            // Extract start values.
+            pid = strtol(pst, &pen, 10);
             pst = pen + 1;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            cy = strtoull(pst, NULL, 10);
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pst = pen + 1;
-            ns = strtoull(pst, NULL, 10);
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pst = pen + 1;
-            uval = strtod(pst, NULL);
-            if (nev) {
-                for (int j = 0; j < nev - 1; j ++) {
-                    step_to(pst, ',', &pen);
-                    *pen = '\0';
-                    pst = pen + 1;
-                    evs[j] = strtoull(pst, NULL, 10);
-                }
-                pst = pen + 1;
+            if (gid != arg->sgid || pid != arg->spid) {
                 step_to(pst, '\n', &pen);
-                *pen = '\0';
-                evs[nev-1] = strtoull(pst, NULL, 10);
+                pst = pen + 1;
+                continue;
+            }
+            
+            // Extract start values.
+            cy = strtoull(pst, &pen, 10);
+            pst = pen + 1;
+            ns = strtoull(pst, &pen, 10);
+            pst = pen + 1;
+            uval = strtod(pst, &pen);
+            pst = pen + 1;
+            for (int j = 0; j < nev; j ++) {
+                evs[j] = strtoull(pst, &pen, 10);
+                pst = pen + 1;
             }
             // Search for end line.
+            gid = strtol(pst, &pen, 10);
             pst = pen + 1;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            gid = strtol(pst, NULL, 10);
-            if (gid != arg->egid) {
-                step_to(pen+1, '\n', &pen);
-                pst = pen + 1;
-                continue;
-            }
+            pid = strtol(pst, &pen, 10);
             pst = pen + 1;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pid = strtol(pst, NULL, 10);
-            if (pid != arg->epid) {
-                step_to(pen+1, '\n', &pen);
-                pst = pen + 1;
-                continue;
-            }
-            // Extract end values.
-            pst = pen + 1;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            cy = strtoull(pst, NULL, 10) - cy;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pst = pen + 1;
-            ns = strtoull(pst, NULL, 10) - ns;
-            step_to(pst, ',', &pen);
-            *pen = '\0';
-            pst = pen + 1;
-            if (nev) {
-                for (int j = 0; j < nev - 1; j ++) {
-                    step_to(pst, ',', &pen);
-                    pst = pen + 1;
-                    evs[j] = strtoull(pst, NULL, 10) - evs[j];
-                }
-                pst = pen + 1;
+            if (gid != arg->egid || pid != arg->epid) {
                 step_to(pst, '\n', &pen);
-                evs[nev-1] = strtoull(pst, NULL, 10) - evs[nev-1];
+                pst = pen + 1;
+                continue;
             }
+
+            cy = strtoull(pst, &pen, 10) - cy;
+            pst = pen + 1;
+            ns = strtoull(pst, &pen, 10) - ns;
+            pst = pen + 1;
+#ifdef RDTSCP
+            ns = ns * 1e6 / 2494103;
+#endif
+
+            strtod(pst, &pen); // Skip this uval
+            pst = pen + 1;
+            for (int j = 0; j < nev; j ++) {
+                evs[j] = strtoull(pst, &pen, 10) - evs[j];
+                pst = pen + 1;
+            }
+
             // Write out.
-            fprintf(fp, "%d,%s,%d,%d,%lu,%lu,%.15f", 
-                    id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
-            id ++;
-            if (nev) {
-                for (int j = 0; j < nev; j ++) {
-                    fprintf(fp, ",%lu", evs[j]);
-                }
+            //printf("Rank %d, %d,%s,%d,%d,%lu,%lu,%.15f", myid,
+            //        id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
+            //fflush(stdout);
+            scount = sprintf(   pout, "%d,%s,%d,%d,%lu,%lu,%.15f", 
+                                id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
+            pout = pout + scount;
+            for (int j = 0; j < nev; j ++) {
+                scount = sprintf(pout, ",%lu", evs[j]);
+                pout = pout + scount;
             }
-            fprintf(fp, "\n");
+            scount = sprintf(pout, "\n");
+            pout = pout + scount;
 
             // Next couple
-            pst = pen + 1;
+            if (myid == 0) {
+                printf("%d\n", id);
+                fflush(stdout);
+            }
+            id ++;
+            // pst = pen + 1;
         }
+        fprintf(fp, "%s", outstr);
         fflush(fp);
         fclose(fp);
         /* Write to all.csv */
-        fp = fopen(fname, "r");
-        fseek(fp, 0, SEEK_END);
-        fsize = ftell(fp);
-        rewind(fp);
-        recstr = (char *)realloc(recstr, fsize+1);
-        fread(recstr, 1, fsize, fp);
-        fclose(fp);
-        recstr[fsize] = '\0';
-        pst = recstr;
-        step_to(pst, '\n', &pen);
-        pst = pen + 1;
+        // fp = fopen(fname, "r");
+        // fseek(fp, 0, SEEK_END);
+        // fsize = ftell(fp);
+        // rewind(fp);
+        // recstr = (char *)realloc(recstr, fsize+1);
+        // fread(recstr, 1, fsize, fp);
+        // fclose(fp);
+        // recstr[fsize] = '\0';
+        // pst = recstr;
+        // step_to(pst, '\n', &pen);
+        // pst = pen + 1;
         if (myid != 0) {
             MPI_Recv(&flag, 1, MPI_INT, myid - 1, myid, MPI_COMM_WORLD, &mpistat);
         }
@@ -532,7 +502,7 @@ calc_interval(arg_t *arg) {
         if (fpall == NULL) {
             return errno;
         }
-        fprintf(fpall, "%s", pst);
+        fprintf(fpall, "%s", outstr);
         fflush(fpall);
         fclose(fpall);
         if (myid + 1 != np && nextjob != 0) {
@@ -542,10 +512,9 @@ calc_interval(arg_t *arg) {
 
 
     }
-    if (nev) {
-        free(evs);
-    }
+
     free(recstr);
+    free(outstr);
     return 0;
 }
 
