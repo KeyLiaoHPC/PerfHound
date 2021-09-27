@@ -413,7 +413,7 @@ calc_interval(arg_t *arg) {
             gid = strtol(pst+1, &pst, 10);
             pid = strtol(pst+1, &pst, 10);
             if (gid != arg->sgid || pid != arg->spid) {
-                step_to(pst+1, '\n', &pst);
+                step_to(pst+5+2*nev, '\n', &pst);
                 // pst += 1;
                 continue;
             }
@@ -432,7 +432,7 @@ calc_interval(arg_t *arg) {
             pid = strtol(pst+1, &pst, 10);
             // pst = pen + 1;
             if (gid != arg->egid || pid != arg->epid) {
-                step_to(pst+1, '\n', &pst);
+                step_to(pst+5+2*nev, '\n', &pst);
                 // pst += 1;
                 continue;
             }
