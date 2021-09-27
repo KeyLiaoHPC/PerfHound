@@ -1,4 +1,36 @@
-
+/*
+ * =================================================================================
+ * PerfHound - Detecting and analyzing performance variation in parallel program
+ * 
+ * Copyright (C) 2020 Key Liao (Liao Qiucheng)
+ * 
+ * This program is free software: you can redistribute it and/or modify it under the
+ *  terms of the GNU General Public License as published by the Free Software 
+ * Foundation, either version 3 of the License, or (at your option) any later 
+ * version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
+ * PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License along with 
+ * this program. If not, see https://www.gnu.org/licenses/.
+ * 
+ * =================================================================================
+ * pfh_interval2csv.c
+ * Description: Wrap Varapi mpi operations.
+ * Author: Key Liao
+ * Modified: May. 28th, 2020
+ * Email: keyliaohpc@gmail.com
+ * Usage:
+ * 
+ * mpicc -Wall -o pfh_interval2csv.x ./pfh_interval2csv.c
+ * mpirun -np 10 ./pfh_interval2csv.x /data/run_16 1,1 1,2
+ * This instruction will read data in /data/run_16, 
+ * calculate data(gid=1,pid=2) - data(gid=1,pid=1)
+ * Data will be write to /data/run_16/diff_1-1_1-2/r*c*.csv and all.csv
+ * =================================================================================
+ */
+//==================================================================================
 #define _XOPEN_SOURCE 600
 
 #include <stdio.h>
@@ -169,7 +201,6 @@ init_rankmap(int argc, char **argv, int myid, int np, arg_t *arg) {
         }
         n = fcount / np;
         for (int i = mod; i < np; i ++) {
-            printf("%d\n", mod*(n+1)+(i-mod)*n);
             fflush(stdout);
             MPI_Send(allcpus+mod*(n+1)+(i-mod)*n, n, MPI_INT, i, i, MPI_COMM_WORLD);
             MPI_Send(allranks+mod*(n+1)+(i-mod)*n, n, MPI_INT, i, i, MPI_COMM_WORLD);
@@ -183,7 +214,7 @@ init_rankmap(int argc, char **argv, int myid, int np, arg_t *arg) {
         MPI_Recv(arg->cpus, arg->nf, MPI_INT, 0, myid, MPI_COMM_WORLD, &mpistat);
         MPI_Recv(arg->ranks, arg->nf, MPI_INT, 0, myid, MPI_COMM_WORLD, &mpistat);
         MPI_Recv(arg->hosts[0], arg->nf * HOST_NAME_MAX, MPI_CHAR, 0, myid, MPI_COMM_WORLD, &mpistat);
-        printf("%d: %d \n", myid, arg->nf);
+        printf("Jobs for rank %d: %d \n", myid, arg->nf);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -265,18 +296,23 @@ step_to(char *str, char ch, char **p) {
 int
 calc_interval(arg_t *arg) {
     long fsize;
-    int ncol, gid, pid, nev, id, myid;
+    int ncol, gid, pid, nev, id, myid, np;
+    int myjob, nextjob, flag = 0;
+    MPI_Status mpistat;
     uint64_t cy, ns;
     double uval;
-    char fname[10240];
-    FILE *fp;
+    char fname[10240], fnameall[10240];
+    FILE *fp, *fpall;
     char *recstr = NULL, *pst = NULL, *pen = NULL;
     uint64_t *evs;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    MPI_Comm_size(MPI_COMM_WORLD, &np);
 
     sprintf(fname, "%s/%s/r%dc%d.csv",
             arg->ipath, arg->hosts[0], arg->ranks[0], arg->cpus[0]);
+    
+    /* Read the first record for counting the # of column */
     fp = fopen(fname, "r");
     if (fp == NULL) {
         return errno;
@@ -287,6 +323,7 @@ calc_interval(arg_t *arg) {
     recstr = (char *)realloc(recstr, fsize+1);
     fread(recstr, 1, fsize, fp);
     fclose(fp);
+
     /* Number of columns */
     recstr[fsize] = '\0';
     pst = recstr;
@@ -303,6 +340,35 @@ calc_interval(arg_t *arg) {
         evs = (uint64_t *)malloc(nev*sizeof(uint64_t));
     }
 
+    /* Rank 0 writes headers to all.vsb */
+    sprintf(fnameall, "%s/all.csv", arg->opath);
+    if (myid == 0) {
+        fpall = fopen(fnameall, "w");
+        printf("All data will be gathered to %s\n", fnameall);
+        if (fpall == NULL) {
+            return errno;
+        }
+        fprintf(fpall, "id,host,rank,cpu,cycle,nanosec,uval");
+        for (int j = 0; j < nev; j ++) {
+            fprintf(fpall, ",ev%d", j + 1);
+        }
+        fprintf(fpall, "\n");
+        fflush(fpall);
+        fclose(fpall);
+    }
+
+    myjob = arg->nf;
+    if (myid == 0) {
+        MPI_Recv(&nextjob, 1, MPI_INT, myid + 1, myid, MPI_COMM_WORLD, &mpistat);
+    } else if (myid +1 == np) {
+        MPI_Send(&myjob, 1, MPI_INT, myid - 1, myid - 1, MPI_COMM_WORLD);
+    } else {
+        MPI_Recv(&nextjob, 1, MPI_INT, myid + 1, myid, MPI_COMM_WORLD, &mpistat);
+        MPI_Send(&myjob, 1, MPI_INT, myid - 1, myid - 1, MPI_COMM_WORLD);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* Main loop for inverval calculation. */
     for (int i = 0; i < arg->nf; i ++) {
         /* Reading data. */
         sprintf(fname, "%s/%s/r%dc%d.csv", 
@@ -319,18 +385,25 @@ calc_interval(arg_t *arg) {
         pst = recstr;
         pen = pst;
         fclose(fp);
+        fp = NULL;
 
         /* File for output. */
         sprintf(fname, "%s/r%dc%d.csv", 
                 arg->opath, arg->ranks[i], arg->cpus[i]);
-        printf("Rank %d: Data will write to %s\n", myid, fname);
+        printf("Rank %d: Data will write to %s (%d/%d)\n", myid, fname, i+1, arg->nf);
         fp = fopen(fname, "w");
         if (fp == NULL) {
             return errno;
         }
+        /* Writing headers. */
+        fprintf(fp, "id,host,rank,cpu,cycle,nanosec,uval");
+        for (int j = 0; j < nev; j ++) {
+            fprintf(fp, ",ev%d", j + 1);
+        }
+        fprintf(fp, "\n");
+        fflush(fp);
         step_to(recstr, '\n', &pen);
         pst = pen + 1;
-        printf("%d %d %d %d\n", *pen, *(pen+1), *(pen+2), *(pen+3));
         fflush(stdout);
 
         id = 0;
@@ -426,6 +499,7 @@ calc_interval(arg_t *arg) {
             // Write out.
             fprintf(fp, "%d,%s,%d,%d,%lu,%lu,%.15f", 
                     id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
+            id ++;
             if (nev) {
                 for (int j = 0; j < nev; j ++) {
                     fprintf(fp, ",%lu", evs[j]);
@@ -438,6 +512,35 @@ calc_interval(arg_t *arg) {
         }
         fflush(fp);
         fclose(fp);
+        /* Write to all.csv */
+        fp = fopen(fname, "r");
+        fseek(fp, 0, SEEK_END);
+        fsize = ftell(fp);
+        rewind(fp);
+        recstr = (char *)realloc(recstr, fsize+1);
+        fread(recstr, 1, fsize, fp);
+        fclose(fp);
+        recstr[fsize] = '\0';
+        pst = recstr;
+        step_to(pst, '\n', &pen);
+        pst = pen + 1;
+        if (myid != 0) {
+            MPI_Recv(&flag, 1, MPI_INT, myid - 1, myid, MPI_COMM_WORLD, &mpistat);
+        }
+
+        fpall = fopen(fnameall, "a");
+        if (fpall == NULL) {
+            return errno;
+        }
+        fprintf(fpall, "%s", pst);
+        fflush(fpall);
+        fclose(fpall);
+        if (myid + 1 != np && nextjob != 0) {
+            MPI_Send(&flag, 1, MPI_INT, myid + 1, myid + 1, MPI_COMM_WORLD);
+            nextjob --;
+        }
+
+
     }
     if (nev) {
         free(evs);
