@@ -297,14 +297,14 @@ step_to(char *str, char ch, char **p) {
 int
 calc_interval(arg_t *arg) {
     long fsize;
-    int ncol, gid, pid, nev, id, myid, np;
+    int ncol, gid, pid, nev, id, myid, np, icol;
     int myjob, nextjob, flag = 0, scount;
     MPI_Status mpistat;
     uint64_t cy, ns;
     double uval;
     char fname[10240], fnameall[10240];
     FILE *fp, *fpall;
-    char *recstr = NULL, *outstr = NULL, *pst = NULL, *pen = NULL, *pout = NULL;
+    char *recstr = NULL, *outstr = NULL, *pst = NULL, *pout = NULL;
     uint64_t evs[12];
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -328,13 +328,12 @@ calc_interval(arg_t *arg) {
     /* Number of columns */
     recstr[fsize] = '\0';
     pst = recstr;
-    pen = pst;
     ncol = 1;
-    while (*pen != '\n') {
-        if (*pen == ',') {
+    while (*pst != '\n') {
+        if (*pst == ',') {
             ncol ++;
         }
-        pen ++;
+        pst ++;
     }
     nev = ncol - 5;
 
@@ -357,7 +356,7 @@ calc_interval(arg_t *arg) {
 
     myjob = arg->nf;
     if (myid == 0) {
-        MPI_Recv(&nextjob, 1, MPI_INT, myid + 1, myid, MPI_COMM_WORLD, &mpistat);
+        MPI_Recv(&nextjob, 1, MPI_INT, 1, 0, MPI_COMM_WORLD, &mpistat);
     } else if (myid +1 == np) {
         MPI_Send(&myjob, 1, MPI_INT, myid - 1, myid - 1, MPI_COMM_WORLD);
     } else {
@@ -383,7 +382,6 @@ calc_interval(arg_t *arg) {
         fread(recstr, 1, fsize, fp);
         recstr[fsize] = '\0';
         pst = recstr;
-        pen = pst;
         fclose(fp);
         fp = NULL;
 
@@ -402,14 +400,15 @@ calc_interval(arg_t *arg) {
         }
         fprintf(fp, "\n");
         fflush(fp);
-        step_to(recstr, '\n', &pen);
-        pst = pen + 1;
-        fflush(stdout);
-
+        // Set pst to the beginning of data - 1
+        step_to(recstr, '\n', &pst);
         id = 0;
+        icol = 1;
         /* Start calculating */
-        while (*pst) {
+        while (*(pst+1)) {
+            // printf("Rank %d, %d, %d: %c%c%c%c\n", myid, i, icol, *pst, *(pst+1), *(pst+2), *(pst+3));
             // Search for start line
+            icol ++;
             gid = strtol(pst+1, &pst, 10);
             pid = strtol(pst+1, &pst, 10);
             if (gid != arg->sgid || pid != arg->spid) {
@@ -427,10 +426,9 @@ calc_interval(arg_t *arg) {
                 // pst = pen + 1;
             }
             // Search for end line.
+            icol ++;
             gid = strtol(pst+1, &pst, 10);
-            // pst = pen + 1;
             pid = strtol(pst+1, &pst, 10);
-            // pst = pen + 1;
             if (gid != arg->egid || pid != arg->epid) {
                 step_to(pst+5+2*nev, '\n', &pst);
                 // pst += 1;
@@ -452,10 +450,6 @@ calc_interval(arg_t *arg) {
                 // pst = pen + 1;
             }
 
-            // Write out.
-            //printf("Rank %d, %d,%s,%d,%d,%lu,%lu,%.15f", myid,
-            //        id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
-            //fflush(stdout);
             scount = sprintf(   pout, "%d,%s,%d,%d,%lu,%lu,%.15f", 
                                 id, arg->hosts[i], arg->ranks[i], arg->cpus[i], cy, ns, uval);
             pout = pout + scount;
@@ -465,18 +459,12 @@ calc_interval(arg_t *arg) {
             }
             scount = sprintf(pout, "\n");
             pout = pout + scount;
-
-            // Next couple
-            // if (myid == 0) {
-            //     printf("%d\n", id);
-            //     fflush(stdout);
-            // }
             id ++;
-            // pst = pen + 1;
         }
         fprintf(fp, "%s", outstr);
         fflush(fp);
         fclose(fp);
+        fp = NULL;
         /* Write to all.csv */
 
         if (myid != 0) {
@@ -490,13 +478,13 @@ calc_interval(arg_t *arg) {
         fprintf(fpall, "%s", outstr);
         fflush(fpall);
         fclose(fpall);
+        fpall = NULL;
         if (myid + 1 != np && nextjob != 0) {
             MPI_Send(&flag, 1, MPI_INT, myid + 1, myid + 1, MPI_COMM_WORLD);
             nextjob --;
         }
-
-
     }
+    printf("%d DONE===\n", myid);
 
     free(recstr);
     free(outstr);
@@ -560,6 +548,7 @@ main(int argc, char **argv) {
     }
     /* Calculating invervals for each record file. */
     err = calc_interval(&arg);
+    MPI_Barrier(MPI_COMM_WORLD);
     if (err) {
         if (myid == 0) {
             printf("Failed to calculate interval values. EXIT %d.\n", err);
