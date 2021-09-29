@@ -36,8 +36,33 @@ static int evset = PAPI_NULL;
 #define _pfh_fini_ts    \
     PAPI_shutdown();
 
-#define _pfh_init_cy    
-    // pfh_set_evt("CPU_CLK_UNHALTED");
+#ifdef _PFH_MPI
+
+#ifdef __x86_64__
+#define _pfh_init_cy    \
+    pfhmpi_set_evt("CPU_CLK_UNHALTED");
+#elif  __aarch64__
+#define _pfh_init_cy    \
+    pfhmpi_set_evt("CPU_CYCLES");
+#else
+#define _pfh_init_cy
+#endif
+
+#else
+
+#ifdef __x86_64__
+#define _pfh_init_cy    \
+    pfh_set_evt("CPU_CLK_UNHALTED");
+#elif  __aarch64__
+#define _pfh_init_cy    \
+    pfh_set_evt("CPU_CYCLES");
+#else
+#define _pfh_init_cy
+
+#endif
+
+#endif
+
 
 #define _pfh_reg_save                                  
 

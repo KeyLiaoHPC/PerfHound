@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #define _ISOC11_SOURCE
+#define _PFH_MPI
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -355,7 +356,6 @@ pfhmpi_init(char *path) {
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
     _pfh_init_ts;
     _pfh_init_cy;
-    pfhmpi_set_evt("CPU_CLK_UNHALTED");
     pfh_ready = 0;
 
     if (pfh_pinfo.rank == 0) {
