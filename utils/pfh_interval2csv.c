@@ -406,8 +406,6 @@ calc_interval(arg_t *arg) {
         icol = 1;
         /* Start calculating */
         while (*(pst+1)) {
-            // printf("Rank %d, %d, %d: %c%c%c%c\n", myid, i, icol, *pst, *(pst+1), *(pst+2), *(pst+3));
-            // Search for start line
             icol ++;
             gid = strtol(pst+1, &pst, 10);
             pid = strtol(pst+1, &pst, 10);
@@ -436,9 +434,7 @@ calc_interval(arg_t *arg) {
             }
 
             cy = strtoull(pst+1, &pst, 10) - cy;
-            // pst = pen + 1;
             ns = strtoull(pst+1, &pst, 10) - ns;
-            // pst = pen + 1;
 #ifdef RDTSCP
             ns = ns * 1e6 / 2494103;
 #endif
@@ -447,7 +443,6 @@ calc_interval(arg_t *arg) {
             // pst = pen + 1;
             for (int j = 0; j < nev; j ++) {
                 evs[j] = strtoull(pst+1, &pst, 10) - evs[j];
-                // pst = pen + 1;
             }
 
             scount = sprintf(   pout, "%d,%s,%d,%d,%lu,%lu,%.15f", 
@@ -517,7 +512,6 @@ main(int argc, char **argv) {
         fflush(stdout);
     }
     err = init_rankmap(argc, argv, myid, np, &arg);
-    // printf("%x\n", arg.hosts[0]);
     if (err) {
         if (myid == 0) {
             printf("Failed to parse rankmap. EXIT %d.\n", err);

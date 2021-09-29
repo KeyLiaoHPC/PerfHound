@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
     char dirname[256];
     sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210909/NINS=%d", mode, op, NINS);
 
-    if (pfhmpi_init("../data/pfh_0917")) {
+    if (pfhmpi_init("../data/pfh_0929")) {
         printf("Failed at initailizing PerfHound.\n");
         exit(1);
     }
@@ -81,8 +81,9 @@ int main(int argc, char** argv) {
     pfhmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
     pfhmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
 
-    if (strcmp(mode, "EV") == 0) {
-        pfhmpi_set_evt("cpu_clk_unhalted.core_clk");
+    if (strcmp(mode, "TS") == 0) {
+        //pfhmpi_set_evt("cpu_clk_unhalted.core_clk");
+        pfhmpi_set_evt("CPU_CLK_UNHALTED");
         pfhmpi_set_evt("inst_retired.any_p");
         pfhmpi_set_evt("uops_issued.any");
         pfhmpi_set_evt("uops_retired.all");
