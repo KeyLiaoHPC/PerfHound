@@ -68,98 +68,7 @@ extern int pfh_io_wtrankmap();
 extern int pfh_io_wtrec(int nrec);
 extern int pfh_io_wtinfo();
 
-/**
- * Initializing varapi
- * Directory tree:
- * pfh_root/ ------- run_#/ ------------ host/ -------- rank_#.csv 
- *                   run_info.csv        ctags.csv      
- *                                       etags.csv
- *                                       rankmap.csv
- */
-int
-pfh_init(char *path) {
-    // User-defined data root and project name.
-    char root[PATH_MAX]; // data root path, hostname.
-    int err = 0;
-
-    printf("*** [Pfh-Probe] Pfh-Probe is initializing. \n");
-    fflush(stdout);
-    pfh_pinfo.nrank = 1;
-    pfh_pinfo.rank = 0;
-    pfh_pinfo.cpu = sched_getcpu();
-    pfh_pinfo.head = 0;
-    pfh_pinfo.iorank = 0;
-    gethostname(pfh_pinfo.host, _HOST_MAX);
-
-    /* Gnerate path. */
-    if (path == NULL) {
-        sprintf(root, "./pfh_data");
-    } else {
-        // TODO: for now, no path syntax check here.
-        strcpy(root, path);
-    }
-
-    /* Initializing run directory tree */
-    printf("*** [Pfh-Probe] Creating data directory tree. \n");
-    pfh_io_mkname(root);
-    err = pfh_io_mkfile();
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-    printf("*** [Pfh-Probe] Data directory: %s\n", root);
-    fflush(stdout);
-
-
-    /* Initializing host directory tree */
-    err = pfh_io_mkhost();
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-
-
-    buf_nbyte = PFH_RECBUF_KIB * 1024;
-    buf_nrec = buf_nbyte / sizeof(rec_t);
-    pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
-    if (pfh_precs == NULL) {
-        printf("*** [Pfh-Probe] Failed at allocating memory for counter readings. \n");
-        fflush(stdout);
-        exit(1);
-    }
-    printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
-    fflush(stdout);
-
-    /* Set all event codes to 0. */
-    for (int i = 0; i < 12; i ++) {
-        pfh_evcodes[i] = 0;
-    }
-
-    /* Init wall clock timer. Implenmetations vary with predefined macros. */
-    _pfh_init_ts;
-    _pfh_init_cy;
-    printf("*** [Pfh-Probe] Timer has been set. \n");
-    fflush(stdout);
-    /* Initial time reading. */
-    pfh_io_wtrankmap();
-
-    pfh_set_tag(0, 0, "PFHGroup");
-    pfh_set_tag(0, 1, "PFH Start");
-    pfh_set_tag(0, 2, "PFH End");
-    pfh_set_tag(0, 3, "PFH Wt Start");
-    pfh_set_tag(0, 4, "PFH Wt End");
-    pfh_ready = 0;
-    printf("*** [Pfh-Probe] Directory tree initialized. \n");
-
-    pfh_irec = 0;
-    pfh_nev = 0;
-#ifdef __x86_64__
-    pfh_nev_max = pfh_nev_max > 8 ? 8 : pfh_nev_max;
-#endif
-    return 0;
-} // END: int vt_init()
+ 
 
 /* Set system events. */
 int
@@ -288,6 +197,9 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
         default:
             break;
     }
+#ifdef USE_PAPI
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#endif
 
     pfh_irec ++;
        
@@ -340,6 +252,100 @@ pfh_dump() {
     pfh_fastread(0, 4, 0);
     
     return;
+}
+
+/**
+ * Initializing PerfHound
+ * Directory tree:
+ * pfh_root/ ------- run_#/ ------------ host/ -------- r#c#.csv 
+ *                   run_info.csv        ctags.csv      
+ *                                       etags.csv
+ *                                       rankmap.csv
+ */
+int
+pfh_init(char *path) {
+    // User-defined data root and project name.
+    char root[PATH_MAX]; // data root path, hostname.
+    int err = 0;
+
+    printf("*** [Pfh-Probe] Pfh-Probe is initializing. \n");
+    fflush(stdout);
+    pfh_pinfo.nrank = 1;
+    pfh_pinfo.rank = 0;
+    pfh_pinfo.cpu = sched_getcpu();
+    pfh_pinfo.head = 0;
+    pfh_pinfo.iorank = 0;
+    gethostname(pfh_pinfo.host, _HOST_MAX);
+
+    /* Gnerate path. */
+    if (path == NULL) {
+        sprintf(root, "./pfh_data");
+    } else {
+        // TODO: for now, no path syntax check here.
+        strcpy(root, path);
+    }
+
+    /* Initializing run directory tree */
+    printf("*** [Pfh-Probe] Creating data directory tree. \n");
+    pfh_io_mkname(root);
+    err = pfh_io_mkfile();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+    printf("*** [Pfh-Probe] Data directory: %s\n", root);
+    fflush(stdout);
+
+
+    /* Initializing host directory tree */
+    err = pfh_io_mkhost();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+
+
+    buf_nbyte = PFH_RECBUF_KIB * 1024;
+    buf_nrec = buf_nbyte / sizeof(rec_t);
+    pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
+    if (pfh_precs == NULL) {
+        printf("*** [Pfh-Probe] Failed at allocating memory for counter readings. \n");
+        fflush(stdout);
+        exit(1);
+    }
+    printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
+    fflush(stdout);
+
+    /* Set all event codes to 0. */
+    for (int i = 0; i < 12; i ++) {
+        pfh_evcodes[i] = 0;
+    }
+
+    /* Init wall clock timer. Implenmetations vary with predefined macros. */
+    pfh_irec = 0;
+    pfh_nev = 0;
+    pfh_ready = 0;
+#ifdef __x86_64__
+    pfh_nev_max = pfh_nev_max > 8 ? 8 : pfh_nev_max;
+#endif
+    _pfh_init_ts;
+    _pfh_init_cy;
+    printf("*** [Pfh-Probe] Timer has been set. \n");
+    fflush(stdout);
+    /* Initial time reading. */
+    pfh_io_wtrankmap();
+
+    pfh_set_tag(0, 0, "PFHGroup");
+    pfh_set_tag(0, 1, "PFH Start");
+    pfh_set_tag(0, 2, "PFH End");
+    pfh_set_tag(0, 3, "PFH Wt Start");
+    pfh_set_tag(0, 4, "PFH Wt End");
+    printf("*** [Pfh-Probe] Directory tree initialized. \n");
+
+
+    return 0;
 }
 
 /* Exiting varapi */

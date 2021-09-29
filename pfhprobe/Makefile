@@ -22,7 +22,7 @@ PAPI_LIB=-L$(PAPI_ROOT)/lib -lpapi
 CFLAGS += -fPIC
 # Installing path
 PREFIX ?= .
-BUF=4
+BUF ?= 4
 PFHFLAGS=-DPFH_RECBUF_KIB=$(BUF)
 
 .PHONY: all install clean

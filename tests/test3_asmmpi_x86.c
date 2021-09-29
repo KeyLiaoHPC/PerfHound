@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
     if (strcmp(mode, "TS") == 0) {
         //pfhmpi_set_evt("cpu_clk_unhalted.core_clk");
-        pfhmpi_set_evt("CPU_CLK_UNHALTED");
+        //pfhmpi_set_evt("CPU_CLK_UNHALTED");
         pfhmpi_set_evt("inst_retired.any_p");
         pfhmpi_set_evt("uops_issued.any");
         pfhmpi_set_evt("uops_retired.all");

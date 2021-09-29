@@ -31,12 +31,13 @@ static int evset = PAPI_NULL;
 
 #define _pfh_init_ts    \
     PAPI_library_init(PAPI_VER_CURRENT);    \
-    PAPI_create_eventset(&evset);
+    PAPI_create_eventset(&evset);       
 
 #define _pfh_fini_ts    \
     PAPI_shutdown();
 
-#define _pfh_init_cy
+#define _pfh_init_cy    
+    // pfh_set_evt("CPU_CLK_UNHALTED");
 
 #define _pfh_reg_save                                  
 
@@ -45,8 +46,9 @@ static int evset = PAPI_NULL;
 
 
 /* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
-#define _pfh_read_cy(_cy)   \
-    (_cy) = PAPI_get_real_cyc();
+#define _pfh_read_cy(_cy)   
+    // PAPI_read(evcy, &(_cy));
+    // (_cy) = PAPI_get_real_cyc();
 
 
 /* Read virtual timer */

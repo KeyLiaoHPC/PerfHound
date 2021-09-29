@@ -47,130 +47,7 @@ int pfh_nev;
 
 
 
-/**
- * Initializing varapi
- * Directory tree:
- * pfh_root/ ------- run_#/ ------------ host/ -------- rank_#.csv 
- *                   run_info.csv        ctags.csv      
- *                                       etags.csv
- *                                       rankmap.csv
- */
-int
-pfhmpi_init(char *path) {
-    // User-defined data root and project name.
-    char root[PATH_MAX]; // data root path, hostname.
-    int i, err = 0;
 
-    /* Init basic rank information */
-    err = pfh_mpi_rank_init();
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT. Failed to init MPI.\n");
-        exit(1);
-    }
-
-    /* Grouping ranks on the same host and get group information. */
-    //err = pfh_mpi_host_init(&pfh_pinfo);
-
-
-
-    /* Gnerate path. */
-    if (path == NULL) {
-        sprintf(root, "./pfh_data");
-    } else {
-        // TODO: for now, no path syntax check here.
-        strcpy(root, path);
-    }
-
-    /* Initializing run directory tree */
-    PFH_PRINTF ("*** [Pfh-Probe] Creating data directory tree. \n");
-    fflush(stdout);   
-    if (pfh_pinfo.rank == 0) {
-        // Rank 0 first creates root directory.
-        err = pfh_io_mkdir(root);
-        if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
-            fflush(stdout);
-            exit(1);
-        }
-        printf("*** [Pfh-Probe] Data directory: %s\n", root);
-        fflush(stdout);
-    }
-    // All ranks wait here.
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    err = pfh_io_mkname(root);
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (pfh_pinfo.rank == 0) {
-        err = pfh_io_mkfile();
-        if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
-            fflush(stdout);
-            exit(1);
-        }
-    }
-
-    /* Initializing host directory tree */
-    err = pfh_mpi_mkhost();
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-
-
-    /* Init data space. */
-
-    buf_nbyte = PFH_RECBUF_KIB * 1024;
-    buf_nrec = buf_nbyte / sizeof(rec_t);
-    pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
-    if (pfh_precs == NULL) {
-        printf("*** [Pfh-Probe] Failed at allocating memory for counter readings. \n");
-        fflush(stdout);
-        exit(1);
-    }
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
-        fflush(stdout);
-    }
-
-    /* Set all event codes to 0. */
-    for (i = 0; i < 12; i ++) {
-        pfh_evcodes[i] = 0;
-    }
-
-    /* Init wall clock timer. Implenmetations vary with predefined macros. */
-    _pfh_init_ts;
-    _pfh_init_cy;
-
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Timer has been set. \n");
-        fflush(stdout);
-    }
-
-    pfhmpi_set_tag(0, 0, "PFHGroup");
-    pfhmpi_set_tag(0, 1, "PFH Start");
-    pfhmpi_set_tag(0, 2, "PFH End");
-    pfhmpi_set_tag(0, 3, "PFH Wt Start");
-    pfhmpi_set_tag(0, 4, "PFH Wt End");
-    pfh_ready = 0;
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Directory tree initialized. \n");
-    }
-
-    pfh_irec = 0;
-    pfh_nev = 0;
-
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-
-    return 0;
-} // END: int vt_init()
 
 
 /* Set system events. */
@@ -320,6 +197,10 @@ pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
             break;
     }
 
+#ifdef USE_PAPI
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#endif
+
     pfh_irec ++;
        
 }
@@ -370,6 +251,133 @@ pfhmpi_dump() {
     
     return;
 }
+
+/**
+ * Initializing PerfHound
+ * Directory tree:
+ * pfh_root/ ------- run_#/ ------------ host/ -------- r#c#.csv 
+ *                   run_info.csv        ctags.csv      
+ *                                       etags.csv
+ *                                       rankmap.csv
+ */
+int
+pfhmpi_init(char *path) {
+    // User-defined data root and project name.
+    char root[PATH_MAX]; // data root path, hostname.
+    int i, err = 0;
+
+    /* Init basic rank information */
+    err = pfh_mpi_rank_init();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT. Failed to init MPI.\n");
+        exit(1);
+    }
+
+    /* Grouping ranks on the same host and get group information. */
+    //err = pfh_mpi_host_init(&pfh_pinfo);
+
+
+
+    /* Gnerate path. */
+    if (path == NULL) {
+        sprintf(root, "./pfh_data");
+    } else {
+        // TODO: for now, no path syntax check here.
+        strcpy(root, path);
+    }
+
+    /* Initializing run directory tree */
+    PFH_PRINTF ("*** [Pfh-Probe] Creating data directory tree. \n");
+    fflush(stdout);   
+    if (pfh_pinfo.rank == 0) {
+        // Rank 0 first creates root directory.
+        err = pfh_io_mkdir(root);
+        if (err) {
+            printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
+            fflush(stdout);
+            exit(1);
+        }
+        printf("*** [Pfh-Probe] Data directory: %s\n", root);
+        fflush(stdout);
+    }
+    // All ranks wait here.
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    err = pfh_io_mkname(root);
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (pfh_pinfo.rank == 0) {
+        err = pfh_io_mkfile();
+        if (err) {
+            printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+            fflush(stdout);
+            exit(1);
+        }
+    }
+
+    /* Initializing host directory tree */
+    err = pfh_mpi_mkhost();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+    pfh_mpi_barrier(MPI_COMM_WORLD);
+
+
+    /* Init data space. */
+
+    buf_nbyte = PFH_RECBUF_KIB * 1024;
+    buf_nrec = buf_nbyte / sizeof(rec_t);
+    pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
+    if (pfh_precs == NULL) {
+        printf("*** [Pfh-Probe] Failed at allocating memory for counter readings. \n");
+        fflush(stdout);
+        exit(1);
+    }
+    if (pfh_pinfo.rank == 0) {
+        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
+        fflush(stdout);
+    }
+
+    /* Set all event codes to 0. */
+    for (i = 0; i < 12; i ++) {
+        pfh_evcodes[i] = 0;
+    }
+
+    pfh_irec = 0;
+    pfh_nev = 0;
+
+    /* Init wall clock timer. Implenmetations vary with predefined macros. */
+    _pfh_init_ts;
+    _pfh_init_cy;
+    pfhmpi_set_evt("CPU_CLK_UNHALTED");
+    pfh_ready = 0;
+
+    if (pfh_pinfo.rank == 0) {
+        printf("*** [Pfh-Probe] Timer has been set. \n");
+        fflush(stdout);
+    }
+
+    pfhmpi_set_tag(0, 0, "PFHGroup");
+    pfhmpi_set_tag(0, 1, "PFH Start");
+    pfhmpi_set_tag(0, 2, "PFH End");
+    pfhmpi_set_tag(0, 3, "PFH Wt Start");
+    pfhmpi_set_tag(0, 4, "PFH Wt End");
+    if (pfh_pinfo.rank == 0) {
+        printf("*** [Pfh-Probe] Directory tree initialized. \n");
+    }
+
+
+    pfh_mpi_barrier(MPI_COMM_WORLD);
+    pfh_mpi_barrier(MPI_COMM_WORLD);
+
+    return 0;
+} // END: int vt_init()
 
 /* Exiting varapi */
 void
