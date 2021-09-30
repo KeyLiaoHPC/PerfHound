@@ -18,6 +18,10 @@
 #include <pfh_mpi.h>
 #endif
 
+#ifndef ARRLEN
+#define ARRLEN 1000
+#endif
+
 #ifndef NINS
 #define NINS 100
 #endif
@@ -65,14 +69,16 @@ int main(int argc, char** argv) {
     char* mode = M2S(MODE);
     uint64_t volatile sec, nsec; // For warmup
     int idx = 0, measure_counter = 0;
+    double scalar = 2.5;
+    double a[ARRLEN], b[ARRLEN], c[ARRLEN];
 
     MPI_Init(NULL, NULL);
 
 #ifdef PERFHOUND
     char dirname[256];
-    sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210909/NINS=%d", mode, op, NINS);
+    sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210930/NINS=%d", mode, op, NINS);
 
-    if (pfhmpi_init("../data/pfh_0929")) {
+    if (pfhmpi_init(dirname)) {
         printf("Failed at initailizing PerfHound.\n");
         exit(1);
     }
@@ -152,8 +158,10 @@ int main(int argc, char** argv) {
         res += rand() % 2 + tv.tv_nsec;
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    for (int i = 0; i < ARRLEN; ++i) {
+        a[i] = 2.2;
+        b[i] = 3.0;
+    }
 
     asm volatile (
         "mov $1, %%r11 \n\t"
@@ -170,6 +178,8 @@ int main(int argc, char** argv) {
         : "r10", "r11", "r12", "xmm0", "xmm1"
     );
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Measure kernel
     while ((measure_counter++) < NMEASURE) {
@@ -191,6 +201,11 @@ int main(int argc, char** argv) {
                 :
                 : "r10", "r11", "r12", "xmm0", "xmm1", "memory"
             );
+        }
+        
+        // triad kernel
+        for (int j = 0; j < ARRLEN; ++j) {
+            c[j] = a[j] + scalar * b[j];
         }
 
 #ifdef PERFHOUND
@@ -222,6 +237,12 @@ int main(int argc, char** argv) {
         : "r11", "memory"
     );
     // printf("%d\n", res);
+
+    double c_sum = 0.0;
+    for (int j = 0; j < ARRLEN; ++j) {
+        c_sum += c[j];
+    }
+    printf("Ref: %lf, actual: %lf\n", 9.7 * ARRLEN, c_sum);
     MPI_Barrier(MPI_COMM_WORLD);
 
 #ifdef PERFHOUND
@@ -229,15 +250,15 @@ int main(int argc, char** argv) {
 #endif
 
 #ifdef PAPI
-    for (int i = 0; i < 2 * NMEASURE; i+=2) {
-        fprintf(fp, "%lld,%lld", cycs[i+1] - cycs[i], nss[i+1] - nss[i]);
+    for (int i = 0; i < 2 * NMEASURE; ++i) {
+        fprintf(fp, "%lld,%lld", cycs[i], nss[i]);
         if (strcmp(mode, "EV") == 0) {
             for (int j = 0; j < 4; ++j) {
-                fprintf(fp, ",%lld", event_data[i+1][j] - event_data[i][j]);
+                fprintf(fp, ",%lld", event_data[i][j]);
             }
         } else if (strcmp(mode, "EVX") == 0) {
             for (int j = 0; j < 8; ++j) {
-                fprintf(fp, ",%lld", event_data[i+1][j] - event_data[i][j]);
+                fprintf(fp, ",%lld", event_data[i][j]);
             }
         }
         fprintf(fp, "\n");
