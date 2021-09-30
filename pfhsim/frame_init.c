@@ -1,184 +1,194 @@
 #include "frame_init.h"
 
-void check(char* name, graphNode* node){
-	if(strcmp(name,node->name) == 0){
-		printf("%s exist recursive call, please check your config file.\n",name);
+void check(char* name, graph_node* node){
+	if(strcmp(name, node->name) == 0){
+		printf("%s exist recursive call, please check your config file.\n", name);
 		exit(-1);
 	}else{
-		for (int i = 0; i < node->parentNum; i++){
-			check(name,node->parents[i]);	
+		for (int i = 0; i < node->parent_num; i ++){
+			check(name, node->parents[i]);	
 		}
 	}
 }
 
-int addEdge(char* childName,char* parentName,int loopNum,graph* mGraph){
-	graphNode* child;
-	graphNode* parent;
-	child = findNode(childName,mGraph);
-	parent = findNode(parentName,mGraph);
+int add_edge(char *child_name, char *parent_name, int loop_num, graph *m_graph){
+	graph_node *child;
+	graph_node *parent;
+	child = find_node(child_name, m_graph);
+	parent = find_node(parent_name, m_graph);
 	if(child == NULL){
-		printf("could not find %s, please check your config file.\n",childName);
+		printf("could not find %s, please check your config file.\n", child_name);
 		exit(-1);
 	}
 	if(parent == NULL){
-		printf("could not find %s, please check your config file.\n",parentName);
+		printf("could not find %s, please check your config file.\n", parent_name);
 		exit(-1);
 	}
 	//check(child->name,parent);
-	child->parents[child->parentNum] = parent;
-	child->parentNum ++;
-	parent->childs[parent->childNum] = child;
-	parent->loopNums[parent->childNum] = loopNum;
-	parent->childNum ++;
+	child->parents[child->parent_num] = parent;
+	child->parent_num ++;
+	parent->childs[parent->child_num] = child;
+	parent->loop_nums[parent->child_num] = loop_num;
+	parent->child_num ++;
 }
 
-int addNode(const char* mNodeName,double mRuntime,noise* mNoise,int sync, graph* mgraph){
-	graphNode* newNode = (graphNode*)malloc(sizeof(graphNode));
-	char* nodeName = (char*) malloc(sizeof(char)*MAX_NAME_SIZE);
-	strcpy(nodeName,mNodeName);
-	newNode->name = nodeName;
-	newNode->runtime = mRuntime;
-	newNode->originRuntime = mRuntime;	
-	newNode->mNoise = mNoise;
-	newNode->parents = (graphNode**) malloc(sizeof(graphNode*)*MAX_PARENT_NUM);
-	newNode->childs = (graphNode**) malloc(sizeof(graphNode*)*MAX_CHILD_NUM);
-	newNode->parentNum = 0;
-	newNode->childNum = 0;
-	newNode->loopNums = (int*) malloc(sizeof(int)*MAX_CHILD_NUM);
-	newNode->sync = sync;
-	mgraph->node[mgraph->nodeNum] = newNode;
-	if(mgraph->nodeNum == 0)
-		mgraph->rootNode = newNode;
-	mgraph->nodeNum ++;
+int add_node(const char *mnode_name, double mrun_time, noise *m_noise, int sync, graph *m_graph){
+	graph_node *new_node = (graph_node*) malloc(sizeof(graph_node));
+	char *node_name = (char*) malloc(sizeof(char) * MAX_NAME_SIZE);
+	strcpy(node_name, mnode_name);
+	new_node->name = node_name;
+	new_node->run_time = mrun_time;
+	new_node->std_run_time = mrun_time;	
+	new_node->m_noise = m_noise;
+	new_node->parents = (graph_node**) malloc(sizeof(graph_node*) * MAX_PARENT_NUM);
+	new_node->childs = (graph_node**) malloc(sizeof(graph_node*) * MAX_CHILD_NUM);
+	new_node->parent_num = 0;
+	new_node->child_num = 0;
+	new_node->loop_nums = (int*) malloc(sizeof(int) * MAX_CHILD_NUM);
+	new_node->sync = sync;
+	m_graph->node[m_graph->node_num] = new_node;
+	if(m_graph->node_num == 0)
+		m_graph->root_node = new_node;
+	m_graph->node_num ++;
 }
 
-void clearNode(graphNode* mNode){
-	if(mNode->name)
+void clear_node(graph_node* mNode){
+	if(mNode->name){
 		free(mNode->name);
-	if(mNode->mNoise){
-		free(mNode->mNoise->noiseType);
-		free(mNode->mNoise->parameters);
 	}
-	if(mNode->loopNums)
-		free(mNode->loopNums);
-	if(mNode->parents)
+	if(mNode->m_noise){
+		free(mNode->m_noise->noise_type);
+		free(mNode->m_noise->parameters);
+	}
+	if(mNode->loop_nums){
+		free(mNode->loop_nums);
+	}
+	if(mNode->parents){
 		free(mNode->parents);
-	if(mNode->childs)
+	}
+	if(mNode->childs){
 		free(mNode->childs);
+	}
 }
 
-graphNode* findNode(char* name,graph *mGraph){
-	for(int i = 0; i < mGraph->nodeNum; i++){
-		if(strcmp(mGraph->node[i]->name,name) == 0)
-			return mGraph->node[i];
+graph_node* find_node(char *name, graph *m_graph){
+	for (int i = 0; i < m_graph->node_num; i ++){
+		if(strcmp(m_graph->node[i]->name, name) == 0){
+			return m_graph->node[i];
+		}
 	}
 	return NULL;
 }
 
-void clearGraph(graph* mGraph){
-	for (int i = 0; i < mGraph->nodeNum; i++)
-		clearNode(mGraph->node[i]);
-	if(mGraph->node)
-		free(mGraph->node);
+void clear_graph(graph *m_graph){
+	for (int i = 0; i < m_graph->node_num; i ++){
+		clear_node(m_graph->node[i]);
+	}
+	if(m_graph->node){
+		free(m_graph->node);
+	}
 }
 
-int readToBuf(const char* fileName,char* configBuf){
-	FILE* fp = fopen(fileName,"r");
+int read_to_buf(const char *file_name,char *config_buf){
+	FILE* fp = fopen(file_name, "r");
 	if(!fp){
-        printf("Config file %s not found.\n",fileName);
+        printf("Config file %s not found.\n", file_name);
         return 0;
     }
-    fread(configBuf,MAX_FILE_SIZE,1,fp);
+    fread(config_buf, MAX_FILE_SIZE, 1, fp);
     fclose(fp);
 	return 1;
 }
 
-void parse_noise(cJSON* noiseJson, noise** mNoise){
-	if(noiseJson == NULL){
-		if(*mNoise)
-			free(*mNoise);
-		*mNoise = NULL;
+void parse_noise(cJSON *noise_json, noise **m_noise){
+	if(noise_json == NULL){
+		if(*m_noise)
+			free(*m_noise);
+		*m_noise = NULL;
 		return;
 	}
-	cJSON* noiseType;
-	cJSON* noiseParameter;
-	noiseType = cJSON_GetObjectItem(noiseJson, "noiseType");
-	(*mNoise)-> noiseType = (char*) malloc(30);
-	strcpy((*mNoise)-> noiseType,noiseType->valuestring);
-	noiseParameter = cJSON_GetObjectItem(noiseJson, "noiseParameters");
-	(*mNoise)->parameterNum = cJSON_GetArraySize(noiseParameter);
-	(*mNoise)->parameters = (double*)malloc(sizeof(double)*(*mNoise)->parameterNum);
-	for(int i = 0;i < (*mNoise)->parameterNum; i++){
-		(*mNoise)->parameters[i] = cJSON_GetArrayItem(noiseParameter,i)->valuedouble;
+	cJSON *noise_type;
+	cJSON *noise_parameter;
+	noise_type = cJSON_GetObjectItem(noise_json, "noiseType");
+	(*m_noise)-> noise_type = (char*) malloc(30);
+	strcpy((*m_noise)-> noise_type, noise_type->valuestring);
+	noise_parameter = cJSON_GetObjectItem(noise_json, "noiseParameters");
+	(*m_noise)->parameter_num = cJSON_GetArraySize(noise_parameter);
+	(*m_noise)->parameters = (double*)malloc(sizeof(double) * (*m_noise)->parameter_num);
+	for (int i = 0;i < (*m_noise)->parameter_num; i ++){
+		(*m_noise)->parameters[i] = cJSON_GetArrayItem(noise_parameter, i)->valuedouble;
 	}
 }
 
-void initNodes(graph* mGraph,cJSON* configJson){
+void init_nodes(graph *m_graph,cJSON *config_json){
 	//add main
-	addNode("main",0,NULL,1,mGraph);
+	add_node("main", 0, NULL, 1, m_graph);
 	//add functions
-	cJSON* functions = cJSON_GetObjectItem(configJson,"functions")->child;
+	cJSON *functions = cJSON_GetObjectItem(config_json, "functions")->child;
 	while(functions != NULL){
 		//sync
 		int sync = 0;
-		cJSON* syncJson = cJSON_GetObjectItem(functions,"sync");
+		cJSON *syncJson = cJSON_GetObjectItem(functions, "sync");
 		if(syncJson != NULL)
-			if(strcmp(syncJson->valuestring,"yes") == 0)
+			if(strcmp(syncJson->valuestring, "yes") == 0)
 				sync = 1;
 		//The function itself has no running time and noise
-		addNode(functions->string,0,NULL,sync,mGraph);
+		add_node(functions->string, 0, NULL, sync, m_graph);
 		functions = functions->next;
 	}
 	//add kernels
-	cJSON* kernels = cJSON_GetObjectItem(configJson,"kernels")->child;
+	cJSON *kernels = cJSON_GetObjectItem(config_json, "kernels")->child;
 	while (kernels != NULL){
-		noise* mNoise = (noise*)malloc(sizeof(noise));
-		parse_noise(cJSON_GetObjectItem(kernels,"noise"),&mNoise);
-		cJSON* runTimeJson = cJSON_GetObjectItem(kernels,"runTime");
+		noise *m_noise = (noise*) malloc(sizeof(noise));
+		parse_noise(cJSON_GetObjectItem(kernels,"noise"), &m_noise);
+		cJSON *run_time_json = cJSON_GetObjectItem(kernels, "runTime");
 		double time = 0;
-		if(runTimeJson != NULL)
-			time = strtod(runTimeJson->valuestring,NULL);
-		addNode(kernels->string,time,mNoise,0,mGraph);
+		if(run_time_json != NULL)
+			time = strtod(run_time_json->valuestring, NULL);
+		add_node(kernels->string, time, m_noise, 0, m_graph);
 		kernels = kernels->next;
 	}
 }
 
-void addFuncEdges(cJSON* functions,graph* mGraph){
+void add_func_edges(cJSON *functions, graph *m_graph){
 	while (functions != NULL){
 		//noloop
-		cJSON* call = cJSON_GetObjectItem(functions,"call");
+		cJSON *call = cJSON_GetObjectItem(functions, "call");
 		if(call != NULL){
-			int callNum = cJSON_GetArraySize(call);
+			int call_num = cJSON_GetArraySize(call);
 			char* ptr = functions -> string;
-			for(int i = callNum - 1; i >= 0; i--){
-				addEdge(cJSON_GetArrayItem(call,i)->valuestring,ptr,1,mGraph);
-				//printf("add : %s -> %s\n",cJSON_GetArrayItem(call,i)->valuestring,ptr);
-				if(cJSON_GetArrayItem(call,i) != NULL)
-					ptr = cJSON_GetArrayItem(call,i)->valuestring;
+			for (int i = call_num - 1; i >= 0; i --){
+				add_edge(cJSON_GetArrayItem(call, i)->valuestring, ptr, 1, m_graph);
+				if(cJSON_GetArrayItem(call, i) != NULL){
+					ptr = cJSON_GetArrayItem(call, i)->valuestring;
+				}
 			}
 		}
 		//loop
-		cJSON* loop = cJSON_GetObjectItem(functions,"loop");
+		cJSON *loop = cJSON_GetObjectItem(functions, "loop");
 		if(loop != NULL){
-			call = cJSON_GetObjectItem(loop,"call");
-			cJSON* loopNumJson = cJSON_GetObjectItem(loop,"loopNum");
-			if(loopNumJson == NULL){
-				printf("please set %s's loopNum value.\n",functions->string);
+			call = cJSON_GetObjectItem(loop, "call");
+			cJSON *loop_num_json = cJSON_GetObjectItem(loop, "loopNum");
+			if(loop_num_json == NULL){
+				printf("please set %s's loopNum value.\n", functions->string);
 				exit(-1);
 			}
-			int loopNum = loopNumJson->valueint;
+			int loop_num = loop_num_json->valueint;
 			if(call != NULL){
-				int callNum = cJSON_GetArraySize(call);
-				char* ptr = functions -> string;
+				int call_num = cJSON_GetArraySize(call);
+				char *ptr = functions->string;
 
-				for(int i = callNum - 1; i >= 0; i--){
+				for (int i = call_num - 1; i >= 0; i --){
 					//exit(0);
-					if(i == callNum -1)
-						addEdge(cJSON_GetArrayItem(call,i)->valuestring,ptr,loopNum,mGraph);
-					else
-						addEdge(cJSON_GetArrayItem(call,i)->valuestring,ptr,1,mGraph);
-					if(cJSON_GetArrayItem(call,i) != NULL)
-						ptr = cJSON_GetArrayItem(call,i)->valuestring;
+					if(i == call_num - 1){
+						add_edge(cJSON_GetArrayItem(call, i)->valuestring, ptr, loop_num, m_graph);
+					}
+					else{
+						add_edge(cJSON_GetArrayItem(call,i)->valuestring,ptr,1,m_graph);
+					}
+					if(cJSON_GetArrayItem(call, i) != NULL){
+						ptr = cJSON_GetArrayItem(call, i)->valuestring;
+					}
 				}
 			}
 		}
@@ -187,121 +197,113 @@ void addFuncEdges(cJSON* functions,graph* mGraph){
 	}
 }
 
-void initEdges(graph* mGraph,cJSON* configJson){
+void init_edges(graph *m_graph,cJSON *config_json){
 	//main
-	cJSON* program = cJSON_GetObjectItem(configJson,"program");
+	cJSON *program = cJSON_GetObjectItem(config_json, "program");
 	if(program != NULL){
-		int callNum = cJSON_GetArraySize(program);
+		int call_num = cJSON_GetArraySize(program);
 		char *ptr = "main";
-		for(int i = callNum - 1; i >= 0; i--){
-			addEdge(cJSON_GetArrayItem(program,i)->valuestring,ptr,1,mGraph);
+		for (int i = call_num - 1; i >= 0; i --){
+			add_edge(cJSON_GetArrayItem(program, i)->valuestring, ptr, 1, m_graph);
 			if(cJSON_GetArrayItem(program,i) != NULL)
 			ptr = cJSON_GetArrayItem(program,i)->valuestring;	
 		}
 	}
+
 	//functions and kernels
-	cJSON* functions = cJSON_GetObjectItem(configJson,"functions")->child;
-	cJSON* kernels = cJSON_GetObjectItem(configJson,"kernels")->child;
-	addFuncEdges(functions,mGraph);
-	addFuncEdges(kernels,mGraph);
+	cJSON *functions = cJSON_GetObjectItem(config_json, "functions")->child;
+	cJSON *kernels = cJSON_GetObjectItem(config_json, "kernels")->child;
+	add_func_edges(functions, m_graph);
+	add_func_edges(kernels, m_graph);
 }
 
-void initGraph(graph*** mGraph,const char* configBuf){
-	cJSON* configJson = cJSON_Parse(configBuf);
-	if(configJson == NULL && my_rank == 0){
+void init_graph(graph ***m_graph,const char *config_buf){
+	cJSON *config_json = cJSON_Parse(config_buf);
+	if(config_json == NULL && my_rank == 0){
 		printf("Error: parse config file fail. Please check your config file.\n");
 		exit(-1);
 	}
+	*m_graph = (graph**) malloc(sizeof(graph*) * local_sz);
 
-	*mGraph = (graph**) malloc(sizeof(graph*) * local_sz);
 	//init graph
-	for (int i = 0; i < local_sz; i++){
-		(*mGraph)[i] = (graph*) malloc(sizeof(graph));
-		(*mGraph)[i]->node = (graphNode**) malloc(sizeof(graphNode*)*MAX_NODE_NUM);
-		(*mGraph)[i]->nodeNum = 0;
-		(*mGraph)[i]->rootNode = NULL;
-
+	for (int i = 0; i < local_sz; i ++){
+		(*m_graph)[i] = (graph*) malloc(sizeof(graph));
+		(*m_graph)[i]->node = (graph_node**) malloc(sizeof(graph_node*) * MAX_NODE_NUM);
+		(*m_graph)[i]->node_num = 0;
+		(*m_graph)[i]->root_node = NULL;
 		//add nodes to graph
-		initNodes((*mGraph)[i],configJson);
+		init_nodes((*m_graph)[i], config_json);
 		//add edges to graph
-		initEdges((*mGraph)[i],configJson);
+		init_edges((*m_graph)[i], config_json);
 	}
 
-
 	//clean
-	cJSON_Delete(configJson);
+	cJSON_Delete(config_json);
 }
 
-void parseProgram(graph*** mGraph,const char* fileName){
-	char* configBuf = (char*)malloc(MAX_FILE_SIZE);
+void parse_program(graph ***m_graph,const char *file_name){
+	char *config_buf = (char*) malloc(MAX_FILE_SIZE);
 	if(my_rank == 0)
-		if(!readToBuf(fileName,configBuf))
+		if(!read_to_buf(file_name, config_buf))
 			return;
-	MPI_Bcast(configBuf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
-
-	initGraph(mGraph,configBuf);
-	free(configBuf);
+	MPI_Bcast(config_buf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
+	init_graph(m_graph, config_buf);
+	free(config_buf);
 	return;
 }
 
-void parseNode(const char* fileName){
-	char* configBuf = (char*) malloc(MAX_FILE_SIZE*sizeof(char));
-	if(my_rank == 0)
-		readToBuf(fileName,configBuf);
-	MPI_Bcast(configBuf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
-	cJSON* configJson = cJSON_Parse(configBuf);
-	
-	cJSON* coreJson = cJSON_GetObjectItem(configJson,"core");
-	cJSON* nodeJson = cJSON_GetObjectItem(configJson,"node");
-	if(coreJson == NULL){
+void parse_node_config(const char *file_name){
+	char *config_buf = (char*) malloc(MAX_FILE_SIZE * sizeof(char));
+	if(my_rank == 0){
+		read_to_buf(file_name, config_buf);
+	}
+	MPI_Bcast(config_buf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
+	cJSON *config_json = cJSON_Parse(config_buf);
+	cJSON *core_json = cJSON_GetObjectItem(config_json, "core");
+	cJSON *node_json = cJSON_GetObjectItem(config_json, "node");
+	if(core_json == NULL){
 		printf("node.json has no core configration.\n");
 		exit(-1);
 	}else{
-		coreNum = cJSON_GetObjectItem(coreJson,"coreNum")->valueint;
+		core_num = cJSON_GetObjectItem(core_json, "coreNum")->valueint;
 	}
-	if(nodeJson == NULL){
+	if(node_json == NULL){
 		printf("node.json has no node configration.\n");
 		exit(-1);
 	}else{
-		nodeNum = cJSON_GetObjectItem(nodeJson,"nodeNum")->valueint;
-		cJSON* noiseJson = cJSON_GetObjectItem(nodeJson,"noise");
-		if(noiseJson == NULL)
-			nodeNoise = NULL;
-		else{
-			nodeNoise = (noise*) malloc(sizeof(noise));
-			parse_noise(noiseJson,&nodeNoise);
+		node_num = cJSON_GetObjectItem(node_json, "nodeNum")->valueint;
+		cJSON* noise_json = cJSON_GetObjectItem(node_json, "noise");
+		if(noise_json == NULL){
+			node_noise = NULL;
+		}else{
+			node_noise = (noise*) malloc(sizeof(noise));
+			parse_noise(noise_json, &node_noise);
 		}
 	}
 	//clean
-	cJSON_Delete(configJson);
-	free(configBuf);
+	cJSON_Delete(config_json);
+	free(config_buf);
 }
 
-void parseOs(const char* fileName){
-	char* configBuf = (char*) malloc(MAX_FILE_SIZE*sizeof(char));
-	if(my_rank == 0)
-		readToBuf(fileName,configBuf);
-	MPI_Bcast(configBuf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
-
-	cJSON* osJson = cJSON_Parse(configBuf);
-	cJSON* noiseJson = cJSON_GetObjectItem(osJson,"osNoise");
-	if(noiseJson == NULL){
-		osPeriod = 0;
-		osDetour = 0;
-		osSwitch = 0;
+void parse_os_config(const char *file_name){
+	char *config_buf = (char*) malloc(MAX_FILE_SIZE * sizeof(char));
+	if(my_rank == 0){
+		read_to_buf(file_name, config_buf);
+	}
+	MPI_Bcast(config_buf, MAX_FILE_SIZE, MPI_CHAR, 0, MPI_COMM_WORLD);
+	cJSON *osJson = cJSON_Parse(config_buf);
+	cJSON *noise_json = cJSON_GetObjectItem(osJson, "osNoise");
+	if(noise_json == NULL){
+		os_period = 0;
+		os_detour = 0;
+		os_switch = 0;
 	}else{
-		osSwitch = 1;
-		osPeriod = strtod(cJSON_GetObjectItem(noiseJson,"period")->valuestring,NULL);
-		osDetour = strtod(cJSON_GetObjectItem(noiseJson,"detour")->valuestring,NULL);		
+		os_switch = 1;
+		os_period = strtod(cJSON_GetObjectItem(noise_json, "period")->valuestring, NULL);
+		os_detour = strtod(cJSON_GetObjectItem(noise_json, "detour")->valuestring, NULL);		
 	}
 	//clean
 	cJSON_Delete(osJson);
-	free(configBuf);
+	free(config_buf);
 }
 
-/*int main(){
-	graph mGraph;
-	Parse(&mGraph,"./config.json");
-	int theoreticalTime = GetTheoreticalTime(&mGraph);
-
-}*/

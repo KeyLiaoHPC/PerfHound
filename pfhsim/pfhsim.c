@@ -1,39 +1,69 @@
 #include "frame_init.h"
 
 
+//node configration
+int node_num;
+int core_num;
+noise *node_noise;
+int total_core_num;
+//os noise configration
+int8_t os_switch;
+double os_period;
+double os_detour;
+double last_sync_time = 0;
+double *node_osbias;
+//gsl 
+const gsl_rng_type *T;
+gsl_rng **r;
+uint64_t *seed;
+//mpi
+int my_rank;
+int comm_sz;
+int local_start;
+int local_sz;
+int local_node_start;
+int local_node_sz;
+int *all_local_sz;
+int *all_displs;
+int *all_node_sz;
+int *all_node_displs;
+
+
+
 double 
-get_theoretical_time(graphNode* node){
+__get_std_time(graph_node *node){
 	double time = 0;
-	time += node->runtime;
-	for (int i = 0; i < node->childNum; i++){
-		time += get_theoretical_time(node->childs[i]) * node->loopNums[i];
+	time += node->run_time;
+	for (int i = 0; i < node->child_num; i ++){
+		time += __get_std_time(node->childs[i]) * node->loop_nums[i];
 	}
 	return time;
 }
 
 double 
-GetTheoreticalTime(graph* mGraph){
+get_std_time(graph *m_graph){
     if(my_rank == 0){
-        graphNode* main = mGraph->rootNode;
+        graph_node *main = m_graph->root_node;
         double time = 0;
-        time = get_theoretical_time(main);
-        printf("Theoretical Time: %lf seconds\n",time);
+        time = __get_std_time(main);
+        printf("Theoretical Time: %lf seconds\n", time);
     }
 }
 
 void 
-Init(int argc,char** argv,graph*** mGraph){
-    parseNode("./config/node.json");
-    parseOs("./config/os.json");   
-    
+Init(int argc, char **argv, graph ***m_graph){
+    parse_node_config("./config/node.json");
+    parse_os_config("./config/os.json");   
+
     //distribute sim core
-    totalCoreNum = coreNum * nodeNum;
-    distributeJob();
+    total_core_num = core_num * node_num;
+    distribute_job();
 
     //parse Program
-    parseProgram(mGraph,"./config/program.json"); 
-    if(my_rank == 0)
-        printf("Nodes: %d, Cores: %d\n",nodeNum,coreNum);
+    parse_program(m_graph, "./config/program.json"); 
+    if(my_rank == 0){
+        printf("Nodes: %d, Cores: %d\n", node_num, core_num);
+    }
 }
 
 int 
@@ -76,9 +106,9 @@ get_nodevar(double *pnode, int n) {
     gsl_rng_set(mr, mseed);
 
 
-    sigma = 3 * nodeNoise->parameters[0]; // 3sigma for +-5% of 99.9% ndoes.
-    ucut = 0 + nodeNoise->parameters[1];  // Cutoff at +NORM_CUT
-    dcut = 0 - nodeNoise->parameters[1];  // Cutoff at -NORM_CUT
+    sigma = 3 * node_noise->parameters[0]; // 3sigma for +-5% of 99.9% ndoes.
+    ucut = 0 + node_noise->parameters[1];  // Cutoff at +NORM_CUT
+    dcut = 0 - node_noise->parameters[1];  // Cutoff at -NORM_CUT
 
     for (i = 0; i < n; i ++) {
         pnode[i] = gsl_ran_gaussian(mr, sigma);
@@ -91,153 +121,147 @@ get_nodevar(double *pnode, int n) {
     return 0;
 }
 
+/*
+* add node noise.
+*/
 void
-nodeNoiseDisturb(graph** mGraph){
-    if(nodeNoise == NULL) //no node noise
+add_node_noise(graph **m_graph){
+    if(node_noise == NULL) //no node noise
         return;
 
-    double* node_perf = (double*) malloc(sizeof(double) * nodeNum);
+    double *node_perf = (double*) malloc(sizeof(double) * node_num);
     if(my_rank == 0)
-        get_nodevar(node_perf, nodeNum);
-    MPI_Bcast(node_perf, nodeNum, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        get_nodevar(node_perf, node_num);
+    MPI_Bcast(node_perf, node_num, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    for(int i = 0; i < local_sz; i++){
-        int simnode = (i + local_start) / coreNum;
-        for (int j = 0; j < mGraph[i]->nodeNum ; j++){
-            mGraph[i]->node[j]->runtime = mGraph[i]->node[j]->originRuntime / node_perf[simnode];  
+    for (int i = 0; i < local_sz; i ++){
+        int sim_node = (i + local_start) / core_num;
+        for (int j = 0; j < m_graph[i]->node_num ; j ++){
+            m_graph[i]->node[j]->run_time = m_graph[i]->node[j]->std_run_time / node_perf[sim_node];  
         }
     }
-    /*if (my_rank == 0){
-        printf("Performance factor for node 0-%d: ",nodeNum-1); 
-        for (int j = 0; j < nodeNum ; j++)
-            printf("%lf, ",node_perf[j]-1);
-        printf("\n");   
-    }*/
     free(node_perf);
 }
 
 double
-selfNoiseDisturb(graphNode* node,int i){
-    //gsl_rng_set(r[i], seed[i]);
-    if(node->mNoise == NULL || node->runtime == 0) //no noise
-        return node->runtime;
+add_noise(graph_node *node, int i){
+    if(node->m_noise == NULL || node->run_time == 0) //no noise
+        return node->run_time;
 
-    if(strcmp(node->mNoise->noiseType,"pareto") == 0){//pareto distribution
-        double s = gsl_ran_pareto(r[0], node->mNoise->parameters[0], 1);
+    if(strcmp(node->m_noise->noise_type, "pareto") == 0){//pareto distribution
+        double s = gsl_ran_pareto(r[0], node->m_noise->parameters[0], 1);
         s = s > 2? 2: s;
-        return(node->runtime * s);
+        return(node->run_time * s);
     }
-    return node->runtime; 
+    return node->run_time; 
 }
 
 void
 update_osbias(double *node_osbias, int nnode, int p, double passed_time) {
-    int passed;
+    int passed_num;
     for (int i = 0; i < nnode; i ++) {
-        passed = (node_osbias[i] + passed_time) / p; 
-        node_osbias[i] = node_osbias[i] + passed_time - passed * p;
+        passed_num = (node_osbias[i] + passed_time) / p; 
+        node_osbias[i] = node_osbias[i] + passed_time - passed_num * p;
     }
 }
 
 void
-addOsNoise(double* lastSyncTime, double* localTotalRunTime,double* passedTime){
+add_os_noise(double *last_sync_time, double *local_total_run_time, double *passed_time){
     uint64_t rand;
-    double node_off,tmax,localFinal = 0,globalFinal = 0;
+    double node_off,tmax,local_final = 0,global_final = 0;
     int nnoise,passed_noise,core,i,j,k;
-    double* ptr;
+    double *ptr;
 
     //gather local run time
-    double* globalTotalRunTime;
-    if (my_rank == 0){
-        globalTotalRunTime = (double*) malloc(sizeof(double) * coreNum * nodeNum);
+    double *global_total_run_time;
+    if(my_rank == 0){
+        global_total_run_time = (double*) malloc(sizeof(double) * core_num * node_num);
     }
-    MPI_Gatherv(localTotalRunTime, local_sz, MPI_DOUBLE, globalTotalRunTime, all_local_sz, all_displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(local_total_run_time, local_sz, MPI_DOUBLE, global_total_run_time, 
+     all_local_sz, all_displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     //distribute job
-    double* localPTime = (double*) malloc(sizeof(double) * local_node_sz * coreNum);
-    MPI_Scatterv(globalTotalRunTime,all_node_sz,all_node_displs,MPI_DOUBLE,localPTime,local_node_sz * coreNum,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    double* local_ptime = (double*) malloc(sizeof(double) * local_node_sz * core_num);
+    MPI_Scatterv(global_total_run_time, all_node_sz, all_node_displs, MPI_DOUBLE,
+     local_ptime, local_node_sz * core_num, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    //osInitialTime,osPeriod,osDetour,lastSyncTime, now time
     for (i = 0; i < local_node_sz; i ++) {
-        // hypothesis: each node start at a random time in a period.
-        //get_urandom(&rand);
         // How many seconds from the starting point to next interrupt.
-        ptr = localPTime + coreNum * i;
+        ptr = local_ptime + core_num * i;
         node_off = node_osbias[i + local_node_sz];
         tmax = 0;
-        for (j = 0; j < coreNum; j ++) {
-            ptr[j] -= *lastSyncTime;
+        for (j = 0; j < core_num; j ++) {
+            ptr[j] -= *last_sync_time;
             tmax = tmax < ptr[j] ? ptr[j] : tmax;
         }       
-        nnoise = (tmax - node_off) / osPeriod + 1;
+        nnoise = (tmax - node_off) / os_period + 1;
         passed_noise = 0;
 
         while(nnoise > passed_noise){
             for (k = 0; k < nnoise - passed_noise; k ++) {
                 get_urandom(&rand);
-                core = rand % coreNum;
-                ptr[core] += osDetour;
+                core = rand % core_num;
+                ptr[core] += os_detour;
                 tmax = tmax < ptr[core]? ptr[core] : tmax;
             }
             passed_noise += k;
-            nnoise = (tmax - node_off) / osPeriod;
+            nnoise = (tmax - node_off) / os_period;
         }
-        localFinal = localFinal < tmax ? tmax : localFinal;
+        local_final = local_final < tmax ? tmax : local_final;
     }
 
-    MPI_Allreduce(&localFinal,&globalFinal,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
-
-    *passedTime = globalFinal;
-    *lastSyncTime += globalFinal;
-    for ( i = 0; i < local_sz; i++){
-        localTotalRunTime[i] = *lastSyncTime;
+    MPI_Allreduce(&local_final, &global_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    *passed_time = global_final;
+    *last_sync_time += global_final;
+    for ( i = 0; i < local_sz; i ++){
+        local_total_run_time[i] = *last_sync_time;
     }
     if (my_rank == 0){
-        free(globalTotalRunTime);
+        free(global_total_run_time);
     }
-    free(localPTime);
+    free(local_ptime);
 }
 
 void
-setMaxTime(double* totalRunTime){
-    double localMaxTime = -1;
-    double globalMaxTime = -1;
-    for(int i = 0;i < local_sz; i++){
-        if(totalRunTime[i] > localMaxTime)
-            localMaxTime = totalRunTime[i];
+get_max_time(double *totalrun_time){
+    double local_max_time = -1;
+    double global_max_time = -1;
+    for (int i = 0; i < local_sz; i ++){
+        if(totalrun_time[i] > local_max_time)
+            local_max_time = totalrun_time[i];
     }
-    MPI_Allreduce(&localMaxTime,&globalMaxTime,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+    MPI_Allreduce(&local_max_time, &global_max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     
-    for(int i = 0;i < local_sz; i++){
-        totalRunTime[i] = globalMaxTime;
+    for (int i = 0; i < local_sz; i ++){
+        totalrun_time[i] = global_max_time;
     }
 }
 
 // real time = self run time + childs run time + osnoise
 void
-get_real_time(graphNode** ptr, double* localTotalRunTime){
+__get_real_time(graph_node **ptr, double *local_total_run_time){
     //self run time
-    for(int i = 0; i < local_sz; i++){
-        localTotalRunTime[i] += selfNoiseDisturb(ptr[i],i);
+    for (int i = 0; i < local_sz; i ++){
+        local_total_run_time[i] += add_noise(ptr[i], i);
     }
-    graphNode** new_ptr = (graphNode**)malloc(sizeof(graphNode*) * local_sz);
+    graph_node **new_ptr = (graph_node**) malloc(sizeof(graph_node*) * local_sz);
 
     //childs' run time
-    for(int i = 0; i < ptr[0]->childNum; i++){
-        for(int k = 0; k < local_sz; k++)
+    for (int i = 0; i < ptr[0]->child_num; i ++){
+        for (int k = 0; k < local_sz; k ++)
             new_ptr[k]=ptr[k]->childs[i];
-        for (int j = 0; j < ptr[0]->loopNums[i]; j++)
-            get_real_time(new_ptr,localTotalRunTime);
+        for (int j = 0; j < ptr[0]->loop_nums[i]; j ++)
+            __get_real_time(new_ptr, local_total_run_time);
     }
 
     // sync
     if(ptr[0]->sync == 1){//需要同步
-        if(osSwitch == 0){//no os noise
-            setMaxTime(localTotalRunTime);
+        if(os_switch == 0){//no os noise
+            get_max_time(local_total_run_time);
         }else{
-            double passedTime;
-            addOsNoise(&lastSyncTime,localTotalRunTime,&passedTime);
-            update_osbias(node_osbias, nodeNum, osPeriod, passedTime);
+            double passed_time;
+            add_os_noise(&last_sync_time, local_total_run_time, &passed_time);
+            update_osbias(node_osbias, node_num, os_period, passed_time);
         }
     }
     free(new_ptr);
@@ -245,16 +269,16 @@ get_real_time(graphNode** ptr, double* localTotalRunTime){
 }
 
 void
-getRealTime(graph** mGraph,double* localTotalRunTime){
-    memset(localTotalRunTime,0,sizeof(double) * local_sz);
+get_real_time(graph **m_graph,double *local_total_run_time){
+    memset(local_total_run_time, 0, sizeof(double) * local_sz);
 
-    graphNode **ptr = (graphNode**) malloc(sizeof(graphNode*) * local_sz);
-    for (int i = 0; i < local_sz; i++){
-        ptr[i] = mGraph[i] ->rootNode;
+    graph_node **ptr = (graph_node**) malloc(sizeof(graph_node*) * local_sz);
+    for (int i = 0; i < local_sz; i ++){
+        ptr[i] = m_graph[i]->root_node;
     }
     
     //get real run time
-    get_real_time(ptr,localTotalRunTime);
+    __get_real_time(ptr, local_total_run_time);
 
     //clean
     free(ptr);
@@ -266,7 +290,7 @@ Init_gsl(){
     T = gsl_rng_ranlux389;
     r = (gsl_rng**) malloc(sizeof(gsl_rng*) * local_sz);
     seed = (uint64_t*) malloc(sizeof(uint64_t) * local_sz);
-    for (int i = 0; i < local_sz; i++){
+    for (int i = 0; i < local_sz; i ++){
         r[i] = gsl_rng_alloc(T);        
         get_urandom(&seed[i]);
         gsl_rng_set(r[i], seed[i]);
@@ -275,7 +299,7 @@ Init_gsl(){
 
 void
 init_osbias(double **node_osbias, int nnode, float p) {
-    if(osSwitch == 0)
+    if(os_switch == 0)
         return;
 
     *node_osbias = (double*) malloc(sizeof(double) * nnode);
@@ -299,13 +323,13 @@ Init_mpi(){
         exit(-1);
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &commsz);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
 }
 
 void
-distributeJob(){
-    int average = totalCoreNum / commsz; //每个进程平均分配的长度
-	int remain = totalCoreNum % commsz;  	
+distribute_job(){
+    int average = total_core_num / comm_sz; //每个进程平均分配的长度
+	int remain = total_core_num % comm_sz;  	
 	if(my_rank < remain){
 		local_sz = average + 1;
 		local_start = (average + 1) * my_rank;
@@ -316,26 +340,26 @@ distributeJob(){
 	}
 
     //distribute cores
-    all_local_sz = (int*) malloc(sizeof(int)*commsz);
-    all_displs= (int*) malloc(sizeof(int)*commsz);
-    memset(all_local_sz,0,commsz*sizeof(int));
-    memset(all_displs,0,commsz*sizeof(int));
+    all_local_sz = (int*) malloc(sizeof(int)*comm_sz);
+    all_displs= (int*) malloc(sizeof(int)*comm_sz);
+    memset(all_local_sz, 0, comm_sz*sizeof(int));
+    memset(all_displs, 0, comm_sz*sizeof(int));
 
-    MPI_Gather(&local_sz,1,MPI_INT,all_local_sz,1,MPI_INT,0,MPI_COMM_WORLD);
+    MPI_Gather(&local_sz, 1, MPI_INT, all_local_sz, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if(my_rank == 0){
-        for(int j = 0; j < commsz ; j++){	
+        for ( int j = 0; j < comm_sz ; j ++){	
             if(j > 0){
                 all_displs[j] += all_displs[j-1] + all_local_sz[j-1];
             }
         }
     } 
 
-    all_node_sz = (int*) malloc(sizeof(int)*commsz);
-    all_node_displs = (int*) malloc(sizeof(int)*commsz);
+    all_node_sz = (int*) malloc(sizeof(int) * comm_sz);
+    all_node_displs = (int*) malloc(sizeof(int) * comm_sz);
 
     //distribute nodes
-    average = nodeNum / commsz; 
-	remain = nodeNum % commsz;  	
+    average = node_num / comm_sz; 
+	remain = node_num % comm_sz;  	
 	if(my_rank < remain){
 		local_node_sz = (average + 1);
 		local_node_start = (average + 1) * my_rank;
@@ -344,16 +368,16 @@ distributeJob(){
 		local_node_sz = average;
 		local_node_start = (average + 1) * remain + average * (my_rank - remain);
 	}
-    memset(all_node_sz,0,commsz*sizeof(int));
-    memset(all_node_displs,0,commsz*sizeof(int));
-	for(int i = 0; i < commsz; i++){
+    memset(all_node_sz, 0, comm_sz * sizeof(int));
+    memset(all_node_displs, 0, comm_sz * sizeof(int));
+	for (int i = 0; i < comm_sz; i ++){
 		if(i < remain){
-			all_node_sz[i] = (average + 1) * coreNum;
-			all_node_displs[i] = (average + 1) * i * coreNum;
+			all_node_sz[i] = (average + 1) * core_num;
+			all_node_displs[i] = (average + 1) * i * core_num;
 		}
 		else{
-			all_node_sz[i] = average * coreNum;
-			all_node_displs[i] = (average + 1) * remain * coreNum + average * (i - remain) * coreNum;
+			all_node_sz[i] = average * core_num;
+			all_node_displs[i] = (average + 1) * remain * core_num + average * (i - remain) * core_num;
 		}
 	}
 }
@@ -366,80 +390,53 @@ clean(){
     free(all_node_displs);
 }
 
-//node configration
-int nodeNum;
-int coreNum;
-noise* nodeNoise;
-int totalCoreNum;
-//os noise configration
-int8_t osSwitch;
-double osPeriod;
-double osDetour;
-double lastSyncTime = 0;
-double *node_osbias;
-//gsl 
-const gsl_rng_type *T;
-gsl_rng **r;
-uint64_t *seed;
-//mpi
-int my_rank;
-int commsz;
-int local_start;
-int local_sz;
-int local_node_start;
-int local_node_sz;
-int* all_local_sz;
-int* all_displs;
-int* all_node_sz;
-int* all_node_displs;
-
 int 
 main(int argc, char **argv){
     //MPI init
     Init_mpi();
 
     //parse config file.
-    graph** mGraph;
-    Init(argc,argv,&mGraph);
+    graph **m_graph;
+    Init(argc, argv, &m_graph);
 
     //get theoretical time.
-    GetTheoreticalTime(mGraph[0]);
+    get_std_time(m_graph[0]);
 
-    int NUMRUN = 200;
-    for (int i = 0; i < NUMRUN; i++){
+    int num_run = 200;
+    for (int i = 0; i < num_run; i ++){
 
         //add node noise.
-        nodeNoiseDisturb(mGraph);
+        add_node_noise(m_graph);
 
         //init gsl
         Init_gsl();   
 
-        lastSyncTime = 0;
+        last_sync_time = 0;
 
         //Randomly generate system initial time.
-        init_osbias(&node_osbias, nodeNum, osPeriod);
+        init_osbias(&node_osbias, node_num, os_period);
         
         //add kernels noise and os noise and get total run time per core.
-        double* localTotalRunTime = (double*) malloc(sizeof(double) * local_sz);
-        getRealTime(mGraph,localTotalRunTime);
+        double *local_total_run_time = (double*) malloc(sizeof(double) * local_sz);
+        get_real_time(m_graph, local_total_run_time);
 
-        if(my_rank == 0)
-            printf("%d, %lf\n",i,localTotalRunTime[0]);
-
+        if(my_rank == 0){
+            printf("%d, %lf\n",i,local_total_run_time[0]);
+        }
         //clean
         free(seed);
-        for(int i = 0; i < local_sz; i++)
+        for(int i = 0; i < local_sz; i++){
             gsl_rng_free(r[i]);
+        }
         free(node_osbias);
-        free(localTotalRunTime);
+        free(local_total_run_time);
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
     //clean
-    for (int i = 0; i < local_sz; i++){
-       clearGraph(mGraph[i]);
+    for (int i = 0; i < local_sz; i ++){
+       clear_graph(m_graph[i]);
     }
     clean();
-
     MPI_Finalize();
 }
