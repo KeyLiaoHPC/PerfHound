@@ -16,10 +16,6 @@
 #endif
 
 
-#ifndef ARRLEN
-#define ARRLEN 1000
-#endif
-
 #ifndef NINS
 #define NINS 100
 #endif
@@ -67,13 +63,12 @@ int main(int argc, char** argv) {
     char* mode = M2S(MODE);
     uint64_t volatile sec, nsec; // For warmup
     int idx = 0, measure_counter = 0;
-    double scalar = 2.5;
-    double a[ARRLEN], b[ARRLEN], c[ARRLEN];
+    int64_t a[4] = {1, 2, 1, 1};
 
     MPI_Init(NULL, NULL);
 
     char dirname[256];
-    sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210930/NINS=%d", mode, op, NINS);
+    sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210909/NINS=%d", mode, op, NINS);
 
 #ifdef PAPI
     if (pfhmpi_init("../data/pfh_papi")) {
@@ -130,10 +125,8 @@ int main(int argc, char** argv) {
         res += rand() % 2 + tv.tv_nsec;
     }
 
-    for (int i = 0; i < ARRLEN; ++i) {
-        a[i] = 2.2;
-        b[i] = 3.0;
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     asm volatile (
         "mov $1, %%r11 \n\t"
@@ -150,8 +143,6 @@ int main(int argc, char** argv) {
         : "r10", "r11", "r12", "xmm0", "xmm1"
     );
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
 
     // Measure kernel
     while ((measure_counter++) < NMEASURE) {
@@ -161,17 +152,14 @@ int main(int argc, char** argv) {
 
 #pragma GCC unroll 10240
         for (int i = 0; i < NINS; ++i) {
-            asm volatile (
-                KERNEL(KNAME)
-                :
-                :
-                : "r10", "r11", "r12", "xmm0", "xmm1", "memory"
-            );
-        }
-        
-        // triad kernel
-        for (int j = 0; j < ARRLEN; ++j) {
-            c[j] = a[j] + scalar * b[j];
+            a[2] = a[0] * a[1];
+            a[3] = a[0] + a[1];
+            a[0] = a[2] * a[3];
+            a[1] = a[2] + a[3];
+            a[0] = a[3];
+            a[1] = a[0];
+            a[2] = a[1];
+            a[3] = a[2];
         }
 
         pfhmpi_read(1, 2, 0);
@@ -185,15 +173,10 @@ int main(int argc, char** argv) {
         : "r11", "memory"
     );
     // printf("%d\n", res);
-
-    double c_sum = 0.0;
-    for (int j = 0; j < ARRLEN; ++j) {
-        c_sum += c[j];
-    }
-    printf("Ref: %lf, actual: %lf\n", 9.7 * ARRLEN, c_sum);
     MPI_Barrier(MPI_COMM_WORLD);
 
     pfhmpi_finalize();
+
 
     MPI_Finalize();
     return 0;
