@@ -1,6 +1,6 @@
 #include "frame_init.h"
 
-void check(char* name, graph_node* node){
+void check(char *name, graph_node *node){
 	if(strcmp(name, node->name) == 0){
 		printf("%s exist recursive call, please check your config file.\n", name);
 		exit(-1);
@@ -52,7 +52,7 @@ int add_node(const char *mnode_name, double mrun_time, noise *m_noise, int sync,
 	m_graph->node_num ++;
 }
 
-void clear_node(graph_node* mNode){
+void clear_node(graph_node *mNode){
 	if(mNode->name){
 		free(mNode->name);
 	}
@@ -122,7 +122,7 @@ void parse_noise(cJSON *noise_json, noise **m_noise){
 
 void init_nodes(graph *m_graph,cJSON *config_json){
 	//add main
-	add_node("main", 0, NULL, 1, m_graph);
+	add_node("program_main", 0, NULL, 1, m_graph);
 	//add functions
 	cJSON *functions = cJSON_GetObjectItem(config_json, "functions")->child;
 	while(functions != NULL){
@@ -152,7 +152,7 @@ void init_nodes(graph *m_graph,cJSON *config_json){
 
 void add_func_edges(cJSON *functions, graph *m_graph){
 	while (functions != NULL){
-		//noloop
+		//call
 		cJSON *call = cJSON_GetObjectItem(functions, "call");
 		if(call != NULL){
 			int call_num = cJSON_GetArraySize(call);
@@ -184,7 +184,7 @@ void add_func_edges(cJSON *functions, graph *m_graph){
 						add_edge(cJSON_GetArrayItem(call, i)->valuestring, ptr, loop_num, m_graph);
 					}
 					else{
-						add_edge(cJSON_GetArrayItem(call,i)->valuestring,ptr,1,m_graph);
+						add_edge(cJSON_GetArrayItem(call, i)->valuestring, ptr, 1, m_graph);
 					}
 					if(cJSON_GetArrayItem(call, i) != NULL){
 						ptr = cJSON_GetArrayItem(call, i)->valuestring;
@@ -192,7 +192,7 @@ void add_func_edges(cJSON *functions, graph *m_graph){
 				}
 			}
 		}
-		//next func
+		//next function
 		functions = functions->next;
 	}
 }
@@ -202,10 +202,10 @@ void init_edges(graph *m_graph,cJSON *config_json){
 	cJSON *program = cJSON_GetObjectItem(config_json, "program");
 	if(program != NULL){
 		int call_num = cJSON_GetArraySize(program);
-		char *ptr = "main";
+		char *ptr = "program_main";
 		for (int i = call_num - 1; i >= 0; i --){
 			add_edge(cJSON_GetArrayItem(program, i)->valuestring, ptr, 1, m_graph);
-			if(cJSON_GetArrayItem(program,i) != NULL)
+			if(cJSON_GetArrayItem(program, i) != NULL)
 			ptr = cJSON_GetArrayItem(program,i)->valuestring;	
 		}
 	}
