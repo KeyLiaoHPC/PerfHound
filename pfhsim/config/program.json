@@ -1,28 +1,25 @@
 {
-	"program":["main"],
+	"program":["mainfun"],
 
 
 	"functions":{
-		"main":{
+		"mainfun":{
 			"loop":{
 				"loopNum": 10,
 				"call": ["func1","func2"]
 			}
 		},
 		"func1":{
-			"call":["k1"]
+			"call":["k4"]
 		},
 		"func2":{
-			"loop":{
-				"loopNum":100,
-				"call":["k2","fun3"]
-			},
+			"call":["kernelfun"],
 			"sync": "yes"
 		},
-		"fun3":{
+		"kernelfun":{
 			"loop":{
-				"loopNum":1000,
-				"call":["k3"]
+				"loopNum":100,
+				"call":["k1","k2"]
 			}
 		}
 	},
@@ -30,21 +27,27 @@
 
 	"kernels":{
 		"k1":{
-			"runTime": "10s",
-			"noise":{
-				"noiseType": "pareto",
-				"noiseParameters":[10]
-			}
-		},
-		"k2":{
 			"runTime": "0.1s",
 			"noise":{
 				"noiseType": "pareto",
 				"noiseParameters":[10]
 			}
 		},
+		"k2":{
+			"loop":{
+				"loopNum":1000,
+				"call":["k3"]
+			}
+		},
 		"k3":{
 			"runTime": "0.0001s",
+			"noise":{
+				"noiseType": "pareto",
+				"noiseParameters":[10]
+			}
+		},
+		"k4":{
+			"runTime": "10s",
 			"noise":{
 				"noiseType": "pareto",
 				"noiseParameters":[10]
