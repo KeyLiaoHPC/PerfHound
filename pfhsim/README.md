@@ -31,7 +31,7 @@ make
 PfhSim会自动读取config目录下的三个配置文件：node.json, os.json, program.json 分别对应着节点配置、操作系统噪声配置、并行应用配置
 
 ```shell
-mpirun -n <...> ./pfhsim 
+mpirun -n <...> ./pfhsim  <模拟次数(default:50)>
 ```
 
 #### 2.3 编写配置文件
@@ -207,6 +207,23 @@ runTime表示执行计算所需的标准时间。
 ```
 
 表示每次执行完"fun1"后，会进行一次全局的同步。
+
+**5）输出时间到out目录下**
+
+可以通过"recordTime"标记来选择输出某个function或kernel的时间，示例如下。
+
+```json
+"functions":{
+    "fun1":{
+        "loop":{
+            "loopNum":100,
+            "call":["k1","k2"]
+        },
+        "sync": "yes",
+        "recordTime": "yes"
+    }
+}
+```
 
 ### 注意事项
 
