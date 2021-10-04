@@ -1,0 +1,28 @@
+main(){
+    mainfun;
+}
+
+mainfun(){
+    loop(10){
+        func1;
+        func2;
+    }
+}
+
+func1(){
+    k1;
+}
+
+func2(){
+    loop(100){
+        k2;
+        fun3;
+    }
+}
+
+fun3(){
+    loop(1000){
+        k3;
+    }
+}
+

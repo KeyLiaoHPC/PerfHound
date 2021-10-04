@@ -1,12 +1,12 @@
+#ifndef FRAME_INIT
+#define FRAME_INIT
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "cJSON.h"
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
-
-#include <stdlib.h>
-#include <stdio.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <mpi.h>
@@ -16,50 +16,59 @@
 #define MAX_PARENT_NUM 500
 #define MAX_NAME_SIZE 200
 #define MAX_NODE_NUM 2000
+#define MAX_RECORD_NUM 100
+#define MAX_FILE_NAME 200
+#define NUM_RUN_DEFAULT 50
 
 typedef struct noise{
-	char* noiseType;
-	int parameterNum;
-	double* parameters;
+	char *noise_type;
+	int parameter_num;
+	double *parameters;
 }noise;
 
-typedef struct graphNode graphNode;
+typedef struct graph_node graph_node;
 typedef struct graph graph;
 
-struct graphNode{
+struct graph_node{
 	//self information
-	char* name;
-	double runtime;
-	double originRuntime;
-	noise* mNoise;
+	char *name;
+	double run_time;
+	double std_run_time;
+	noise *m_noise;
 	//parents and childs
-	graphNode** parents;
-	graphNode** childs;
-	int childNum;
-	int parentNum;
-	//Number of loop per child 
-	int* loopNums;
+	graph_node **parents;
+	graph_node **childs;
+	int child_num;
+	int parent_num;
+	//number of loop per child 
+	int *loop_nums;
 	//sync：1  nonsync: 0 
 	int sync;
+	//if need to record time
+	int record_flag;
+	//time to execute once
+	double mrunning_time;
+	//total running time 
+	double total_mrunning_time;
 };
 
 struct graph{
-	int nodeNum;
-	graphNode** node;
-	graphNode* rootNode;//main function
+	int node_num;
+	graph_node **node;
+	graph_node *root_node;//main function
 };
 
 
 //node config
-extern int nodeNum;
-extern int coreNum;
-extern noise* nodeNoise;
-extern int totalCoreNum;
+extern int node_num;
+extern int core_num;
+extern noise *node_noise;
+extern int total_core_num;
 //os noise config
-extern double osPeriod;
-extern double osDetour;
-extern int8_t osSwitch; //1 on, 0 down
-extern double lastSyncTime;
+extern double os_period;
+extern double os_detour;
+extern int8_t os_switch; //1 on, 0 down
+extern double last_sync_time;
 extern double *node_osbias;
 //gsl
 extern const gsl_rng_type *T;
@@ -67,30 +76,32 @@ extern gsl_rng **r;
 uint64_t *seed;
 //mpi
 extern int my_rank;
-extern int commsz;
+extern int comm_sz;
 extern int local_start;
 extern int local_sz;
 extern int local_node_start;
 extern int local_node_sz;
 extern int local_node_sz;
-extern int* all_local_sz;
-extern int* all_displs;
-extern int* all_node_sz;
-extern int* all_node_displs;
+extern int *all_local_sz;
+extern int *all_displs;
+extern int *all_node_sz;
+extern int *all_node_displs;
 
 
-void clearGraph(graph* mGraph);
-void clearNode(graphNode* mNode);
-void check(char* name, graphNode* node);
-int addEdge(char* childName,char* parentName,int loopNum,graph* mGraph);
-int addNode(const char* mNodeName,double mRuntime,noise* mNoise,int sync,graph* mgraph);
-graphNode* findNode(char* name,graph *mGraph);
-void parseProgram(graph*** mGraph,const char* fileName);
-void parseNode(const char* fileName);
-void parseOs(const char* fileName);
-int readToBuf(const char* fileName,char* configBuf);
-void initGraph(graph*** mGraph,const char* configBuf);
-void initNodes(graph* mGraph,cJSON* configJson);
-double GetTheoreticalTime(graph* mGraph);
+void clear_graph(graph *m_graph);
+void clear_node(graph_node *mnode);
+void check(char *name, graph_node *node);
+int add_edge(char *child_name, char *parent_name, int loop_num, graph *m_graph);
+int add_node(const char *mnode_name, double mrun_time, noise *m_noise, int sync, int record_time, graph *m_graph);
+void add_func_edges(cJSON *functions, graph *m_graph);
+graph_node* find_node(char *name, graph *m_graph);
+void parse_program(graph ***m_graph, const char *file_name);
+void parse_node_config(const char *file_name);
+void parse_os_config(const char *file_name);
+int read_to_buf(const char *file_name, char *config_buf);
+void init_graph(graph ***m_graph, const char *config_buf);
+void init_nodes(graph *m_graph, cJSON *config_json);
+double get_std_time(graph *m_graph);
+void distribute_job();
 
-void distributeJob();
+#endif
