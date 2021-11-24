@@ -168,13 +168,13 @@ int main(int argc, char** argv) {
                 : "r10", "r11", "r12", "xmm0", "xmm1", "memory"
             );
         }
+        pfhmpi_read(1, 2, 0);
         
         // triad kernel
         for (int j = 0; j < ARRLEN; ++j) {
             c[j] = a[j] + scalar * b[j];
         }
 
-        pfhmpi_read(1, 2, 0);
 
     }
 

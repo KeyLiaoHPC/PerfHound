@@ -2,9 +2,10 @@
 #NINS=${NINS:-1000}
 NINS=$1
 MODE=${MODE:-TS}
-KNAME=${KNAME:-ST}
+KNAME=${KNAME:-ADD}
 NMEASURE=${NMEASURE:-1050}
 TOOL=${TOOL:-PERFHOUND}
+ARRLEN=${ARRLEN:-16777216}
 
 LIBPFIX=${MODE,,}
 
@@ -14,11 +15,11 @@ LIBPFIX=${MODE,,}
 #    ./test1_asm_x86.c
 
 mpicc -O2 -fno-builtin  -o test3_papi_${NINS}.x -DPAPI -DMODE=$MODE -DKNAME=$KNAME \
-    -DNINS=$NINS -DNMEASURE=$NMEASURE -I../pfhprobe/include \
+    -DNINS=$NINS -DNMEASURE=$NMEASURE -DARRLEN=$ARRLEN -I../pfhprobe/include \
     -L../pfhprobe -lpfh_papi_mpi  -L$PAPI -lpapi\
     ./test3_asmmpi_x86.c
 mpicc -O2 -fno-builtin  -o test3_pfh_${NINS}.x  -DMODE=$MODE -DKNAME=$KNAME \
-    -DNINS=$NINS -DNMEASURE=$NMEASURE  -I../pfhprobe/include \
+    -DNINS=$NINS -DNMEASURE=$NMEASURE -DARRLEN=$ARRLEN -I../pfhprobe/include \
     -L../pfhprobe -lpfh_mpi  \
     ./test3_asmmpi_x86.c
 #mpicc -O2 -fno-builtin  -o test3_asmmpi_x86.x -DMODE=$MODE \

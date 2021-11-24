@@ -288,6 +288,14 @@ pfh_init(char *path) {
     /* Initializing run directory tree */
     printf("*** [Pfh-Probe] Creating data directory tree. \n");
     pfh_io_mkname(root);
+    err = pfh_io_mkdir(root);
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
+    printf("*** [Pfh-Probe] Data directory: %s\n", root);
+    fflush(stdout);
     err = pfh_io_mkfile();
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
