@@ -298,13 +298,20 @@ pfh_init(char *path) {
     fflush(stdout);
     err = pfh_io_mkfile();
     if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+        printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
         fflush(stdout);
         exit(1);
     }
     printf("*** [Pfh-Probe] Data directory: %s\n", root);
     fflush(stdout);
 
+    pfh_io_mkname(root);
+    err = pfh_io_mkfile();
+    if (err) {
+        printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+        fflush(stdout);
+        exit(1);
+    }
 
     /* Initializing host directory tree */
     err = pfh_io_mkhost();
@@ -313,7 +320,6 @@ pfh_init(char *path) {
         fflush(stdout);
         exit(1);
     }
-
 
     buf_nbyte = PFH_RECBUF_KIB * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
