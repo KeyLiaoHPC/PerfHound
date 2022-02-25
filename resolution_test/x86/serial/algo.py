@@ -127,10 +127,10 @@ def least_interval(res_df, options_dict):
     cost_nanosec = int(fargs[2])
     theo_cycle = 2 * test_round * ins_lat["ADD"]
     theo_nanosec = theo_cycle / frequency
-    all_cycles = np.array(res_df['cycle'], dtype=np.int32)
+    all_cycles = np.array(res_df['cycle'], dtype=np.int64)
     all_cycles -= cost_cycle
     all_cycles.sort()
-    all_nanosecs = np.array(res_df['nanosec'], dtype=np.int32)
+    all_nanosecs = np.array(res_df['nanosec'], dtype=np.int64)
     all_nanosecs -= cost_nanosec
     all_nanosecs.sort()
 
@@ -163,10 +163,10 @@ def variation_resolution(res_df, options_dict):
     dst_file_split[-5] = f"round_{least_round}"
     ref_path = '/'.join(dst_file_split)
     ref_df = pd.read_csv(ref_path)
-    ref_cycles = np.array(ref_df["cycle"], dtype=np.int32) - cost_cycle
-    ref_nanosecs = np.array(ref_df["nanosec"], dtype=np.int32) - cost_nanosec
-    res_cycles = np.array(res_df['cycle'], dtype=np.int32) - cost_cycle
-    res_nanosecs = np.array(res_df['nanosec'], dtype=np.int32) - cost_nanosec
+    ref_cycles = np.array(ref_df["cycle"], dtype=np.int64) - cost_cycle
+    ref_nanosecs = np.array(ref_df["nanosec"], dtype=np.int64) - cost_nanosec
+    res_cycles = np.array(res_df['cycle'], dtype=np.int64) - cost_cycle
+    res_nanosecs = np.array(res_df['nanosec'], dtype=np.int64) - cost_nanosec
     _, p_cycle = stats.mannwhitneyu(ref_cycles, res_cycles, alternative='two-sided')
     _, p_nanosec = stats.mannwhitneyu(ref_nanosecs, res_nanosecs, alternative='two-sided')
     with open("tmp_var_resolution.txt", 'w') as fp:
