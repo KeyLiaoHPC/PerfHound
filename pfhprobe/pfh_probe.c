@@ -287,16 +287,8 @@ pfh_init(char *path) {
 
     /* Initializing run directory tree */
     printf("*** [Pfh-Probe] Creating data directory tree. \n");
-    pfh_io_mkname(root);
-    err = pfh_io_mkdir(root);
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-    printf("*** [Pfh-Probe] Data directory: %s\n", root);
     fflush(stdout);
-    err = pfh_io_mkfile();
+    err = pfh_io_mkdir(root);
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
         fflush(stdout);
@@ -382,7 +374,7 @@ pfh_finalize() {
         printf("*** [Pfh-Probe] Exit %d, failed at writing run info. \n", err);
         fflush(stdout);
     }
-    
+
     printf("*** [Pfh-Probe] Pfh-Probe Exited. \n");
     _pfh_fini_ts;
 }
