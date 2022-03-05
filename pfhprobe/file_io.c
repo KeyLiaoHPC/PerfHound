@@ -87,6 +87,7 @@ pfh_io_mkdir(char *path){
         if (*p == '/') {
             // Jump the first '/' which is root directory.
             *p = '\0';
+            printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
             err = mkdir(tmp_path, S_IRWXU);
             if (err) {
                 if(errno != EEXIST) {
@@ -99,6 +100,7 @@ pfh_io_mkdir(char *path){
         }
     }
 
+    printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
     if (mkdir(tmp_path, S_IRWXU) != 0){
         if(errno != EEXIST) {
             printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);

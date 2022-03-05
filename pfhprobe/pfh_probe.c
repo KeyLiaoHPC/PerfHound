@@ -58,6 +58,7 @@ rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
 int pfh_nev;
 
+extern int pfh_io_mkdir(char *path);
 extern int pfh_io_mkname(char *root);
 extern int pfh_io_mkfile();
 extern int pfh_io_mkhost();
@@ -287,7 +288,6 @@ pfh_init(char *path) {
 
     /* Initializing run directory tree */
     printf("*** [Pfh-Probe] Creating data directory tree. \n");
-    pfh_io_mkname(root);
     err = pfh_io_mkdir(root);
     if (err) {
         printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
@@ -296,15 +296,7 @@ pfh_init(char *path) {
     }
     printf("*** [Pfh-Probe] Data directory: %s\n", root);
     fflush(stdout);
-    err = pfh_io_mkfile();
-    if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
-        fflush(stdout);
-        exit(1);
-    }
-    printf("*** [Pfh-Probe] Data directory: %s\n", root);
-    fflush(stdout);
-
+    
     pfh_io_mkname(root);
     err = pfh_io_mkfile();
     if (err) {
