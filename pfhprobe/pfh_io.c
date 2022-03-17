@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "pfhprobe_core.h"
+#include "pfh_core.h"
 
 /* Variables for files and information */
 typedef struct {

@@ -16,7 +16,7 @@
 #endif
 
 #ifdef PERFHOUND
-#include <pfhprobe.h>
+#include <perfhound.h>
 #endif
 
 // The number of tests(random number).

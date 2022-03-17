@@ -14,7 +14,7 @@
 #endif
 
 #ifdef PERFHOUND
-#include <pfhprobe.h>
+#include <perfhound.h>
 #endif
 
 #ifndef NINS

@@ -11,7 +11,7 @@
 
 
 #ifdef PFH
-#include "pfhprobe.h"
+#include "perfhound.h"
 #endif
 
 #ifdef PAPI

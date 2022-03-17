@@ -13,7 +13,7 @@
 #include <errno.h>
 #include <mpi.h>
 
-#include "pfhprobe_core.h"
+#include "pfh_core.h"
 #include "pfh_mpi.h"
 
 

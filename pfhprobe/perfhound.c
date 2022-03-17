@@ -47,8 +47,8 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include "pfhprobe.h"
-#include "pfhprobe_core.h"
+#include "perfhound.h"
+#include "pfh_core.h"
 
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
 static uint32_t pfh_irec;            // Index for counter readings.

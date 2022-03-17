@@ -43,7 +43,7 @@
 #include <sched.h>
 #include <math.h>
 #include <mpi.h>
-#include "pfhprobe_core.h"
+#include "pfh_core.h"
 
 extern int pfh_io_mkhost();
 extern int pfh_io_wtrankmap();
