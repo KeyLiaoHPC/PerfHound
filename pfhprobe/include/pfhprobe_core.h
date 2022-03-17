@@ -23,16 +23,7 @@
  * Email: keyliaohpc@gmail.com
  * =================================================================================
  */
-//==================================================================================
 
-/* Comment Syntax */
-/*
- * Long block document.
- */
-/* Beginning remark for functioning block/procedure. */
-// Short comment for variables, short explanation.
-
-//==================================================================================
 
 #ifndef __VARAPI_CORE_H__
 #define __VARAPI_CORE_H__

@@ -139,118 +139,60 @@ pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
     return 0;
 }
 
-
-/* Get and record an event reading without boundary check. */
+/**
+ * @brief Reading counter.
+ * @param grp_id 
+ * @param p_id 
+ * @param uval 
+ */
 void
-pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
-    // uint64_t r1 = 0, r2 = 0, r3 = 0;
+pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
 
-    // _pfh_reg_save;
 
+    /* Reading timestamp, tag ids and the user defined value. */
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
     _pfh_read_cy (pfh_precs[pfh_irec].cy);
     _pfh_read_ns (pfh_precs[pfh_irec].ns);
     pfh_precs[pfh_irec].uval = uval;
-    
-    // _pfh_reg_restore;
 
-    /* Read system event */
-    switch (pfh_nev){
-        case 0:
-            break;
-        case 1: 
-            _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
-            break;
-        case 2: 
-            _pfh_read_pm_2 (pfh_precs[pfh_irec].ev);
-            break;
-        case 3: 
-            _pfh_read_pm_3 (pfh_precs[pfh_irec].ev);
-            break;
-        case 4: 
-            _pfh_read_pm_4 (pfh_precs[pfh_irec].ev);
-            break;
-        case 5: 
-            _pfh_read_pm_5 (pfh_precs[pfh_irec].ev);
-            break;
-        case 6: 
-            _pfh_read_pm_6 (pfh_precs[pfh_irec].ev);
-            break;
-        case 7: 
-            _pfh_read_pm_7 (pfh_precs[pfh_irec].ev);
-            break;
-        case 8: 
-            _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
-            break;
-        case 9: 
-            _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
-            break;
-        case 10: 
-            _pfh_read_pm_10 (pfh_precs[pfh_irec].ev);
-            break;
-        case 11: 
-            _pfh_read_pm_11 (pfh_precs[pfh_irec].ev);
-            break;
-        case 12: 
-            _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
-            break;
-        default:
-            break;
-    }
+    /* Reading PMU */
+#ifdef PFH_MODE_EV
+    // EV Mode: Reading 4 event counters after the timestamp.
+    _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
+
+#elif PFH_MODE_EVX
+    // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
+    _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
+
+#endif // END: #ifdef PFH_RMODE_EV
+
 #ifdef USE_PAPI
     pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
 #endif
 
     pfh_irec ++;
-       
-}
 
-void
-pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec+1 >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-            pfh_pinfo.rank, pfh_irec);
-        fflush(stdout);
+    if (pfh_irec+1-buf_nrec == 0) {
+        // printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+            // pfh_pinfo.rank, pfh_irec);
+        // fflush(stdout);
         pfh_dump();
-        pfh_irec = 0;
-        pfh_fastread(grp_id, p_id, uval);
-    } else {
-        pfh_fastread(grp_id, p_id, uval);
-        if (pfh_irec+1 >= buf_nrec) {
-            printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-                pfh_pinfo.rank, pfh_irec);
-            fflush(stdout);
-            pfh_dump();
-        }
     }
 }
 
 
 /**
- * Dumping collected records if the number has larger than nrec. 
- * Force dumping if nrec is set to 0. 
- * The function returns directly if pfh_irec == 0.
+ * 
+ * @brief  Dumping collected records if the number has larger than nrec. 
+ * Force dumping if nrec is set to 0. The function returns directly if pfh_irec == 0.
  */
 void
 pfh_dump() {
-
-    if (pfh_irec == 0) {
-        // Return without timing.
-        return;
-    }
-
-    if (pfh_irec == buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
-        pfh_pinfo.rank, pfh_irec);
-        fflush(stdout);
-        pfh_irec --; // Step back for recording writing time.
-    }
-
-    pfh_fastread(0, 3, 0);
+    pfh_read(0, 3, pfh_irec+1);  // Recording writing overhead.
     pfh_io_wtrec(pfh_irec);
     pfh_irec = 0;
-    pfh_fastread(0, 4, 0);
+    pfh_read(0, 4, 0);
     
     return;
 }
@@ -354,7 +296,10 @@ pfh_init(char *path) {
     return 0;
 }
 
-/* Exiting varapi */
+/**
+ * @brief Exit PerfHound. Reading final record, then dumping the buffer.
+ * @param
+ */
 void
 pfh_finalize() {
     int err;
