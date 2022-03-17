@@ -14,13 +14,6 @@
  * You should have received a copy of the GNU General Public License along with 
  * this program. If not, see https://www.gnu.org/licenses/.
  * 
- * =================================================================================
- * perfhound.h
- * Description: API for PFH-Probe
- * Author: Key Liao
- * Modified: Jul. 28th, 2021
- * Email: keyliao@sjtu.edu.cn
- * =================================================================================
  */
 
 #include <stdint.h>
@@ -66,8 +59,6 @@ int pfh_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
 
 /**
  * Write collected data to csv files.
- * @param bufsize	uint64. The buffer size in Bytes. Write when the size of data
- * 			fills the buffer. Force write when bufsize=0.
  */
 void pfh_dump();
 

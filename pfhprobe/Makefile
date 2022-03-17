@@ -6,39 +6,48 @@ include make.config
 
 # === Compiling settings, DO NOT TOUCH ===
 CFLAGS = -O2 -fno-builtin -Wall -fPIC
+CFLAGS += -DPFH_OPT_$(PFH_API) -DPFH_OPT_$(PFH_EVMODE)
+CFLAGS += -DPFH_OPT_BUFSIZE=$(PFH_BUFSIZE)
+CFLAGS += -I./include 
 
-CFLAGS += -I$(PFHPROBE)/include -I$(MPI)/include
+ifeq ($(PFH_PARMODE),MPI)
+	CFLAGS += -DPFH_OPT_MPI
+endif
+
+ifeq ($(PFH_DEBUG),YES)
+	CFLAGS += -DPFH_DEBUG
+endif
+
+
 LDFLAGS =  -fPIC
-MPILDFLAGS = -L$(MPI)/lib -lmpi
+
+ifeq ($(ARCH),x86_64)
+	LDFLAGS += -lmpi
+endif
+
 ARCH := $(shell uname -p)
 ifeq ($(ARCH),x86_64)
     CFLAGS += -I$(LIBPFC)/include 
     LDFLAGS += -L$(LIBPFC)/lib64 -lpfc
 endif
 
-PAPI_ROOT=$(PAPI)
-PAPI_INC=-I$(PAPI_ROOT)/include
-PAPI_LIB=-L$(PAPI_ROOT)/lib -lpapi
+ifeq ($(PFH_API),PAPI)
+	PAPI_ROOT=$(PAPI)
+	CFLAGS += -I$(PAPI_ROOT)/include
+	LD_FLAGS += -L$(PAPI_ROOT)/lib -lpapi
+endif
 
 
-#CFLAGS += -DUSE_MPI
-CFLAGS += -fPIC
-# Installing path
-PREFIX ?= .
-BUF ?= 4
-PFHFLAGS=-DPFH_RECBUF_KIB=$(BUF)
-
+# === TARGETS ===
 .PHONY: all install clean
 
 all: libperfhound.so
 
-
-libperfhound.so: perfhound.c file_io.c 
-	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o perfhound.o -c perfhound.c
-	$(CC) $(CFLAGS) -DPFH_MODE_TS $(PFHFLAGS) $(LDFLAGS) -o pfh_io.o -c pfh_io.c
+libperfhound.so: perfhound.c pfh_io.c 
+	$(CC) $(CFLAGS)  $(LDFLAGS) -o perfhound.o -c perfhound.c
+	$(CC) $(CFLAGS)  $(LDFLAGS) -o pfh_io.o -c pfh_io.c
 	$(CC) $(LDFLAGS) -DPFH_MODE_TS -shared -o $@ pfh_probe.o pfh_io.o 
 	rm *.o
-
 
 install:
 	mkdir -p ${PREFIX}/lib
@@ -48,7 +57,6 @@ install:
 	cp ./include/pfhprobe.h ./include/pfh_mpi.h ${PREFIX}/include
 	rm *.o
 	@echo Pfh-Probe has been installed in ${PREFIX}
-
 
 clean:
 	rm -rf *.o *.x *.so
