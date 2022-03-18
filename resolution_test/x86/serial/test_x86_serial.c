@@ -40,8 +40,6 @@
 #define NMEASURE 10000
 #endif
 
-
-
 #define _M2S(x) #x
 #define M2S(x) _M2S(x)
 #define _STRCAT(x, y) x##y
@@ -66,13 +64,13 @@
 #define DEP_ST "mov %%r10, (%%rsp) \n\t" \
                "mov %%r10, (%%rsp) \n\t" 
 
-void flush_cache(double* arr, double scalar) {
-    for (int i = 1; i < ARRLEN; ++i) {
-        arr[i] = arr[i - 1] * scalar + arr[i];
+void flush_cache(double* arr1, double scalar) {
+    for (int i = 1; i < ARRLEN; i += 8) {
+        arr1[i] = arr1[i - 1] * scalar + arr1[i];
     }
 }
 
-void one_round_test(double* arr, double scalar) {
+void one_round_test(double* arr1, double scalar) {
     int idx = 0, measure_counter = 0;
 
     // register initialization
@@ -93,7 +91,7 @@ void one_round_test(double* arr, double scalar) {
 
     while ((measure_counter++) < NMEASURE) {
         pfh_read(1, 1, 0);
-#pragma GCC unroll 10240
+#pragma GCC unroll 65534
         for (int i = 0; i < ROUND; ++i) {
             asm volatile (
                 KERNEL(KNAME)
@@ -103,7 +101,7 @@ void one_round_test(double* arr, double scalar) {
             );
         }
         pfh_read(1, 2, 0);
-        flush_cache(arr, scalar);
+        flush_cache(arr1, scalar);
     }
 }
 
@@ -113,9 +111,9 @@ int main(int argc, char** argv) {
     char* mode = M2S(MODE);
 
 #ifdef PAPI
-    sprintf(dirname, "./data/papi/%s_%s_test_6248_20220222/round_%d", mode, op, ROUND);
+    sprintf(dirname, "./data/papi/arrlen_%d/%s_%s_test_6248_20220222/round_%d", ARRLEN, mode, op, ROUND);
 #else
-    sprintf(dirname, "./data/pfhd/%s_%s_test_6248_20220222/round_%d", mode, op, ROUND);
+    sprintf(dirname, "./data/pfhd/arrlen_%d/%s_%s_test_6248_20220222/round_%d", ARRLEN, mode, op, ROUND);
 #endif
 
     // create directory
@@ -139,17 +137,19 @@ int main(int argc, char** argv) {
     pfh_commit();
 
     // initial array
+    double scalar;
     struct timespec tv;
-    double scalar, arr[ARRLEN];
     clock_gettime(CLOCK_MONOTONIC, &tv);
+    double* arr1 = (double*) malloc(ARRLEN * sizeof(double));
     // srand(0);
     srand(tv.tv_nsec);
+    scalar = ((rand() * 1.0) / RAND_MAX);
     for (int i = 0; i < ARRLEN; ++i) {
-        arr[i] = ((rand() * 1.0) / RAND_MAX);
+        arr1[i] = ((rand() * 1.0) / RAND_MAX);
     }
-    flush_cache(arr, scalar);
+    flush_cache(arr1, scalar);
 
-    one_round_test(arr, scalar);
+    one_round_test(arr1, scalar);
     /*asm volatile (
         "mov %%r11, %0 \n\t"
         : "=r"(res)
@@ -158,6 +158,7 @@ int main(int argc, char** argv) {
     );
     printf("%d\n", res);*/
 
+    free(arr1);
     pfh_finalize();
     return 0;
 }

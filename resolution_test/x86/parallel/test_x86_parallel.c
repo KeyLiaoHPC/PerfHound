@@ -16,19 +16,9 @@
 #include <papi.h>
 #endif
 
-// used for flush cache
-#ifndef ARRLEN
-#define ARRLEN 20000000
-#endif
-
-// number of test block
-#ifndef ROUND
-#define ROUND 0
-#endif
-
-// number of repeat run
-#ifndef NMEASURE
-#define NMEASURE 10000
+// PerfHound mode
+#ifndef MODE
+#define MODE TS
 #endif
 
 // name of test kernel, default is ADD
@@ -36,9 +26,19 @@
 #define KNAME ADD
 #endif
 
-// PerfHound mode
-#ifndef MODE
-#define MODE TS
+// number of test block
+#ifndef ROUND
+#define ROUND 0
+#endif
+
+// used for flush cache
+#ifndef ARRLEN
+#define ARRLEN 720896
+#endif
+
+// number of repeat run
+#ifndef NMEASURE
+#define NMEASURE 10000
 #endif
 
 #define _M2S(x) #x
@@ -65,9 +65,9 @@
 #define DEP_ST "mov %%r10, (%%rsp) \n\t" \
                "mov %%r10, (%%rsp) \n\t" 
 
-void flush_cache(double* arr, double scalar) {
-    for (int i = 1; i < ARRLEN; ++i) {
-        arr[i] = arr[i - 1] * scalar + arr[i];
+void flush_cache(double* arr1,  double* arr2, double* arr3, double scalar) {
+    for (int i = 0; i < ARRLEN; ++i) {
+        arr1[i] = arr2[i] * scalar + arr3[i];
     }
 }
 
@@ -102,7 +102,7 @@ void one_round_test(double* arr, double scalar) {
             );
         }
         pfhmpi_read(1, 2, 0);
-        flush_cache(arr, scalar);
+        flush_cache(arr1, arr2, arr3, scalar);
     }
 }
 
@@ -142,18 +142,21 @@ int main(int argc, char** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     // initial array
     struct timespec tv;
-    double scalar, arr[ARRLEN];
+    double scalar, arr1[ARRLEN], arr2[ARRLEN], arr3[ARRLEN];
     clock_gettime(CLOCK_MONOTONIC, &tv);
     // srand(0);
     srand(tv.tv_nsec);
+    scalar = ((rand() * 1.0) / RAND_MAX);
     for (int i = 0; i < ARRLEN; ++i) {
-        arr[i] = ((rand() * 1.0) / RAND_MAX);
+        arr1[i] = ((rand() * 1.0) / RAND_MAX);
+        arr2[i] = ((rand() * 1.0) / RAND_MAX);
+        arr3[i] = ((rand() * 1.0) / RAND_MAX);
     }
-    flush_cache(arr, scalar);
+    flush_cache(arr1, arr2, arr3, scalar);
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    one_round_test(arr, scalar);
+    one_round_test(arr1, arr2, arr3, scalar);
     /*asm volatile (
         "mov %%r11, %0 \n\t"
         : "=r"(res)
