@@ -332,7 +332,7 @@ pfhmpi_init(char *path) {
 
     /* Init data space. */
 
-    buf_nbyte = PFH_RECBUF_KIB * 1024;
+    buf_nbyte = PFH_OPT_BUFSIZE * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
     pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
     if (pfh_precs == NULL) {
@@ -341,7 +341,7 @@ pfhmpi_init(char *path) {
         exit(1);
     }
     if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
+        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_OPT_BUFSIZE, buf_nrec);
         fflush(stdout);
     }
 

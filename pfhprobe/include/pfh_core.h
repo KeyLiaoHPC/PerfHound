@@ -46,10 +46,9 @@
 #define _SYNC_NS_OFFSET 1e4     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
-#ifndef PFH_RECBUF_KIB 
-#define PFH_RECBUF_KIB  2048      // 4 KiB
+#ifndef PFH_OPT_BUFSIZE 
+#define PFH_OPT_BUFSIZE  2048      // 4 KiB
 #endif
-#define PFH_BUF_NMARGIN 4
 
 #define ALIGN           64
 
@@ -57,17 +56,13 @@
 
 
 /**
- * Define collecting mode for PFH-Probe
- * PFH_MODE_TS: Timestamp mode. (Default)
- * PFH_MODE_EV: Up to 4 Events.
- * PFH_MODE_EVX: Up to 12 Events.
+ * Define record size for PerfHound.
+ * PFH_OPT_TS: 32Bytes. Timestamp mode. (Default)
+ * PFH_OPT_EV: 64Bytes. Up to 4 Events.
+ * PFH_OPT_EVX: 128Bytes. Up to 12 Events.
  */
 
-/* Import performance monitor header after setting mode. */
-
-
-
-#ifdef PFH_MODE_EVX
+#ifdef PFH_OPT_EVX
 
 #ifdef __x86_64__
 static int pfh_nev_max = 8;
@@ -79,7 +74,7 @@ static int pfh_nev_max = 12;
 static int pfh_nev_max = 4;
 #endif
 
-#ifdef PFH_MODE_EVX
+#ifdef PFH_OPT_EVX
 #define _N_EVARR 12
 #else
 #define _N_EVARR 4

@@ -147,8 +147,6 @@ pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
  */
 void
 pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
-
-
     /* Reading timestamp, tag ids and the user defined value. */
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
@@ -157,14 +155,13 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     pfh_precs[pfh_irec].uval = uval;
 
     /* Reading PMU */
-#ifdef PFH_MODE_EV
+#ifdef PFH_OPT_EV
     // EV Mode: Reading 4 event counters after the timestamp.
     _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
 
-#elif PFH_MODE_EVX
+#elif PFH_OPT_EVX
     // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
     _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
-
 #endif // END: #ifdef PFH_RMODE_EV
 
 #ifdef USE_PAPI
@@ -255,7 +252,7 @@ pfh_init(char *path) {
         exit(1);
     }
 
-    buf_nbyte = PFH_RECBUF_KIB * 1024;
+    buf_nbyte = PFH_OPT_BUFSIZE * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
     pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
     if (pfh_precs == NULL) {
@@ -263,7 +260,7 @@ pfh_init(char *path) {
         fflush(stdout);
         exit(1);
     }
-    printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_RECBUF_KIB, buf_nrec);
+    printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_OPT_BUFSIZE, buf_nrec);
     fflush(stdout);
 
     /* Set all event codes to 0. */
