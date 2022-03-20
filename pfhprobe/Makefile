@@ -46,7 +46,7 @@ all: libperfhound.so
 libperfhound.so: perfhound.c pfh_io.c 
 	$(CC) $(CFLAGS)  $(LDFLAGS) -o perfhound.o -c perfhound.c
 	$(CC) $(CFLAGS)  $(LDFLAGS) -o pfh_io.o -c pfh_io.c
-	$(CC) $(LDFLAGS) -DPFH_OPT_TS -shared -o $@ pfh_probe.o pfh_io.o 
+	$(CC) $(LDFLAGS) -DPFH_OPT_TS -shared -o $@ perfhound.o pfh_io.o 
 	rm *.o
 
 install:
