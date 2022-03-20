@@ -75,9 +75,9 @@ static int pfh_nev_max = 4;
 #endif
 
 #ifdef PFH_OPT_EVX
-#define _N_EVARR 12
+#define PFH_NEV 12
 #else
-#define _N_EVARR 4
+#define PFH_NEV 4
 #endif
 
 /* Pfh-Probe record data type */
@@ -85,10 +85,10 @@ typedef struct __attribute__((packed)){
     uint32_t ctag[2];
     int64_t cy, ns;    
     double uval;        // 32 Bytes
-#ifdef USE_PAPI
-    int64_t ev[_N_EVARR];
+#ifdef PFH_OPT_PAPI
+    int64_t ev[PFH_NEV];
 #else
-    uint64_t ev[_N_EVARR];
+    uint64_t ev[PFH_NEV];
 #endif
 } rec_t;
 
@@ -114,10 +114,10 @@ extern rec_t *pfh_precs; // raw data.
 extern proc_t pfh_pinfo;
 extern int pfh_nev;
 
-#ifdef USE_PAPI
+#ifdef PFH_OPT_PAPI
 #include "pfh_pm_papi.h"
 
-static int pfh_evcodes[12];
+static int pfh_evcodes[PFH_NEV];
 
 #else
 #ifdef __x86_64__
@@ -131,8 +131,8 @@ static int pfh_evcodes[12];
 #endif // END: #ifdef __x86_64__
 
 
-static uint64_t pfh_evcodes[12];
-#endif // END: #ifdef USE_PAPI
+static uint64_t pfh_evcodes[PFH_NEV];
+#endif // END: #ifdef PFH_OPT_PAPI
 
 
 #endif // END: #ifndef __VARAPI_CORE_H__

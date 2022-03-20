@@ -198,7 +198,7 @@ pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
             break;
     }
 
-#ifdef USE_PAPI
+#ifdef PFH_OPT_PAPI
     pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
 #endif
 

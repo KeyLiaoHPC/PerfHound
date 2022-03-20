@@ -431,7 +431,7 @@ pfh_io_wtrec(int nrec) {
     if (p_recfile == NULL) {
         return 1;
     }
-#ifdef USE_PAPI
+#ifdef PFH_OPT_PAPI
 
     for (int i = 0; i < nrec; i ++) {
         fprintf(p_recfile, "%u,%u,%lld,%lld,%f", 

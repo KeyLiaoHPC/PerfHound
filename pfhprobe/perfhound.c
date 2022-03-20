@@ -120,7 +120,7 @@ pfh_commit() {
     }
     pfh_ready = 1;
     pfh_irec = 0;
-    pfh_fastread(0, 1, 0);
+    pfh_read(0, 1, 0);
     return;
 }
 
@@ -147,14 +147,16 @@ pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
  */
 void
 pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    /* Reading timestamp, tag ids and the user defined value. */
+    // Get tag
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
+    // Get timestamp
     _pfh_read_cy (pfh_precs[pfh_irec].cy);
     _pfh_read_ns (pfh_precs[pfh_irec].ns);
+    // Get user-defined FP64 value. 
     pfh_precs[pfh_irec].uval = uval;
 
-    /* Reading PMU */
+    // Get PMU
 #ifdef PFH_OPT_EV
     // EV Mode: Reading 4 event counters after the timestamp.
     _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
@@ -164,18 +166,17 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
 #endif // END: #ifdef PFH_RMODE_EV
 
-#ifdef USE_PAPI
-    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
-#endif
-
+    // Index up.
     pfh_irec ++;
 
+    // Check buffer.
+    // Only jump to pfh_dump() when the buffer have 1 empty slot
+    // for preventing infinite recursion in pfh_read()
     if (pfh_irec+1-buf_nrec == 0) {
-        // printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-            // pfh_pinfo.rank, pfh_irec);
-        // fflush(stdout);
         pfh_dump();
     }
+
+    return;
 }
 
 
@@ -264,7 +265,7 @@ pfh_init(char *path) {
     fflush(stdout);
 
     /* Set all event codes to 0. */
-    for (int i = 0; i < 12; i ++) {
+    for (int i = 0; i < pfh_nev_max; i ++) {
         pfh_evcodes[i] = 0;
     }
 
@@ -272,9 +273,7 @@ pfh_init(char *path) {
     pfh_irec = 0;
     pfh_nev = 0;
     pfh_ready = 0;
-#ifdef __x86_64__
-    pfh_nev_max = pfh_nev_max > 8 ? 8 : pfh_nev_max;
-#endif
+
     _pfh_init_ts;
     _pfh_init_cy;
     printf("*** [Pfh-Probe] Timer has been set. \n");
@@ -283,12 +282,11 @@ pfh_init(char *path) {
     pfh_io_wtrankmap();
 
     pfh_set_tag(0, 0, "PFHGroup");
-    pfh_set_tag(0, 1, "PFH Start");
-    pfh_set_tag(0, 2, "PFH End");
-    pfh_set_tag(0, 3, "PFH Wt Start");
-    pfh_set_tag(0, 4, "PFH Wt End");
+    pfh_set_tag(0, 1, "PFH_S_main");
+    pfh_set_tag(0, 2, "PFH_E_main");
+    pfh_set_tag(0, 3, "PFH_S_pfh_dump");
+    pfh_set_tag(0, 4, "PFH_S_pfh_dump");
     printf("*** [Pfh-Probe] Directory tree initialized. \n");
-
 
     return 0;
 }

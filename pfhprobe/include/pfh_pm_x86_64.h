@@ -113,17 +113,17 @@
 #else
 #define _pfh_read_ns(_ns)                               \
     do {                                                \
-        register uint64_t cy;                           \
+        register uint64_t ns;                           \
         asm volatile(                                   \
             "\n\tRDTSCP"                                \
             "\n\tshl $32, %%rdx"                        \
             "\n\tor  %%rax, %%rdx"                      \
             "\n\tmov %%rdx, %0"                         \
             "\n\t"                                      \
-            :"=r" (cy)                                  \
+            :"=r" (ns)                                  \
             :                                           \
             : "memory", "%rax", "%rdx");                \
-        _ns = cy;                                       \
+        _ns = ns;                                       \
     } while(0);
 
 #endif
@@ -251,3 +251,6 @@
 #define _pfh_read_pm_10(arr)
 #define _pfh_read_pm_11(arr)
 #define _pfh_read_pm_12(arr)
+
+#define _pfh_read_pm_ev(_val_arr)   _pfh_read_pm_4(_val_arr);
+#define _pfh_read_pm_evx(_val_arr)  _pfh_read_pm_8(_val_arr);
