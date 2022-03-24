@@ -54,8 +54,7 @@ install:
 	mkdir -p ${PREFIX}/include
 	mkdir -p ${PREFIX}/bin
 	cp ./*.so ${PREFIX}/lib
-	cp ./include/pfhprobe.h ./include/pfh_mpi.h ${PREFIX}/include
-	rm *.o
+	cp ./include/perfhound.h ${PREFIX}/include
 	@echo Pfh-Probe has been installed in ${PREFIX}
 
 clean:
