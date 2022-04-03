@@ -145,7 +145,6 @@ pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // uint64_t r1 = 0, r2 = 0, r3 = 0;
 
     // _pfh_reg_save;
-
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
     _pfh_read_cy (pfh_precs[pfh_irec].cy);

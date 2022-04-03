@@ -4,15 +4,16 @@
 mode=TS
 kernel=ADD
 bind_core=7
-tool=PERFHOUND
+tool=PAPI
 arrlen=720896
 measure_num=10000
 src_file=test_x86_serial.c
 output_dir=""
 timing_cost_file="cost.txt"
-resolution_file="resolution.txt"
 least_interval_file="interval.txt"
-resolution_continue_num=20
+cy_resolution_file="cycle_resolution.txt"
+ns_resolution_file="nanosec_resolution.txt"
+resolution_test_num=20
 
 cost_cycle=0
 cost_nanosec=0
@@ -35,7 +36,7 @@ function compile_and_run() {
     output_dir="./data/${backend}/arrlen_${arrlen}/${mode}_${kernel}_test_6248_20220222/round_${round}/run_1"
     if [ ! -d ${output_dir} ]; then
         exe=./${tool}_${mode}_${kernel}_${round}.x
-        flags="-O2 -std=gnu99 -D$tool -DMODE=$mode -DKNAME=$kernel -DROUND=$round -DARRLEN=$arrlen -DNMEASURE=$measure_num"
+        flags="-O3 -std=gnu99 -D$tool -DMODE=$mode -DKNAME=$kernel -DROUND=$round -DARRLEN=$arrlen -DNMEASURE=$measure_num"
         echo "tool=${tool}, mode=${mode}, kernel=${kernel}, round=${round}, arrlen=${arrlen}"
         gcc ${flags} -o $exe $src_file $link_lib
         taskset -c ${bind_core} ${exe}
@@ -51,11 +52,25 @@ function timing_cost_test() {
     cost_nanosec=`sed -n '2p' ${timing_cost_file}`
 }
 
+function interval_check() {
+    target_round=${1}
+    for j in `seq 0 9`
+    do
+        rm -rf ${output_dir}
+        compile_and_run $target_round
+        python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f least_interval -a ${target_round},${timing_cost_file},${least_interval_file}
+        passed=`cat ${least_interval_file}`
+        if [[ ${passed} == "no" ]]; then
+            break
+        fi
+    done
+}
+
 function least_interval_test() {
     i=0
     end=0
     start=0
-    test_step=1000
+    test_step=10000
     while [[ ${test_step} -gt 0 ]]
     do
         passed="no"
@@ -68,7 +83,14 @@ function least_interval_test() {
             if [[ ${passed} == "no" ]]; then
                 let start=i
             else
-                let end=i
+                interval_check $i
+                check_passed=`cat ${least_interval_file}`
+                if [[ ${check_passed} == "no" ]]; then
+                    passed="no"
+                    let start=i
+                else
+                    let end=i
+                fi
             fi
         done
         let i=start
@@ -84,18 +106,19 @@ function variation_resolution() {
     left=0
     right=0
     test_step=100
+    resolution_file=$1
     while [[ ${test_step} -gt 0 ]]
     do
         passed="no"
         while [[ ${passed} == "no" ]]
         do
             let k=k+test_step
-            let end_round=least_round+k*resolution_continue_num
+            let end_round=least_round+k*resolution_test_num
             for i in `seq ${least_round} ${k} ${end_round}`
             do
                 compile_and_run $i
             done
-            python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f variation_resolution -a ${resolution_continue_num},${timing_cost_file},${least_interval_file},${resolution_file}
+            python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f variation_resolution -a ${k},${least_round},${timing_cost_file},${resolution_file}
             passed=`cat ${resolution_file}`
             if [[ ${passed} == "no" ]]; then
                 let left=k
@@ -106,8 +129,6 @@ function variation_resolution() {
         let k=left
         let test_step=test_step/10
     done
-    dcycle=`sed -n '2p' ${resolution_file}`
-    dnanosec=`sed -n '3p' ${resolution_file}`
 }
 
 # step-0: fix the frequency
@@ -117,7 +138,10 @@ timing_cost_test
 # step-2: least measurable interval
 least_interval_test
 # step-3: variation resolution
-variation_resolution
+variation_resolution ${cy_resolution_file}
+variation_resolution ${ns_resolution_file}
+dcycle=`sed -n '2p' ${cy_resolution_file}`
+dnanosec=`sed -n '2p' ${ns_resolution_file}`
 # output result
 echo "cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
 echo "least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"

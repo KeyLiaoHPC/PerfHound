@@ -28,3 +28,5 @@ lib/
 *.btr
 rsync.sh
 test.sh
+parallel
+serial-no-continue

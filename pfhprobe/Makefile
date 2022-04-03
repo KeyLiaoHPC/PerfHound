@@ -17,12 +17,11 @@ PAPI_ROOT=$(PAPI)
 PAPI_INC=-I$(PAPI_ROOT)/include
 PAPI_LIB=-L$(PAPI_ROOT)/lib -lpapi
 
-
 #CFLAGS += -DUSE_MPI
 CFLAGS += -fPIC
 # Installing path
-PREFIX ?= .
-BUF ?= 4
+PREFIX = /mnt/nvme/hpczsc/software/PerfHound/build
+BUF = 4096
 PFHFLAGS=-DPFH_RECBUF_KIB=$(BUF)
 
 .PHONY: all install clean

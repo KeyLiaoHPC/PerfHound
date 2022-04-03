@@ -91,7 +91,7 @@ void one_round_test(double* arr1, double scalar) {
 
     while ((measure_counter++) < NMEASURE) {
         pfh_read(1, 1, 0);
-#pragma GCC unroll 65534
+#pragma GCC unroll 1024
         for (int i = 0; i < ROUND; ++i) {
             asm volatile (
                 KERNEL(KNAME)

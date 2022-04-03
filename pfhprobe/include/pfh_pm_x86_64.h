@@ -97,7 +97,7 @@
             _pfc_read(0x40000001)                       \
             : "=r"(cy)                                  \
             :                                           \
-            : "memory", "rax", "rcx", "rdx"             \
+            : "memory", "%rax", "%rbx", "%rcx", "%rdx"  \
         );                                              \
         _cy = cy;                                       \
     } while(0)
@@ -122,7 +122,7 @@
             "\n\t"                                      \
             :"=r" (cy)                                  \
             :                                           \
-            : "memory", "%rax", "%rdx");                \
+            : "memory", "%rax", "%rbx", "%rcx", "%rdx");\
         _ns = cy;                                       \
     } while(0);
 
