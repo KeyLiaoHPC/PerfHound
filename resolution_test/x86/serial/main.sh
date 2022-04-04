@@ -4,7 +4,7 @@
 mode=TS
 kernel=ADD
 bind_core=7
-tool=PAPI
+tool=PERFHOUND
 arrlen=720896
 measure_num=10000
 src_file=test_x86_serial.c
@@ -15,7 +15,7 @@ cost_measure_file="cost.txt"
 least_interval_file="interval.txt"
 cy_resolution_file="cycle_resolution.txt"
 ns_resolution_file="nanosec_resolution.txt"
-resolution_test_num=20
+resolution_test_num=30
 
 # variables to store result
 cost_cycle=0
@@ -62,7 +62,7 @@ function cost_measure_test() {
 
 function interval_check() {
     target_round=${1}
-    for j in `seq 2 11`
+    for j in `seq 2 21`
     do
         compile_and_run $target_round $j
         python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f least_interval -a ${target_round},${cost_measure_file},${least_interval_file}
@@ -150,6 +150,6 @@ variation_resolution ${ns_resolution_file}
 dcycle=`sed -n '2p' ${cy_resolution_file}`
 dnanosec=`sed -n '2p' ${ns_resolution_file}`
 # output result
-echo "cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
-echo "least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"
-echo "cycle and nanosec variation resolution: $dcycle $dnanosec"
+echo "[result-info] ${tool} cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
+echo "[result-info] ${tool} least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"
+echo "[result-info] ${tool} cycle and nanosec variation resolution: $dcycle $dnanosec"

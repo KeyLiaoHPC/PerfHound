@@ -76,7 +76,8 @@ def parse_option():
             options_dict["function"] = arg
         elif opt in ('-a', '--fargs'):
             options_dict["fargs"] = [x for x in arg.split(',') if x]
-    options_dict["output"] = f'{options_dict["input"]}/diff_{sgid}-{spid}_{egid}-{epid}'
+    options_dict["output_suffix"] = f'diff_{sgid}-{spid}_{egid}-{epid}'
+    options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
 
     # print(f'process data in {options_dict["input"]}')
     # print(f'backend use {options_dict["backend"]}')
@@ -134,23 +135,27 @@ def interval2csv(options_dict, rankmap_dict):
     rank_id = rankmap_dict["rank"]
     hostname = rankmap_dict["hostname"]
     src_file = f"{options_dict['input']}/{hostname}/r{rank_id}c{cpu_id}.csv"
+    # file path for the result data
     dst_file = f"{options_dict['output']}/{hostname}/r{rank_id}c{cpu_id}.csv"
-    host_prefix = hostname.split(".")[0]
-    # read the original data
-    src_df = pd.read_csv(src_file)
-    col_names = list(src_df.columns.values)
-    col_names.remove("gid")
-    col_names.remove("pid")
-    src_df_sp = src_df[(src_df["gid"] == sgid) & (src_df["pid"] == spid)][col_names]
-    src_df_ep = src_df[(src_df["gid"] == egid) & (src_df["pid"] == epid)][col_names]
-    src_df_sp.reset_index(inplace=True)
-    src_df_ep.reset_index(inplace=True)
-    # use the data of (end_gid, end_pid) to minus the data of (start_gid, start_pid)
-    res_df = (src_df_ep - src_df_sp)[col_names]
-    if options_dict["backend"] == "pfhd":
-        res_df["nanosec"] = res_df["nanosec"].apply(lambda x: int(x * 1000000 // constant_rates[host_prefix]))
-    # store the result data
-    res_df.to_csv(dst_file, index=False)
+    if os.path.exists(dst_file):
+        res_df = pd.read_csv(dst_file)
+    else:
+        host_prefix = hostname.split(".")[0]
+        # read the original data
+        src_df = pd.read_csv(src_file)
+        col_names = list(src_df.columns.values)
+        col_names.remove("gid")
+        col_names.remove("pid")
+        src_df_sp = src_df[(src_df["gid"] == sgid) & (src_df["pid"] == spid)][col_names]
+        src_df_ep = src_df[(src_df["gid"] == egid) & (src_df["pid"] == epid)][col_names]
+        src_df_sp.reset_index(inplace=True)
+        src_df_ep.reset_index(inplace=True)
+        # use the data of (end_gid, end_pid) to minus the data of (start_gid, start_pid)
+        res_df = (src_df_ep - src_df_sp)[col_names]
+        if options_dict["backend"] == "pfhd":
+            res_df["nanosec"] = res_df["nanosec"].apply(lambda x: int(x * 1000000 // constant_rates[host_prefix]))
+        # store the result data
+        res_df.to_csv(dst_file, index=False)
     return res_df
 
 
@@ -268,6 +273,33 @@ def rm_noise(org_df):
     return new_df
 
 
+def get_res_df_no_noise(options_dict):
+    ''' Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
+
+        Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
+        used to get the dataframe of result data without noise points
+
+        Args:
+            options_dict: the dict of parsed commandline options.
+
+        Returns:
+            new_res_df: the pandas.DataFrame of the result data without noise points
+    '''
+    rankmap_dict = parse_rankmap(options_dict)
+    res_df = interval2csv(options_dict, rankmap_dict)
+    cpu_id = rankmap_dict["cpu"]
+    rank_id = rankmap_dict["rank"]
+    hostname = rankmap_dict["hostname"]
+    # file path for the result data without noise points
+    clean_dst_file = f"{options_dict['output']}/{hostname}/clean_r{rank_id}c{cpu_id}.csv"
+    if not os.path.exists(clean_dst_file):
+        new_res_df = rm_noise(res_df)
+        new_res_df.to_csv(clean_dst_file, index=False)
+    else:
+        new_res_df = pd.read_csv(clean_dst_file)
+    return new_res_df
+
+
 def least_interval(options_dict):
     ''' The function to find the least measurable interval
 
@@ -290,7 +322,7 @@ def least_interval(options_dict):
         cost_cycle = int(lines[0].strip())
         cost_nanosec = int(lines[1].strip())
     # get the data after filtering out noise points
-    new_res_df = rm_noise(get_res_df(options_dict))
+    new_res_df = get_res_df_no_noise(options_dict)
     all_cycles = np.array(new_res_df['cycle'], dtype=np.int64) - cost_cycle
     all_nanosecs = np.array(new_res_df['nanosec'], dtype=np.int64) - cost_nanosec
     # theo_cycle = 2 * test_round * ins_lat["ADD"]
@@ -361,10 +393,10 @@ def variation_resolution(options_dict):
     ''' The function to get the resolution
 
         Given the least measurable round (r) and the delta round (k),
-        this function will process the data of round [r, r + k, r + 2k, ..., r + 20k],
+        this function will process the data of round [r, r + k, r + 2k, ..., r + 30k],
         and then check whether the data of round r + i * k and round r + (i + 1) * k is
-        distinguishable (i = 0, 1, 19). If this condition is satisfied, the result of
-        resolution will be written to the output file. The path of output file is
+        distinguishable (i = 0, 1, ..., 29). If this condition is satisfied, the result
+        of resolution will be written to the output file. The path of output file is
         specified by command line options.
 
         Args:
@@ -395,7 +427,8 @@ def variation_resolution(options_dict):
     for i in range(test_num + 1):
         input_split[-2] = f"round_{rounds[i]}"
         options_dict["input"] = '/'.join(input_split)
-        round_dfs.append(rm_noise(get_res_df(options_dict)))
+        options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
+        round_dfs.append(get_res_df_no_noise(options_dict))
     for i in range(test_num):
         round_1_df = round_dfs[i]
         round_2_df = round_dfs[i + 1]
