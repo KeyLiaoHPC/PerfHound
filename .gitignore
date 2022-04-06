@@ -7,12 +7,16 @@
 *.csv
 *.swp
 *.out
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
 .vscode
 ./*.sh
 .vscode/
 data/
 bin/
 lib/
+.idea/
 *.host
 *.ipynb
 *.html
