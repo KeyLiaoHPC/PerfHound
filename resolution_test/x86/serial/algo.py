@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import getopt
 import numpy as np
 import pandas as pd
@@ -101,8 +102,7 @@ def parse_rankmap(options_dict):
         Returns:
             rankmap_dict: A dict that contains the value of rank id, cpu id and hostname.
     '''
-    input_dir = options_dict["input"]
-    rankmap_path = f"{input_dir}/rankmap.csv"
+    rankmap_path = f"{options_dict['input']}/rankmap.csv"
     rankmap_df = pd.read_csv(rankmap_path)
     rankmap_dict = dict()
     for key in ["rank", "cpu", "hostname"]:
@@ -187,8 +187,8 @@ def cost_measure(options_dict):
     '''
     cost_res_file = options_dict["fargs"][0]
     res_df = get_res_df(options_dict)
-    cost_nanosec = res_df["nanosec"].min()
     cost_cycle = res_df["cycle"].min()
+    cost_nanosec = res_df["nanosec"].min()
     with open(cost_res_file, "w") as fp:
         fp.write(f"{cost_cycle}\n{cost_nanosec}\n")
 
@@ -214,6 +214,7 @@ def IsolationForest_filter(param, data):
         density = (data.shape[0] / (org_cycle_width * org_nanosec_width))
     else:
         labels = IsolationForest(random_state=42, contamination=param).fit_predict(data)
+        # label == 1 means the point is normal point
         target_idx = np.array([(label == 1) for label in labels])
         new_data = data[target_idx]
         cycle_width = np.max(new_data[:, 0]) - np.min(new_data[:, 0])
@@ -222,7 +223,7 @@ def IsolationForest_filter(param, data):
     return density
 
 
-def rm_noise(org_df):
+def rm_noise(org_df, multi_proc):
     ''' The function to remove the noise points in the original data
 
         Use ten-point search method (similar to a binary search) to search
@@ -239,6 +240,7 @@ def rm_noise(org_df):
 
         Args:
             org_df: the dataframe contains the orginal data.
+            multi_proc: use multiprocessing to accelerate or not
 
         Returns:
             new_df: the dataframe contains data after filtering out noise points.
@@ -248,14 +250,20 @@ def rm_noise(org_df):
     data_cycle = np.array(org_df["cycle"])
     data_nanosec = np.array(org_df["nanosec"])
     data = np.array([data_cycle, data_nanosec]).T
-    partial_func = partial(IsolationForest_filter, data=data)
-    # use multi process to accelerate
-    with multiprocessing.Pool(processes=ncpus) as pool:
-        # use ten-point search method to search the best parameters
+    if multi_proc:
+        partial_func = partial(IsolationForest_filter, data=data)
+        # use multi process to accelerate
+        with multiprocessing.Pool(processes=ncpus) as pool:
+            # use ten-point search method to search the best parameters
+            while factor <= 1000:
+                params = [(x / factor) + start for x in range(11)]
+                density_results = pool.map(partial_func, params)
+                start = params[np.argmax(np.diff(density_results))]
+                factor *= 10
+    else:
         while factor <= 1000:
-            filter_results = list()
             params = [(x / factor) + start for x in range(11)]
-            density_results = pool.map(partial_func, params)
+            density_results = [IsolationForest_filter(param, data) for param in params]
             start = params[np.argmax(np.diff(density_results))]
             factor *= 10
     best_param = (start + (10 / factor))
@@ -273,13 +281,14 @@ def rm_noise(org_df):
     return new_df
 
 
-def get_res_df_no_noise(options_dict):
+def get_res_df_no_noise(options_dict, multi_proc):
     ''' Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
 
         Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
         used to get the dataframe of result data without noise points
 
         Args:
+            multi_proc: use multiprocessing to accelerate `rm_noise` function or not.
             options_dict: the dict of parsed commandline options.
 
         Returns:
@@ -293,7 +302,7 @@ def get_res_df_no_noise(options_dict):
     # file path for the result data without noise points
     clean_dst_file = f"{options_dict['output']}/{hostname}/clean_r{rank_id}c{cpu_id}.csv"
     if not os.path.exists(clean_dst_file):
-        new_res_df = rm_noise(res_df)
+        new_res_df = rm_noise(res_df, multi_proc)
         new_res_df.to_csv(clean_dst_file, index=False)
     else:
         new_res_df = pd.read_csv(clean_dst_file)
@@ -322,11 +331,9 @@ def least_interval(options_dict):
         cost_cycle = int(lines[0].strip())
         cost_nanosec = int(lines[1].strip())
     # get the data after filtering out noise points
-    new_res_df = get_res_df_no_noise(options_dict)
+    new_res_df = get_res_df_no_noise(options_dict, True)
     all_cycles = np.array(new_res_df['cycle'], dtype=np.int64) - cost_cycle
     all_nanosecs = np.array(new_res_df['nanosec'], dtype=np.int64) - cost_nanosec
-    # theo_cycle = 2 * test_round * ins_lat["ADD"]
-    # theo_nanosec = theo_cycle / frequency
     min_cycle = np.min(all_cycles)
     min_nanosec = np.min(all_nanosecs)
     percent_cycle = np.quantile(all_cycles, data_level)
@@ -345,24 +352,6 @@ def least_interval(options_dict):
             fp.write("no\n")
             print(f"Round {test_round} failed cycle: {min_cycle} {percent_cycle}")
             print(f"Round {test_round} failed nanosec: {min_nanosec} {percent_nanosec}")
-
-
-# def cal_overlap(data1, data2):
-#     count_data1 = sorted(Counter(data1).items(), key=lambda x: x[0])
-#     count_data2 = sorted(Counter(data2).items(), key=lambda x: x[0])
-#     data1_key = np.array([x[0] for x in count_data1])
-#     data1_val = np.array([x[1] for x in count_data1])
-#     data2_key = np.array([x[0] for x in count_data2])
-#     data2_val = np.array([x[1] for x in count_data2])
-#     data1_val = data1_val / np.sum(data1_val)
-#     data2_val = data2_val / np.sum(data2_val)
-#     dict_data1 = dict(zip(data1_key, data1_val))
-#     dict_data2 = dict(zip(data2_key, data2_val))
-#     overlap = 0
-#     for key2, value2 in dict_data2.items():
-#         if key2 in data1_key:
-#             overlap += min(dict_data1[key2], value2)
-#     return overlap
 
 
 def variation_judge(round_1_df, round_2_df, cost, indicator):
@@ -406,29 +395,31 @@ def variation_resolution(options_dict):
     least_round = int(options_dict["fargs"][1])
     cost_res_file = options_dict["fargs"][2]
     resolution_res_file = options_dict["fargs"][3]
+    indicator = resolution_res_file.split('_')[0]
     # get the measure cost
     with open(cost_res_file, 'r') as fp:
         lines = fp.readlines()
-        cost_cycle = int(lines[0].strip())
-        cost_nanosec = int(lines[1].strip())
-    indicator = resolution_res_file.split('_')[0]
-    if indicator == "cycle":
-        cost = cost_cycle
-    else:
-        cost = cost_nanosec
+        if indicator == "cycle":
+            # cost_cycle
+            cost = int(lines[0].strip())
+        else:
+            # cost_nanosec
+            cost = int(lines[1].strip())
 
     cond_res = list()
     dist_w_res = list()
-    round_dfs = list()
     input_split = options_dict["input"].split('/')
     end_round = int(input_split[-2].split('_')[-1])
     rounds = [x for x in range(least_round, end_round + 1, k)]
     test_num = len(rounds) - 1
+    copy_options_dict = [copy.deepcopy(options_dict) for i in range(test_num + 1)]
     for i in range(test_num + 1):
         input_split[-2] = f"round_{rounds[i]}"
-        options_dict["input"] = '/'.join(input_split)
-        options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
-        round_dfs.append(get_res_df_no_noise(options_dict))
+        copy_options_dict[i]["input"] = '/'.join(input_split)
+        copy_options_dict[i]["output"] = f'{copy_options_dict[i]["input"]}/{copy_options_dict[i]["output_suffix"]}'
+    with multiprocessing.Pool(processes=ncpus) as pool:
+        partial_func = partial(get_res_df_no_noise, multi_proc=False)
+        round_dfs = pool.map(partial_func, copy_options_dict)
     for i in range(test_num):
         round_1_df = round_dfs[i]
         round_2_df = round_dfs[i + 1]
@@ -437,7 +428,7 @@ def variation_resolution(options_dict):
         dist_w_res.append(dist_w)
     with open(resolution_res_file, 'w') as fp:
         if np.sum(cond_res) == test_num:
-            indicator_resolution = int(np.max(dist_w_res))
+            indicator_resolution = int(np.mean(dist_w_res))
             fp.write(f"yes\n{indicator_resolution}\n")
             print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
         else:

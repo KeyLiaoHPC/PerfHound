@@ -32,7 +32,7 @@
 
 // used for flush cache
 #ifndef ARRLEN
-#define ARRLEN 20000000
+#define ARRLEN 720896
 #endif
 
 // number of repeat run
