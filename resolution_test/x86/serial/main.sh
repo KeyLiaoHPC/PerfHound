@@ -8,31 +8,9 @@ tool=PERFHOUND
 arrlen=720896
 measure_num=10000
 src_file=test_x86_serial.c
-
-# variables for data process script
-output_dir=""
-cost_measure_file="cost.txt"
-least_interval_file="interval.txt"
-cy_resolution_file="cycle_resolution.txt"
-ns_resolution_file="nanosec_resolution.txt"
+check_times=20
 resolution_test_num=30
 
-# variables to store result
-cost_cycle=0
-cost_nanosec=0
-least_round=0
-least_interval_cycle=0
-least_interval_nanosec=0
-dcyle=0
-dnanosec=0
-
-if [ ${tool} == PAPI ]; then
-    link_lib="-lpfh_papi"
-    backend="papi"
-else
-    link_lib="-lpfh"
-    backend="pfhd"
-fi
 
 function compile_and_run() {
     round=${1}
@@ -56,13 +34,11 @@ function cost_measure_test() {
     compile_and_run 0
     # get the cost of timing instruction
     python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f cost_measure -a ${cost_measure_file}
-    cost_cycle=`sed -n '1p' ${cost_measure_file}`
-    cost_nanosec=`sed -n '2p' ${cost_measure_file}`
 }
 
 function interval_check() {
     target_round=${1}
-    for j in `seq 2 21`
+    for j in `seq 2 $[check_times + 1]`
     do
         compile_and_run $target_round $j
         python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f least_interval -a ${target_round},${cost_measure_file},${least_interval_file}
@@ -103,9 +79,6 @@ function least_interval_test() {
         let i=start
         let test_step=test_step/10
     done
-    least_round=`sed -n '2p' ${least_interval_file}`
-    least_interval_cycle=`sed -n '3p' ${least_interval_file}`
-    least_interval_nanosec=`sed -n '4p' ${least_interval_file}`
 }
 
 function variation_resolution() {
@@ -138,18 +111,44 @@ function variation_resolution() {
     done
 }
 
-# step-0: fix the frequency
-sudo cpupower frequency-set -g performance -u 2.6G -d 2.6G
-# step-1: timing instruction cost test
-cost_measure_test
-# step-2: least measurable interval
-least_interval_test
-# step-3: variation resolution
-variation_resolution ${cy_resolution_file}
-variation_resolution ${ns_resolution_file}
-dcycle=`sed -n '2p' ${cy_resolution_file}`
-dnanosec=`sed -n '2p' ${ns_resolution_file}`
-# output result
-echo "[result-info] ${tool} cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
-echo "[result-info] ${tool} least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"
-echo "[result-info] ${tool} cycle and nanosec variation resolution: $dcycle $dnanosec"
+function main() {
+    if [ ${tool} == PAPI ]; then
+        link_lib="-lpfh_papi"
+        backend="papi"
+    else
+        link_lib="-lpfh"
+        backend="pfhd"
+    fi
+
+    result_dir="test_results"
+    if [ ! -d ${result_dir} ]; then
+        mkdir -p ${result_dir}
+    fi
+
+    # step-0: fix the frequency
+    sudo cpupower frequency-set -g performance -u 2.6G -d 2.6G
+    # step-1: measure cost test
+    cost_measure_file="${result_dir}/cost.txt"
+    cost_measure_test
+    cost_cycle=`sed -n '1p' ${cost_measure_file}`
+    cost_nanosec=`sed -n '2p' ${cost_measure_file}`
+    # step-2: least measurable interval
+    least_interval_file="${result_dir}/interval.txt"
+    least_interval_test
+    least_round=`sed -n '2p' ${least_interval_file}`
+    least_interval_cycle=`sed -n '3p' ${least_interval_file}`
+    least_interval_nanosec=`sed -n '4p' ${least_interval_file}`
+    # step-3: variation resolution
+    cy_resolution_file="${result_dir}/cycle_resolution.txt"
+    ns_resolution_file="${result_dir}/nanosec_resolution.txt"
+    variation_resolution ${cy_resolution_file}
+    variation_resolution ${ns_resolution_file}
+    dcycle=`sed -n '2p' ${cy_resolution_file}`
+    dnanosec=`sed -n '2p' ${ns_resolution_file}`
+    # output result
+    echo "[result-info] ${tool} cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
+    echo "[result-info] ${tool} least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"
+    echo "[result-info] ${tool} cycle and nanosec variation resolution: $dcycle $dnanosec"
+}
+
+main

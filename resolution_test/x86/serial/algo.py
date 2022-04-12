@@ -97,7 +97,7 @@ def parse_rankmap(options_dict):
         Then, create the output directory to store result data.
 
         Args:
-            option_dict: the dict of parsed commandline options.
+            options_dict: the dict of parsed commandline options.
 
         Returns:
             rankmap_dict: A dict that contains the value of rank id, cpu id and hostname.
@@ -114,7 +114,7 @@ def parse_rankmap(options_dict):
     return rankmap_dict
 
 
-def interval2csv(options_dict, rankmap_dict):
+def sample_pt_diff(options_dict, rankmap_dict):
     ''' Process the original data
 
         Process the original data according to the command line options,
@@ -125,7 +125,7 @@ def interval2csv(options_dict, rankmap_dict):
             rankmap_dict: the dict of parsed rankmap.csv file.
 
         Returns:
-            res_df: the pandas.DataFrame of the result data
+            res_df: the pandas.DataFrame of the result data.
     '''
     sgid = options_dict["start_gid"]
     spid = options_dict["start_pid"]
@@ -160,9 +160,9 @@ def interval2csv(options_dict, rankmap_dict):
 
 
 def get_res_df(options_dict):
-    ''' Wrapper function of "parse_rankmap" and "interval2csv"
+    ''' Wrapper function of "parse_rankmap" and "sample_pt_diff"
 
-        Wrapper function of "parse_rankmap" and "interval2csv",
+        Wrapper function of "parse_rankmap" and "sample_pt_diff",
         used to get the dataframe of result data
 
         Args:
@@ -172,7 +172,7 @@ def get_res_df(options_dict):
             res_df: the pandas.DataFrame of the result data
     '''
     rankmap_dict = parse_rankmap(options_dict)
-    res_df = interval2csv(options_dict, rankmap_dict)
+    res_df = sample_pt_diff(options_dict, rankmap_dict)
     return res_df
 
 
@@ -282,9 +282,9 @@ def rm_noise(org_df, multi_proc):
 
 
 def get_res_df_no_noise(options_dict, multi_proc):
-    ''' Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
+    ''' Wrapper function of "parse_rankmap", "sample_pt_diff" and "rm_noise"
 
-        Wrapper function of "parse_rankmap", "interval2csv" and "rm_noise"
+        Wrapper function of "parse_rankmap", "sample_pt_diff" and "rm_noise"
         used to get the dataframe of result data without noise points
 
         Args:
@@ -295,7 +295,7 @@ def get_res_df_no_noise(options_dict, multi_proc):
             new_res_df: the pandas.DataFrame of the result data without noise points
     '''
     rankmap_dict = parse_rankmap(options_dict)
-    res_df = interval2csv(options_dict, rankmap_dict)
+    res_df = sample_pt_diff(options_dict, rankmap_dict)
     cpu_id = rankmap_dict["cpu"]
     rank_id = rankmap_dict["rank"]
     hostname = rankmap_dict["hostname"]
@@ -395,7 +395,13 @@ def variation_resolution(options_dict):
     least_round = int(options_dict["fargs"][1])
     cost_res_file = options_dict["fargs"][2]
     resolution_res_file = options_dict["fargs"][3]
-    indicator = resolution_res_file.split('_')[0]
+    if "cycle" in resolution_res_file:
+        indicator = "cycle"
+    elif "nanosec" in resolution_res_file:
+        indicator = "nanosec"
+    else:
+        print(f"invalid resolution file name {resolution_res_file}")
+        sys.exit(-1)
     # get the measure cost
     with open(cost_res_file, 'r') as fp:
         lines = fp.readlines()
@@ -428,7 +434,7 @@ def variation_resolution(options_dict):
         dist_w_res.append(dist_w)
     with open(resolution_res_file, 'w') as fp:
         if np.sum(cond_res) == test_num:
-            indicator_resolution = int(np.mean(dist_w_res))
+            indicator_resolution = int(np.median(dist_w_res))
             fp.write(f"yes\n{indicator_resolution}\n")
             print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
         else:
