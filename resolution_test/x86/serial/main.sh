@@ -8,7 +8,7 @@ tool=PERFHOUND
 arrlen=720896
 measure_num=10000
 src_file=test_x86_serial.c
-check_times=20
+interval_check_times=20
 resolution_test_num=30
 
 
@@ -38,7 +38,7 @@ function cost_measure_test() {
 
 function interval_check() {
     target_round=${1}
-    for j in `seq 2 $[check_times + 1]`
+    for j in `seq 2 $[interval_check_times + 1]`
     do
         compile_and_run $target_round $j
         python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${backend} -f least_interval -a ${target_round},${cost_measure_file},${least_interval_file}
@@ -53,7 +53,7 @@ function least_interval_test() {
     i=0
     end=0
     start=0
-    test_step=10000
+    test_step=1000
     while [[ ${test_step} -gt 0 ]]
     do
         passed="no"
@@ -128,26 +128,26 @@ function main() {
     # step-0: fix the frequency
     sudo cpupower frequency-set -g performance -u 2.6G -d 2.6G
     # step-1: measure cost test
-    cost_measure_file="${result_dir}/cost.txt"
+    cost_measure_file="${result_dir}/${tool}_cost.txt"
     cost_measure_test
     cost_cycle=`sed -n '1p' ${cost_measure_file}`
     cost_nanosec=`sed -n '2p' ${cost_measure_file}`
     # step-2: least measurable interval
-    least_interval_file="${result_dir}/interval.txt"
+    least_interval_file="${result_dir}/${tool}_interval.txt"
     least_interval_test
     least_round=`sed -n '2p' ${least_interval_file}`
     least_interval_cycle=`sed -n '3p' ${least_interval_file}`
     least_interval_nanosec=`sed -n '4p' ${least_interval_file}`
     # step-3: variation resolution
-    cy_resolution_file="${result_dir}/cycle_resolution.txt"
-    ns_resolution_file="${result_dir}/nanosec_resolution.txt"
+    cy_resolution_file="${result_dir}/${tool}_cycle_resolution.txt"
+    ns_resolution_file="${result_dir}/${tool}_nanosec_resolution.txt"
     variation_resolution ${cy_resolution_file}
     variation_resolution ${ns_resolution_file}
     dcycle=`sed -n '2p' ${cy_resolution_file}`
     dnanosec=`sed -n '2p' ${ns_resolution_file}`
     # output result
-    echo "[result-info] ${tool} cycle and nanosec cost of timing instruction: $cost_cycle $cost_nanosec"
-    echo "[result-info] ${tool} least interval cycle and nanosec: $least_interval_cycle $least_interval_nanosec"
+    echo "[result-info] ${tool} cycle and nanosec meausre cost: $cost_cycle $cost_nanosec"
+    echo "[result-info] ${tool} cycle and nanosec least interval: $least_interval_cycle $least_interval_nanosec"
     echo "[result-info] ${tool} cycle and nanosec variation resolution: $dcycle $dnanosec"
 }
 

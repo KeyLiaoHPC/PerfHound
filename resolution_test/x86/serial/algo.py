@@ -224,11 +224,11 @@ def IsolationForest_filter(param, data):
 
 
 def rm_noise(org_df, multi_proc):
-    ''' The function to remove the noise points in the original data
+    ''' This function is used to remove noise points from original data
 
-        Use ten-point search method (similar to a binary search) to search
-        for the best parameters of IsolationForest. For example, in the first round,
-        we iterate over the parameters [0, 0.01, 0.02, ..., 0.09, 0.1] in steps of 0.01,
+        Use ten-point search method (similar to a binary search) to search for the
+        best parameters of IsolationForest. For example, in the first round, we
+        iterate over the parameters [0, 0.01, 0.02, ..., 0.09, 0.1] in steps of 0.01,
         and in the second round, we traverse the parameters [0.03, 0.031, ..., 0.039, 0.4]
         in the steps of 0.001. The step size is controlled by the variable "factor". For
         each parameter, we calculate its corresponding point density (see the description in
@@ -240,10 +240,10 @@ def rm_noise(org_df, multi_proc):
 
         Args:
             org_df: the dataframe contains the orginal data.
-            multi_proc: use multiprocessing to accelerate or not
+            multi_proc: use multiprocessing to accelerate or not.
 
         Returns:
-            new_df: the dataframe contains data after filtering out noise points.
+            new_df: the dataframe after filtering out noise points.
     '''
     start = 0
     factor = 100
@@ -258,15 +258,15 @@ def rm_noise(org_df, multi_proc):
             while factor <= 1000:
                 params = [(x / factor) + start for x in range(11)]
                 density_results = pool.map(partial_func, params)
-                start = params[np.argmax(np.diff(density_results))]
+                start = params[np.argmax(np.diff(density_results)) + 1]
                 factor *= 10
     else:
         while factor <= 1000:
             params = [(x / factor) + start for x in range(11)]
             density_results = [IsolationForest_filter(param, data) for param in params]
-            start = params[np.argmax(np.diff(density_results))]
+            start = params[np.argmax(np.diff(density_results)) + 1]
             factor *= 10
-    best_param = (start + (10 / factor))
+    best_param = start
     labels = IsolationForest(random_state=42, contamination=best_param).fit_predict(data)
     tmp_idx = np.array([(label == 1) for label in labels])
     tmp_data = data[tmp_idx]
@@ -281,27 +281,27 @@ def rm_noise(org_df, multi_proc):
     return new_df
 
 
-def get_res_df_no_noise(options_dict, multi_proc):
+def get_clean_res_df(options_dict, multi_proc):
     ''' Wrapper function of "parse_rankmap", "sample_pt_diff" and "rm_noise"
 
         Wrapper function of "parse_rankmap", "sample_pt_diff" and "rm_noise"
         used to get the dataframe of result data without noise points
 
         Args:
-            multi_proc: use multiprocessing to accelerate `rm_noise` function or not.
             options_dict: the dict of parsed commandline options.
+            multi_proc: use multiprocessing to accelerate `rm_noise` function or not.
 
         Returns:
             new_res_df: the pandas.DataFrame of the result data without noise points
     '''
     rankmap_dict = parse_rankmap(options_dict)
-    res_df = sample_pt_diff(options_dict, rankmap_dict)
     cpu_id = rankmap_dict["cpu"]
     rank_id = rankmap_dict["rank"]
     hostname = rankmap_dict["hostname"]
     # file path for the result data without noise points
     clean_dst_file = f"{options_dict['output']}/{hostname}/clean_r{rank_id}c{cpu_id}.csv"
     if not os.path.exists(clean_dst_file):
+        res_df = sample_pt_diff(options_dict, rankmap_dict)
         new_res_df = rm_noise(res_df, multi_proc)
         new_res_df.to_csv(clean_dst_file, index=False)
     else:
@@ -331,7 +331,7 @@ def least_interval(options_dict):
         cost_cycle = int(lines[0].strip())
         cost_nanosec = int(lines[1].strip())
     # get the data after filtering out noise points
-    new_res_df = get_res_df_no_noise(options_dict, True)
+    new_res_df = get_clean_res_df(options_dict, True)
     all_cycles = np.array(new_res_df['cycle'], dtype=np.int64) - cost_cycle
     all_nanosecs = np.array(new_res_df['nanosec'], dtype=np.int64) - cost_nanosec
     min_cycle = np.min(all_cycles)
@@ -424,7 +424,7 @@ def variation_resolution(options_dict):
         copy_options_dict[i]["input"] = '/'.join(input_split)
         copy_options_dict[i]["output"] = f'{copy_options_dict[i]["input"]}/{copy_options_dict[i]["output_suffix"]}'
     with multiprocessing.Pool(processes=ncpus) as pool:
-        partial_func = partial(get_res_df_no_noise, multi_proc=False)
+        partial_func = partial(get_clean_res_df, multi_proc=False)
         round_dfs = pool.map(partial_func, copy_options_dict)
     for i in range(test_num):
         round_1_df = round_dfs[i]

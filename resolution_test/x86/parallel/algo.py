@@ -15,7 +15,6 @@ from scipy.stats import wasserstein_distance
 # frequency = 2.6
 confidence_level = 0.05
 data_level = 1 - confidence_level
-ncpus = multiprocessing.cpu_count()
 constant_rates = {"cas114": 2494103, "cas113": 249414}
 # ins_lat = {"ADD": 1, "MUL": 3, "FMA": 4, "LD": 0.5, "ST": 1}
 
@@ -112,16 +111,19 @@ def parse_rankmap(options_dict):
 
 
 def sample_pt_diff_single(idx, options_dict, rankmap_dict):
-    ''' Process single rank's original data
+    ''' Process single core's original data
 
-        Help function of `sample_pt_diff_all`, process single rank's
+        Help function of `get_combine_df`, Process single core's
         original data according to the command line options, and
         write the result data to the output directory.
 
         Args:
-            idx: controls which rank's data to process.
+            idx: controls which core's data to process.
             options_dict: the dict of parsed commandline options.
             rankmap_dict: the dict of parsed rankmap.csv file.
+
+        Returns:
+            res_df: result dataframe of specified cpu core.
     '''
     egid = options_dict["end_gid"]
     epid = options_dict["end_pid"]
@@ -150,53 +152,59 @@ def sample_pt_diff_single(idx, options_dict, rankmap_dict):
         res_df["nanosec"] = res_df["nanosec"].apply(lambda x: int(x * 1000000 // constant_rates[host_prefix]))
     # store the result data
     res_df.to_csv(dst_file, index=False)
-
-
-def sample_pt_diff_all(options_dict, rankmap_dict):
-    ''' Process the original data of all ranks
-
-        Process all original data according to the command line
-        options, and write all result data to the output directory.
-        Use multi-process to accelerate.
-
-        Args:
-            options_dict: the dict of parsed commandline options.
-            rankmap_dict: the dict of parsed rankmap.csv file.
-    '''
-    idxs = [x for x in range(rankmap_dict["rank"].shape[0])]
-    partial_func = partial(sample_pt_diff_single, options_dict=options_dict, rankmap_dict=rankmap_dict)
-    # use multi process to accelerate
-    with multiprocessing.Pool(processes=ncpus) as pool:
-        pool.map(partial_func, idxs)
-
-
-def get_res_df(core_id, options_dict):
-    ''' Given the cpu core id, get the corresponding processed dataframe
-
-        Wrapper function of "parse_rankmap" and "sample_pt_diff_all",
-        used to get the result dataframe of specified cpu core.
-
-        Args:
-            core_id: specified id of cpu core.
-            options_dict: the dict of parsed commandline options.
-
-        Returns:
-            res_df: result dataframe of specified cpu core.
-    '''
-    rankmap_dict = parse_rankmap(options_dict)
-    cpu_id = core_id
-    idx = np.where(rankmap_dict["cpu"] == core_id)
-    rank_id = rankmap_dict["rank"][idx][0]
-    hostname = rankmap_dict["hostname"][idx][0]
-    res_file = f"{options_dict['output']}/{hostname}/r{rank_id}c{cpu_id}.csv"
-    if not os.path.exists(res_file):
-        sample_pt_diff_all(options_dict, rankmap_dict)
-    res_df = pd.read_csv(res_file)
     return res_df
 
 
+def get_combine_df(options_dict, pool):
+    ''' Get the combined dataframe of all cores
+
+        Process all original data according to the command line
+        options, write all result data to the output directory,
+        and collect all cores' data in a single dataframe. Use
+        multi-process to accelerate.
+
+        Args:
+            options_dict: the dict of parsed commandline options.
+            pool: the process pool.
+
+        Returns:
+            combine_df: result dataframe of specified cpu core.
+    '''
+    rankmap_dict = parse_rankmap(options_dict)
+    # file path for the combined dataframe
+    combine_dst_file = f"{options_dict['output']}/combine.csv"
+    if os.path.exists(combine_dst_file):
+        combine_df = pd.read_csv(combine_dst_file)
+    else:
+        idxs = [x for x in range(rankmap_dict["rank"].shape[0])]
+        partial_func = partial(sample_pt_diff_single, options_dict=options_dict, rankmap_dict=rankmap_dict)
+        # use multi process to accelerate
+        all_cores_dfs = pool.map(partial_func, idxs)
+        combine_df = pd.concat(all_cores_dfs, axis=0)
+        combine_df.to_csv(combine_dst_file, index=False)
+    return combine_df
+
+
+def cost_measure(options_dict, pool):
+    ''' Get the cost of measure function
+
+        Get the cost of measure function and write the result to the output
+        file. The path of output file is specified by command line options.
+
+        Args:
+            options_dict: the dict of parsed commandline options.
+            pool: the process pool.
+    '''
+    cost_res_file = options_dict["fargs"][0]
+    combine_df = get_combine_df(options_dict, pool)
+    cost_cycle = combine_df["cycle"].min()
+    cost_nanosec = combine_df["nanosec"].min()
+    with open(cost_res_file, "w") as fp:
+        fp.write(f"{cost_cycle}\n{cost_nanosec}\n")
+
+
 def IsolationForest_filter(param, data):
-    ''' The help function of "rm_noise_single"
+    ''' The help function of "rm_noise"
 
         Given the original data and a parameter, use the parameter to run
         IsolationForest and get the data after filtering out noise points.
@@ -225,10 +233,9 @@ def IsolationForest_filter(param, data):
     return density
 
 
-def rm_noise_single(idx, options_dict, rankmap_dict):
-    ''' The function to remove the noise points for single rank's dataframe
+def rm_noise(org_combine_df, multi_proc, pool):
+    ''' This function is used to remove noise points from original dataframe
 
-        Help function of `rm_noise_all`.
         Use ten-point search method (similar to a binary search) to search for the
         best parameters of IsolationForest. For example, in the first round, we
         iterate over the parameters [0, 0.01, 0.02, ..., 0.09, 0.1] in steps of 0.01,
@@ -239,34 +246,37 @@ def rm_noise_single(idx, options_dict, rankmap_dict):
         there is a sudden change in the point density.
 
         After finding the best parameter, we then use the IsolationForest to filter the noise
-        points in the original data.
+        points in the original dataframe.
 
         Args:
-            idx: controls which rank's data to process.
-            options_dict: the dict of parsed commandline options.
-            rankmap_dict: the dict of parsed rankmap.csv file.
-    '''
-    cpu_id = rankmap_dict["cpu"][idx]
-    rank_id = rankmap_dict["rank"][idx]
-    hostname = rankmap_dict["hostname"][idx]
-    # file path for the original result dataframe
-    org_df_path = f"{options_dict['output']}/{hostname}/r{rank_id}c{cpu_id}.csv"
-    # file path for the result data without noise points
-    clean_df_path = f"{options_dict['output']}/{hostname}/clean_r{rank_id}c{cpu_id}.csv"
+            org_combine_df: original dataframe.
+            multi_proc: use multiprocessing to accelerate or not.
+            pool: the process pool.
 
-    # start to remove noise points
+        Returns:
+            clean_combine_df: the dataframe after filtering out noise points.
+    '''
     start = 0
     factor = 100
-    org_df = pd.read_csv(org_df_path)
-    data_cycle = np.array(org_df["cycle"])
-    data_nanosec = np.array(org_df["nanosec"])
+    data_cycle = np.array(org_combine_df["cycle"])
+    data_nanosec = np.array(org_combine_df["nanosec"])
     data = np.array([data_cycle, data_nanosec]).T
-    while factor <= 1000:
-        params = [(x / factor) + start for x in range(11)]
-        density_results = [IsolationForest_filter(param, data) for param in params]
-        start = params[np.argmax(np.diff(density_results))]
-        factor *= 10
-    best_param = (start + (10 / factor))
+    if multi_proc:
+        partial_func = partial(IsolationForest_filter, data=data)
+        # use multi process to accelerate
+        while factor <= 1000:
+            params = [(x / factor) + start for x in range(11)]
+            density_results = pool.map(partial_func, params)
+            start = params[np.argmax(np.diff(density_results)) + 1]
+            factor *= 10
+    else:
+        # use ten-point search method to search the best parameters
+        while factor <= 1000:
+            params = [(x / factor) + start for x in range(11)]
+            density_results = [IsolationForest_filter(param, data) for param in params]
+            start = params[np.argmax(np.diff(density_results)) + 1]
+            factor *= 10
+    best_param = start
     labels = IsolationForest(random_state=42, contamination=best_param).fit_predict(data)
     tmp_idx = np.array([(label == 1) for label in labels])
     tmp_data = data[tmp_idx]
@@ -277,75 +287,35 @@ def rm_noise_single(idx, options_dict, rankmap_dict):
     for idx in noise_idx:
         if (data[idx, 0] <= tmp_max_cycle) and (data[idx, 1] <= tmp_max_nanosec):
             tmp_idx[idx] = True
-    new_df = pd.DataFrame(data[tmp_idx], columns=["cycle", "nanosec"])
-    # store the result data without noise points
-    new_df.to_csv(clean_df_path, index=False)
+    clean_combine_df = pd.DataFrame(data[tmp_idx], columns=["cycle", "nanosec"])
+    return clean_combine_df
 
 
-def rm_noise_all(options_dict, rankmap_dict):
-    ''' Remove noise points for all ranks' dataframe
+def get_clean_combine_df(options_dict, multi_proc, pool):
+    ''' Get the combined dataframe without noise points
 
-        Remove noise points for all ranks' dataframe, and write all
-        result data to the output directory. Use multi-process to accelerate.
+        Wrapper function of "get_combine_df" and "rm_noise",
+        used to get the noise free dataframe of all cpu cores.
 
         Args:
             options_dict: the dict of parsed commandline options.
-            rankmap_dict: the dict of parsed rankmap.csv file.
-    '''
-    idxs = [x for x in range(rankmap_dict["rank"].shape[0])]
-    partial_func = partial(rm_noise_single, options_dict=options_dict, rankmap_dict=rankmap_dict)
-    # use multi process to accelerate
-    with multiprocessing.Pool(processes=ncpus) as pool:
-        pool.map(partial_func, idxs)
-
-
-def get_res_df_no_noise(core_id, options_dict):
-    ''' Given the cpu core id, get the corresponding result dataframe without noise points
-
-        Wrapper function of "parse_rankmap", "sample_pt_diff_all" and "rm_noise_all",
-        used to get the noise free dataframe of specified cpu core.
-
-        Args:
-            core_id: specified id of cpu core.
-            options_dict: the dict of parsed commandline options.
+            multi_proc: use multiprocessing to accelerate `rm_noise` function or not.
+            pool: the process pool.
 
         Returns:
-            clean_res_df: pandas.DataFrame of the result data without noise points
+            clean_combine_df: pandas.DataFrame of the result data without noise points
     '''
-    rankmap_dict = parse_rankmap(options_dict)
-    cpu_id = core_id
-    idx = np.where(rankmap_dict["cpu"] == core_id)
-    rank_id = rankmap_dict["rank"][idx][0]
-    hostname = rankmap_dict["hostname"][idx][0]
-    clean_res_file = f"{options_dict['output']}/{hostname}/clean_r{rank_id}c{cpu_id}.csv"
-    if not os.path.exists(clean_res_file):
-        sample_pt_diff_all(options_dict, rankmap_dict)
-        rm_noise_all(options_dict, rankmap_dict)
-    clean_res_df = pd.read_csv(clean_res_file)
-    return clean_res_df
+    clean_combine_file = f"{options_dict['output']}/clean_combine.csv"
+    if not os.path.exists(clean_combine_file):
+        org_combine_df = get_combine_df(options_dict, pool)
+        clean_combine_df = rm_noise(org_combine_df, multi_proc, pool)
+        clean_combine_df.to_csv(clean_combine_file, index=False)
+    else:
+        clean_combine_df = pd.read_csv(clean_combine_file)
+    return clean_combine_df
 
 
-def cost_measure(options_dict):
-    ''' Get the cost of measure function
-
-        Get the cost of measure function and write the result to the output file.
-        The path of output file is specified by command line options. The path of
-        output file contains the id of cpu core.
-
-        Args:
-            options_dict: the dict of parsed commandline options.
-    '''
-    cost_res_file = options_dict["fargs"][0]
-    # get the id of cpu core
-    core_id = int(cost_res_file.split('.')[0].split('_')[-1])
-    res_df = get_res_df(core_id, options_dict)
-    cost_cycle = res_df["cycle"].min()
-    cost_nanosec = res_df["nanosec"].min()
-    with open(cost_res_file, "w") as fp:
-        fp.write(f"{cost_cycle}\n{cost_nanosec}\n")
-
-
-def least_interval(options_dict):
+def least_interval(options_dict, pool):
     ''' The function to find the least measurable interval
 
         The least measurable interval means that the fluctuations introduced by
@@ -353,11 +323,11 @@ def least_interval(options_dict):
         as an example, take the confidence level as 0.05, as long as
         (np.quantile(cycle_data, 0.95) - np.min(cycle_data)) / np.min(cycle_data) < 0.05,
         the condition can be considered satisfied. The final result will be written to the
-        output file. The path of output file is specified by command line options. The path
-        of output file contains the id of cpu core.
+        output file. The path of output file is specified by command line options.
 
         Args:
             options_dict: the dict of parsed commandline options.
+            pool: the process pool.
     '''
     test_round = int(options_dict["fargs"][0])
     cost_res_file = options_dict["fargs"][1]
@@ -367,12 +337,10 @@ def least_interval(options_dict):
         lines = fp.readlines()
         cost_cycle = int(lines[0].strip())
         cost_nanosec = int(lines[1].strip())
-    # get the id of cpu core
-    core_id = int(interval_res_file.split('.')[0].split('_')[-1])
     # get the data without noise points
-    clean_res_df = get_res_df_no_noise(core_id, options_dict)
-    all_cycles = np.array(clean_res_df['cycle'], dtype=np.int64) - cost_cycle
-    all_nanosecs = np.array(clean_res_df['nanosec'], dtype=np.int64) - cost_nanosec
+    clean_combine_df = get_clean_combine_df(options_dict, True, pool)
+    all_cycles = np.array(clean_combine_df['cycle'], dtype=np.int64) - cost_cycle
+    all_nanosecs = np.array(clean_combine_df['nanosec'], dtype=np.int64) - cost_nanosec
     min_cycle = np.min(all_cycles)
     min_nanosec = np.min(all_nanosecs)
     percent_cycle = np.quantile(all_cycles, data_level)
@@ -393,13 +361,150 @@ def least_interval(options_dict):
             print(f"Round {test_round} failed nanosec: {min_nanosec} {percent_nanosec}")
 
 
+def combine_df_filter(args_tuple):
+    ''' Just a help function of `get_multi_clean_combine_dfs`
+
+        do the same thing with `get_clean_combine_df`.
+
+        Args:
+            args_tuple: (options_dict, org_combine_df).
+
+        Returns:
+            clean_combine_df: pandas.DataFrame of the result data without noise points
+    '''
+    my_options_dict = args_tuple[0]
+    org_combine_df = args_tuple[1]
+    clean_combine_file = f"{my_options_dict['output']}/clean_combine.csv"
+    if not os.path.exists(clean_combine_file):
+        # use single core to filter noise points
+        clean_combine_df = rm_noise(org_combine_df, False, None)
+        clean_combine_df.to_csv(clean_combine_file, index=False)
+    else:
+        clean_combine_df = pd.read_csv(clean_combine_file)
+    return clean_combine_df
+
+
+def get_multi_clean_combine_dfs(test_rounds, options_dict, pool):
+    ''' Help function of `variation_resolution`
+
+        Given multiple test rounds, return the clean combined
+        dataframe (no noise points) of each test round.
+
+        Args:
+            test_rounds: list of all test rounds.
+            options_dict: the original dict of parsed commandline options.
+            pool: the process pool.
+
+        Returns:
+            test_rounds_dfs: clean combined dataframes of all test rounds.
+    '''
+    input_split = options_dict["input"].split('/')
+    # prepare different option_dict for each test rounds
+    copy_options_dict_list = [copy.deepcopy(options_dict) for x in test_rounds]
+    for i, my_options_dict in enumerate(copy_options_dict_list):
+        input_split[-2] = f"round_{test_rounds[i]}"
+        my_options_dict["input"] = '/'.join(input_split)
+        my_options_dict["output"] = f'{my_options_dict["input"]}/{my_options_dict["output_suffix"]}'
+    # get the original combined dataframe
+    org_combine_df_list = [get_combine_df(my_options_dict, pool) for my_options_dict in copy_options_dict_list]
+    test_rounds_dfs = pool.map(combine_df_filter, zip(copy_options_dict_list, org_combine_df_list))
+    return test_rounds_dfs
+
+
+def variation_judge(round_1_df, round_2_df, cost, indicator):
+    ''' The help function of "variation resolution"
+
+        Given two measurement data, determine whether they are distinguishable,
+        and calculate the wasserstein distance of the two data distributions.
+
+        Args:
+            round_1_df: the dataframe of the first measurement data
+            round_2_df: the dataframe of the second measurement data
+            cost: the cost of measurement
+            indicator: Controls whether to use cycle data or nanosec data
+
+        Returns:
+            cond: whether the two measurement data are distinguishable
+            dist_w: the wasserstein distance of the two data distributions
+    '''
+    round_1_data = np.array(round_1_df[indicator], dtype=np.int64) - cost
+    round_2_data = np.array(round_2_df[indicator], dtype=np.int64) - cost
+    # the condition that the two data can be distinguished
+    cond = (np.min(round_2_data) > np.quantile(round_1_data, 1 - confidence_level))
+    dist_w = wasserstein_distance(round_1_data, round_2_data)
+    return cond, dist_w
+
+
+def variation_resolution(options_dict, pool):
+    ''' The function to get the measure resolution of a specified cpu core
+
+        Given the least measurable round (r) and the delta round (k),
+        this function will process the data of round [r, r + k, r + 2k, ..., r + 30k],
+        and then check whether the data of round r + i * k and round r + (i + 1) * k is
+        distinguishable (i = 0, 1, ..., 29). If this condition is satisfied, the result
+        of resolution will be written to the output file. The path of output file is
+        specified by command line options. The path of output file contains the id of
+        cpu core.
+
+        Args:
+            options_dict: the dict of parsed commandline options.
+            pool: the process pool.
+    '''
+    k = int(options_dict["fargs"][0])
+    least_round = int(options_dict["fargs"][1])
+    cost_res_file = options_dict["fargs"][2]
+    resolution_res_file = options_dict["fargs"][3]
+    if "cycle" in resolution_res_file:
+        indicator = "cycle"
+    elif "nanosec" in resolution_res_file:
+        indicator = "nanosec"
+    else:
+        print(f"invalid resolution file name {resolution_res_file}")
+        sys.exit(-1)
+    # get the measure cost
+    with open(cost_res_file, 'r') as fp:
+        lines = fp.readlines()
+        if indicator == "cycle":
+            # cost_cycle
+            cost = int(lines[0].strip())
+        else:
+            # cost_nanosec
+            cost = int(lines[1].strip())
+
+    cond_res = list()
+    dist_w_res = list()
+    input_split = options_dict["input"].split('/')
+    end_round = int(input_split[-2].split('_')[-1])
+    test_rounds = [x for x in range(least_round, end_round + 1, k)]
+    continue_test_times = len(test_rounds) - 1
+    test_round_dfs = get_multi_clean_combine_dfs(test_rounds, options_dict, pool)
+    for i in range(continue_test_times):
+        round_1_df = test_round_dfs[i]
+        round_2_df = test_round_dfs[i + 1]
+        cond, dist_w = variation_judge(round_1_df, round_2_df, cost, indicator)
+        cond_res.append(cond)
+        dist_w_res.append(dist_w)
+    with open(resolution_res_file, 'w') as fp:
+        if np.sum(cond_res) == continue_test_times:
+            indicator_resolution = int(np.median(dist_w_res))
+            fp.write(f"yes\n{indicator_resolution}\n")
+            print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
+        else:
+            fp.write("no\n")
+            print(f"resolution {k} round failed, {np.sum(cond_res)} of {continue_test_times}")
+
+
 def main():
     ''' The main function '''
-    options_dict = parse_option()
-    if options_dict["function"] == "cost_measure":
-        cost_measure(options_dict)
-    elif options_dict["function"] == "least_interval":
-        least_interval(options_dict)
+    ncpus = multiprocessing.cpu_count()
+    with multiprocessing.Pool(processes=ncpus) as pool:
+        options_dict = parse_option()
+        if options_dict["function"] == "cost_measure":
+            cost_measure(options_dict, pool)
+        elif options_dict["function"] == "least_interval":
+            least_interval(options_dict, pool)
+        elif options_dict["function"] == "variation_resolution":
+            variation_resolution(options_dict, pool)
 
 
 if __name__ == '__main__':
