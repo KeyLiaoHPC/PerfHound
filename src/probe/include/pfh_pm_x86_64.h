@@ -95,7 +95,6 @@
         register uint64_t cy;                           \
         asm volatile(                                   \
             _pfc_read(0x40000001)                       \
-            "\n\tlfence"                                \
             : "=r"(cy)                                  \
             :                                           \
             : "memory", "rax", "rcx", "rdx"             \

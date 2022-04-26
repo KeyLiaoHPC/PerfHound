@@ -28,9 +28,9 @@
 #ifndef __VARAPI_CORE_H__
 #define __VARAPI_CORE_H__
 
-#include <stdint.h>
-#include <stdio.h>
 #include <time.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <limits.h>
 
 /* ======== User config area ======== */

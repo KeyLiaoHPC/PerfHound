@@ -62,16 +62,17 @@ static int evset = PAPI_NULL;
 
 #endif
 
+// #define _pfh_reg_save
 
-#define _pfh_reg_save                                  
-
-
-#define _pfh_reg_restore                                
-
+// #define _pfh_reg_restore
 
 /* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
 #define _pfh_read_cy(_cy)   \
-    (_cy) = PAPI_get_real_cyc();
+    int _ecx = (1 << 30) + 1;                                     \
+    unsigned int _a = 0, _d = 0;                                  \
+    asm volatile("rdpmc" : "=a"(_a), "=d"(_d) : "c"(_ecx));       \
+    _cy = (((int64_t) _a) | (((int64_t) _d) << 32));
+    // (_cy) = PAPI_get_real_cyc();
 
 
 /* Read virtual timer */
