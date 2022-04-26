@@ -29,19 +29,19 @@ Both Chinses and English documentation can be found in **docs/**.
 $ git clone https://git.computing.sjtu.edu.cn/keymorrislane/perfhound
 $ cd perfhound/src
 $ make
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ts.so varapi.mpi_ts.o file_op.mpi_ts.o vt_mpi.mpi_ts.o
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ev.so varapi.mpi_ev.o file_op.mpi_ev.o vt_mpi.mpi_ev.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ts.so varapi.ts.o file_op.ts.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ev.so varapi.ev.o file_op.ev.o
 mkdir -p ./lib
 mkdir -p ./include

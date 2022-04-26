@@ -29,19 +29,19 @@ Both Chinses and English documentation can be found in **docs/**.
 $ git clone https://git.computing.sjtu.edu.cn/keymorrislane/perfhound
 $ cd perfhound/src
 $ make
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ts.so varapi.mpi_ts.o file_op.mpi_ts.o vt_mpi.mpi_ts.o
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
+mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ev.so varapi.mpi_ev.o file_op.mpi_ev.o vt_mpi.mpi_ev.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ts.so varapi.ts.o file_op.ts.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_MODE_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
+gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
 gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ev.so varapi.ev.o file_op.ev.o
 mkdir -p ./lib
 mkdir -p ./include
@@ -122,24 +122,25 @@ $ cd samples && make
 
 #### 2.3.2 API列表
 
-##### vt\_init 
+##### pfh\_init 
 初始化PerfHound API
-##### vt\_set\_grp 
-为插桩点编组。
-##### vt\_set\_tag
+##### pfh\_set\_tag
 为插桩点设置标记。
-##### vt\_set\_evt
+##### pfh\_set\_evt
 设置需要收集的性能事件。
-##### vt\_commit 
+##### pfh\_commit 
 提交PerfHound的配置。
-##### vt\_strict\_sync
-强制所有进程进行CPU计时器的对齐。
-##### vt\_read
+##### pfh\_read
 读取时间戳和性能计数器。
-##### vt\_write
+##### pfh\_dump
 强制写入文件。
-##### vt\_clean
-写入并终止PerfHound。
+##### pfh\_finalize
+终止PerfHound。
+
+#### 2.3.3 编译设置
+
+盘瓠支持多种工作模式，包括不同的计数器读取方式，不同的PMU读取个数，不同的串行模式等。大多数工作模式均在编译前指定，虽然这降低了程序的灵活性，并且对使用带来了一些困难，但是这种方式也有效地降低了数据收集中的性能波动，以换取更高的计时精度和更小的技术误差。
+
 
 ### 2.4 性能数据分析
 
