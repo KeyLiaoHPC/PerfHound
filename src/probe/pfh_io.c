@@ -27,16 +27,16 @@
 
 #define _XOPEN_SOURCE 600
 
+#include <pwd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include "pfh_core.h"
 
 /* Variables for files and information */
@@ -87,7 +87,7 @@ pfh_io_mkdir(char *path){
         if (*p == '/') {
             // Jump the first '/' which is root directory.
             *p = '\0';
-            printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
+            // printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
             err = mkdir(tmp_path, S_IRWXU);
             if (err) {
                 if(errno != EEXIST) {
@@ -100,7 +100,7 @@ pfh_io_mkdir(char *path){
         }
     }
 
-    printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
+    // printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
     if (mkdir(tmp_path, S_IRWXU) != 0){
         if(errno != EEXIST) {
             printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);

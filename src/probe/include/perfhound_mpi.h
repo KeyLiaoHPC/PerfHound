@@ -52,8 +52,7 @@ void pfhmpi_commit();
  * @param p_id          uint32. Collecting point index.
  * @return              int. Return error code.
  */
-void pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval);
-
+// void pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval);
 void pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval);
 
 

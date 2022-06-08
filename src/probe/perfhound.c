@@ -47,16 +47,16 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include "perfhound.h"
 #include "pfh_core.h"
+#include "perfhound.h"
 
-static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
-static uint32_t pfh_irec;            // Index for counter readings.
 static int pfh_ready;
+static uint32_t pfh_irec;            // Index for counter readings.
+static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
 
+int pfh_nev = 0;
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
-int pfh_nev;
 
 extern int pfh_io_mkdir(char *path);
 extern int pfh_io_mkname(char *root);
@@ -69,8 +69,6 @@ extern int pfh_io_wtrankmap();
 extern int pfh_io_wtrec(int nrec);
 extern int pfh_io_wtinfo();
 
- 
-
 /* Set system events. */
 int
 pfh_set_evt(const char *etag) {
@@ -82,13 +80,17 @@ pfh_set_evt(const char *etag) {
         fflush(stdout);
         return 1;
     }
-    if (pfh_nev > pfh_nev_max) {
+    if (pfh_nev >= PFH_NEV_MAX) {
         printf("*** [Pfh-Probe] WARNING. Too many events , this event will be omitted. \n");
         fflush(stdout);
         return 2;     
     }
 
+#ifdef PFH_OPT_PAPI
+    int evcode = 0;
+#else
     uint64_t evcode = 0;
+#endif
 
     _pfh_parse_event (evcode, etag);
 
@@ -130,14 +132,59 @@ int
 pfh_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
     pfh_io_wtctag(gid, pid, tagstr);
     if (pid) {
-        printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n",
-            gid, pid, tagstr);
+        printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n", gid, pid, tagstr);
     } else {
         printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
     }
     fflush(stdout);
     return 0;
 }
+
+#ifdef PFH_OPT_PAPI
+/**
+ * @brief Reading counter.
+ * @param grp_id
+ * @param p_id
+ * @param uval
+ */
+void
+pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
+    // Get tag
+    pfh_precs[pfh_irec].ctag[0] = grp_id;
+    pfh_precs[pfh_irec].ctag[1] = p_id;
+    // Get timestamp
+    _pfh_read_ns (pfh_precs[pfh_irec].ns);
+#ifdef PFH_OPT_TS
+    _pfh_read_cy (pfh_precs[pfh_irec].cy);
+#endif
+    // Get user-defined FP64 value.
+    pfh_precs[pfh_irec].uval = uval;
+
+    // Get PMU
+#ifdef PFH_OPT_EV
+    // EV Mode: Reading 4 event counters after the timestamp.
+    _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#elif PFH_OPT_EVX
+    // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
+    _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#endif // END: #ifdef PFH_RMODE_EV
+
+    // Index up.
+    pfh_irec ++;
+
+    // Check buffer.
+    // Only jump to pfh_dump() when the buffer have 1 empty slot
+    // for preventing infinite recursion in pfh_read()
+    if (pfh_irec + 1 - buf_nrec == 0) {
+        pfh_dump();
+    }
+
+    return;
+}
+
+#else
 
 /**
  * @brief Reading counter.
@@ -151,8 +198,8 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
     // Get timestamp
-    _pfh_read_cy (pfh_precs[pfh_irec].cy);
     _pfh_read_ns (pfh_precs[pfh_irec].ns);
+    _pfh_read_cy (pfh_precs[pfh_irec].cy);
     // Get user-defined FP64 value. 
     pfh_precs[pfh_irec].uval = uval;
 
@@ -160,11 +207,16 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
 #ifdef PFH_OPT_EV
     // EV Mode: Reading 4 event counters after the timestamp.
     _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
-
 #elif PFH_OPT_EVX
     // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
     _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
 #endif // END: #ifdef PFH_RMODE_EV
+
+#ifdef __x86_64__
+    asm volatile("lfence":::"memory");
+#else
+    asm volatile("isb":::"memory");
+#endif // #END: #ifdef __x86_64__
 
     // Index up.
     pfh_irec ++;
@@ -172,13 +224,13 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
     // Check buffer.
     // Only jump to pfh_dump() when the buffer have 1 empty slot
     // for preventing infinite recursion in pfh_read()
-    if (pfh_irec+1-buf_nrec == 0) {
+    if (pfh_irec + 1 - buf_nrec == 0) {
         pfh_dump();
     }
 
     return;
 }
-
+#endif
 
 /**
  * 
@@ -187,7 +239,7 @@ pfh_read(uint32_t grp_id, uint32_t p_id, double uval) {
  */
 void
 pfh_dump() {
-    pfh_read(0, 3, pfh_irec+1);  // Recording writing overhead.
+    pfh_read(0, 3, pfh_irec + 1);  // Recording writing overhead.
     pfh_io_wtrec(pfh_irec);
     pfh_irec = 0;
     pfh_read(0, 4, 0);
@@ -265,7 +317,7 @@ pfh_init(char *path) {
     fflush(stdout);
 
     /* Set all event codes to 0. */
-    for (int i = 0; i < pfh_nev_max; i ++) {
+    for (int i = 0; i < PFH_NEV_MAX; i ++) {
         pfh_evcodes[i] = 0;
     }
 

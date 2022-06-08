@@ -14,7 +14,7 @@
 #include <mpi.h>
 
 #include "pfh_core.h"
-#include "pfh_mpi.h"
+#include "perfhound_mpi.h"
 
 
 #define PFH_PRINTF(_msg)    if(pfh_pinfo.rank == 0) {  \
@@ -44,12 +44,7 @@ static int pfh_ready;
 /* Global */
 rec_t *pfh_precs; // raw data.
 proc_t pfh_pinfo;
-int pfh_nev;
-
-
-
-
-
+int pfh_nev = 0;
 
 /* Set system events. */
 int
@@ -63,7 +58,7 @@ pfhmpi_set_evt(const char *etag) {
         return 1;
     }
     
-    if (pfh_nev >= pfh_nev_max) {
+    if (pfh_nev >= PFH_NEV_MAX) {
         if (pfh_pinfo.rank == 0) {
             printf("*** [Pfh-Probe] WARNING. Too many events, this event will be omitted. \n");
             fflush(stdout);
@@ -71,7 +66,11 @@ pfhmpi_set_evt(const char *etag) {
         return 2;     
     }
 
+#ifdef PFH_OPT_PAPI
+    int evcode = 0;
+#else
     uint64_t evcode = 0;
+#endif
 
     _pfh_parse_event (evcode, etag);
 
@@ -109,14 +108,16 @@ pfhmpi_commit() {
 
     err = pfh_io_mkrec();
     if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create record file.\n", err);
-        fflush(stdout);
+        if (pfh_pinfo.rank == 0) {
+            printf("*** [Pfh-Probe] EXIT %d. Failed to create record file.\n", err);
+            fflush(stdout);
+        }
         exit(1);
     }
     pfh_ready = 1;
     pfh_irec = 0;
     pfh_mpi_barrier(MPI_COMM_WORLD);
-    pfhmpi_fastread(0, 1, 0);
+    pfhmpi_read(0, 1, 0);
     return;
 }
 
@@ -129,8 +130,7 @@ pfhmpi_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
     }
     if (pfh_pinfo.rank == 0) {
         if (pid) {
-            printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n",
-                gid, pid, tagstr);
+            printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n", gid, pid, tagstr);
         } else {
             printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
         }
@@ -140,91 +140,85 @@ pfhmpi_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
     return 0;
 }
 
+#ifdef PFH_OPT_PAPI
+/* Get and record an event reading without boundary check. */
+void
+pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
+    // Get tag
+    pfh_precs[pfh_irec].ctag[0] = grp_id;
+    pfh_precs[pfh_irec].ctag[1] = p_id;
+    // Get timestamp
+    _pfh_read_ns (pfh_precs[pfh_irec].ns);
+#ifdef PFH_OPT_TS
+    _pfh_read_cy (pfh_precs[pfh_irec].cy);
+#endif
+    // Get user-defined FP64 value.
+    pfh_precs[pfh_irec].uval = uval;
+
+    // Get PMU
+#ifdef PFH_OPT_EV
+    // EV Mode: Reading 4 event counters after the timestamp.
+    _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#elif PFH_OPT_EVX
+    // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
+    _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
+    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#endif // END: #ifdef PFH_RMODE_EV
+
+    // Index up.
+    pfh_irec ++;
+
+    // Check buffer.
+    // Only jump to pfhmpi_dump() when the buffer have 1 empty slot.
+    if (pfh_irec + 1 - buf_nrec == 0) {
+        pfhmpi_dump();
+    }
+
+    return;
+}
+
+#else
 
 /* Get and record an event reading without boundary check. */
 void
-pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
-    // uint64_t r1 = 0, r2 = 0, r3 = 0;
-
-    // _pfh_reg_save;
-
+pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
+    // Get tag
     pfh_precs[pfh_irec].ctag[0] = grp_id;
     pfh_precs[pfh_irec].ctag[1] = p_id;
-    _pfh_read_cy (pfh_precs[pfh_irec].cy);
+    // Get timestamp
     _pfh_read_ns (pfh_precs[pfh_irec].ns);
+    _pfh_read_cy (pfh_precs[pfh_irec].cy);
+    // Get user-defined FP64 value.
     pfh_precs[pfh_irec].uval = uval;
-    
-    // _pfh_reg_restore;
 
-    /* Read system event */
-    switch (pfh_nev){
-        case 1: 
-            _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
-            break;
-        case 2: 
-            _pfh_read_pm_2 (pfh_precs[pfh_irec].ev);
-            break;
-        case 3: 
-            _pfh_read_pm_3 (pfh_precs[pfh_irec].ev);
-            break;
-        case 4: 
-            _pfh_read_pm_4 (pfh_precs[pfh_irec].ev);
-            break;
-        case 5: 
-            _pfh_read_pm_5 (pfh_precs[pfh_irec].ev);
-            break;
-        case 6: 
-            _pfh_read_pm_6 (pfh_precs[pfh_irec].ev);
-            break;
-        case 7: 
-            _pfh_read_pm_7 (pfh_precs[pfh_irec].ev);
-            break;
-        case 8: 
-            _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
-            break;
-        case 9: 
-            _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
-            break;
-        case 10: 
-            _pfh_read_pm_10 (pfh_precs[pfh_irec].ev);
-            break;
-        case 11: 
-            _pfh_read_pm_11 (pfh_precs[pfh_irec].ev);
-            break;
-        case 12: 
-            _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
-            break;
-        default:
-            break;
-    }
+    // Get PMU
+#ifdef PFH_OPT_EV
+    // EV Mode: Reading 4 event counters after the timestamp.
+    _pfh_read_pm_ev (pfh_precs[pfh_irec].ev);
+#elif PFH_OPT_EVX
+    // EVX Mode: Reading 12(Armv8) or 8(X86-64) counters after the timestamp.
+    _pfh_read_pm_evx (pfh_precs[pfh_irec].ev);
+#endif // END: #ifdef PFH_RMODE_EV
 
-#ifdef PFH_OPT_PAPI
-    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
-#endif
+#ifdef __x86_64__
+    asm volatile("lfence":::"memory");
+#else
+    asm volatile("isb":::"memory");
+#endif // #END: #ifdef __x86_64__
 
+    // Index up.
     pfh_irec ++;
-       
-}
 
-void
-pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec+1 >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-            pfh_pinfo.rank, pfh_irec);
-        fflush(stdout);
+    // Check buffer.
+    // Only jump to pfhmpi_dump() when the buffer have 1 empty slot.
+    if (pfh_irec + 1 - buf_nrec == 0) {
         pfhmpi_dump();
-        pfh_irec = 0;
-        pfhmpi_fastread(grp_id, p_id, uval);
-    } else {
-        pfhmpi_fastread(grp_id, p_id, uval);
-        if (pfh_irec+1 >= buf_nrec) {
-            printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-                pfh_pinfo.rank, pfh_irec);
-            fflush(stdout);
-            pfhmpi_dump();
-        }
     }
+
+    return;
 }
+#endif
 
 /**
  * Dumping collected records if the number has larger than nrec. 
@@ -233,22 +227,10 @@ pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
  */
 void
 pfhmpi_dump() {
-
-    if (pfh_irec == 0) {
-        // Return empty request.
-        return;
-    }
-
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
-        pfh_pinfo.rank, pfh_irec);
-        pfh_irec = buf_nrec - 1; // Step back for recording writing time.
-    }
-
-    pfhmpi_fastread(0, 3, 0);
+    pfhmpi_read(0, 3, pfh_irec + 1);
     pfh_io_wtrec(pfh_irec);
     pfh_irec = 0;
-    pfhmpi_fastread(0, 4, 0);
+    pfhmpi_read(0, 4, 0);
     
     return;
 }
@@ -265,7 +247,7 @@ int
 pfhmpi_init(char *path) {
     // User-defined data root and project name.
     char root[PATH_MAX]; // data root path, hostname.
-    int i, err = 0;
+    int err = 0;
 
     /* Init basic rank information */
     err = pfh_mpi_rank_init();
@@ -346,7 +328,7 @@ pfhmpi_init(char *path) {
     }
 
     /* Set all event codes to 0. */
-    for (i = 0; i < 12; i ++) {
+    for (int i = 0; i < PFH_NEV_MAX; i ++) {
         pfh_evcodes[i] = 0;
     }
 
@@ -412,5 +394,3 @@ pfhmpi_finalize() {
     free(pfh_precs);
 
 }
-
-

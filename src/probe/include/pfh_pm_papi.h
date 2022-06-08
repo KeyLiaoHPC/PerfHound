@@ -39,10 +39,10 @@ static int evset = PAPI_NULL;
 #ifdef _PFH_MPI
 
 #ifdef __x86_64__
-#define _pfh_init_cy    \
+#define _pfh_init_cy                        \
     pfhmpi_set_evt("CPU_CLK_UNHALTED");
 #elif  __aarch64__
-#define _pfh_init_cy    \
+#define _pfh_init_cy                        \
     pfhmpi_set_evt("CPU_CYCLES");
 #else
 #define _pfh_init_cy
@@ -51,29 +51,29 @@ static int evset = PAPI_NULL;
 #else
 
 #ifdef __x86_64__
-#define _pfh_init_cy    \
+#define _pfh_init_cy                        \
     pfh_set_evt("CPU_CLK_UNHALTED");
 #elif  __aarch64__
-#define _pfh_init_cy    \
+#define _pfh_init_cy                        \
     pfh_set_evt("CPU_CYCLES");
 #else
 #define _pfh_init_cy
-
 #endif
 
 #endif
 
+// #define _pfh_reg_save
 
-#define _pfh_reg_save                                  
-
-
-#define _pfh_reg_restore                                
-
+// #define _pfh_reg_restore
 
 /* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
-#define _pfh_read_cy(_cy)   
-    // PAPI_read(evcy, &(_cy));
-    (_cy) = PAPI_get_real_cyc();
+#define _pfh_read_cy(_cy)                               \
+    PAPI_read(evset, &(_cy));
+    // (_cy) = PAPI_get_real_cyc();
+    // int _ecx = (1 << 30) + 1;
+    // unsigned int _a = 0, _d = 0;
+    // asm volatile("rdpmc" : "=a"(_a), "=d"(_d) : "c"(_ecx));
+    // _cy = (((int64_t) _a) | (((int64_t) _d) << 32));
 
 
 /* Read virtual timer */
@@ -96,7 +96,6 @@ static int evset = PAPI_NULL;
         PAPI_event_name_to_code((_evstr), &(_code));        \
     }
 
-/* Set IA32_PERFEVTSELx */
 #define _pfh_config_event(_code_arr, _nevt)             \
     if ((_nevt)) {                                      \
         PAPI_add_events(evset, (_code_arr), (_nevt));   \
@@ -141,3 +140,6 @@ static int evset = PAPI_NULL;
 
 #define _pfh_read_pm_12(_arr)   \
         PAPI_read(evset, _arr);
+
+#define _pfh_read_pm_ev(_val_arr)   _pfh_read_pm_4(_val_arr);
+#define _pfh_read_pm_evx(_val_arr)  _pfh_read_pm_8(_val_arr);

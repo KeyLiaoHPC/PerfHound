@@ -122,7 +122,7 @@
             "\n\t"                                      \
             :"=r" (ns)                                  \
             :                                           \
-            : "memory", "%rax", "%rdx");                \
+            : "memory", "%rax", "%rcx", "%rdx");        \
         _ns = ns;                                       \
     } while(0);
 

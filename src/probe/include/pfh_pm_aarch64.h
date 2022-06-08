@@ -31,7 +31,7 @@
 
 
 /* Init Armv8 PMU settings */
-#define _pfh_init_cy                         \
+#define _pfh_init_cy                        \
     do {                                    \
         uint64_t _pmu_val0 = 0;             \
         _pmu_val0 = _pmu_val0 | (1 << 31);  \
@@ -48,7 +48,7 @@
 
 
 /* Read cycle */
-#define _pfh_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0"     "\n\t": "=r" (_cy)::);
+#define _pfh_read_cy(_cy)  asm volatile("mrs %0, pmccntr_el0\n\t" : "=r" (_cy)::"memory");
 
 /* Read virtual timer */
 #ifdef USE_CLOCK_GETTIME
@@ -59,7 +59,7 @@
 #define _pfh_read_ns(_ns)    syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
 #else
-#define _pfh_read_ns(_ns)    asm volatile("mrs %0, cntvct_el0"      "\n\t": "=r" (_ns)::);
+#define _pfh_read_ns(_ns)    asm volatile("isb; mrs %0, cntvct_el0\n\t" : "=r" (_ns)::"memory");
 
 #endif
 
@@ -68,7 +68,7 @@
 #define _PMSET_REG(_id) "pmevtyper"#_id"_el0"
 #define _PMVAL_REG(_id) "pmevcntr"#_id"_el0"
 #define _pfh_set_pmreg(_id, _val)    asm volatile("msr " _PMSET_REG(_id) ", %0": : "r" (_val));
-#define _pfh_read_pm(_id, _val)      asm volatile("mrs %0, " _PMVAL_REG(_id) "\n\t": "=r" (_val));
+#define _pfh_read_pm(_id, _val)      asm volatile("mrs %0, " _PMVAL_REG(_id) "\n\t": "=r" (_val)::"memory");
 
 /* Parsing string events to hex event code. */
 #define _pfh_parse_event(_code, _evstr)                                     \
@@ -93,6 +93,8 @@
  * reset PMEVCNTR<n>_EL0 to zero. 
  * 
  */
+#ifdef PFH_OPT_EVX
+
 #define _pfh_config_event(_code_arr, _nevt)     \
     if ((_nevt)) {                              \
         do {                                    \
@@ -119,7 +121,32 @@
                 : "memory", "x22"               \
             );                                  \
         } while(0);                             \
-    }
+    }                                           \
+
+#else
+
+#define _pfh_config_event(_code_arr, _nevt)     \
+    if ((_nevt)) {                              \
+        do {                                    \
+            uint32_t _pmu_val0 = 0xFFFFFFFF;    \
+            _pfh_set_pmreg(0, _code_arr[0]);    \
+            _pfh_set_pmreg(1, _code_arr[1]);    \
+            _pfh_set_pmreg(2, _code_arr[2]);    \
+            _pfh_set_pmreg(3, _code_arr[3]);    \
+            asm volatile(                       \
+                "mrs x22, pmcr_el0"     "\n\t"  \
+                "orr x22, x22, #0x2"    "\n\t"  \
+                "msr pmcr_el0, x22"     "\n\t"  \
+                "msr pmovsclr_el0, %0"  "\n\t"  \
+                :                               \
+                : "r" (_pmu_val0)               \
+                : "memory", "x22"               \
+            );                                  \
+        } while(0);                             \
+    }                                           \
+
+#endif // END: #ifdef PFH_OPT_EVX
+
 
 #define _pfh_read_pm_1(_val_arr)    _pfh_read_pm(0, (_val_arr)[0]);
 

@@ -32,3 +32,4 @@ lib/
 *.btr
 rsync.sh
 test.sh
+bak/

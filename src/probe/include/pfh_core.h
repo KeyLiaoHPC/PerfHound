@@ -28,9 +28,9 @@
 #ifndef __VARAPI_CORE_H__
 #define __VARAPI_CORE_H__
 
-#include <stdint.h>
-#include <stdio.h>
 #include <time.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <limits.h>
 
 /* ======== User config area ======== */
@@ -65,30 +65,30 @@
 #ifdef PFH_OPT_EVX
 
 #ifdef __x86_64__
-static int pfh_nev_max = 8;
+#define PFH_NEV_MAX 8
 #else
-static int pfh_nev_max = 12;
-#endif
+#define PFH_NEV_MAX 12
+#endif // END #ifdef __x86_64__
 
 #else
-static int pfh_nev_max = 4;
-#endif
 
-#ifdef PFH_OPT_EVX
-#define PFH_NEV 12
-#else
-#define PFH_NEV 4
-#endif
+#define PFH_NEV_MAX 4
+
+#endif // END #ifdef PFH_OPT_EVX
 
 /* Pfh-Probe record data type */
 typedef struct __attribute__((packed)){
     uint32_t ctag[2];
-    int64_t cy, ns;    
+#ifdef PFH_OPT_PAPI
+    long long ns, cy;
+#else
+    int64_t ns, cy;
+#endif
     double uval;        // 32 Bytes
 #ifdef PFH_OPT_PAPI
-    int64_t ev[PFH_NEV];
+    long long ev[PFH_NEV_MAX];
 #else
-    uint64_t ev[PFH_NEV];
+    uint64_t ev[PFH_NEV_MAX];
 #endif
 } rec_t;
 
@@ -115,24 +115,22 @@ extern proc_t pfh_pinfo;
 extern int pfh_nev;
 
 #ifdef PFH_OPT_PAPI
-#include "pfh_pm_papi.h"
 
-static int pfh_evcodes[PFH_NEV];
+#include "pfh_pm_papi.h"
+static int pfh_evcodes[PFH_NEV_MAX];
 
 #else
+
 #ifdef __x86_64__
 #include "pfh_pm_x86_64.h"
 #include "pfh_evt_clx.h"
-
 #elif  __aarch64__
 #include "pfh_pm_aarch64.h"
 #include "pfh_evt_aarch64.h"
-
 #endif // END: #ifdef __x86_64__
 
+static uint64_t pfh_evcodes[PFH_NEV_MAX];
 
-static uint64_t pfh_evcodes[PFH_NEV];
 #endif // END: #ifdef PFH_OPT_PAPI
-
 
 #endif // END: #ifndef __VARAPI_CORE_H__
