@@ -14,7 +14,7 @@ from scipy.stats import wasserstein_distance
 
 # frequency = 2.5
 error_level = 0.01
-confidence_level = 0.95
+confidence_level = 0.05
 constant_rates = {"cas114": 2494103, "cas113": 249414}
 # ins_lat = {"ADD": 1, "MUL": 3, "FMA": 4, "LD": 0.5, "ST": 1}
 
@@ -378,8 +378,23 @@ def variation_judge(round_1_df, round_2_df, cost, indicator):
     '''
     round_1_data = np.array(round_1_df[indicator], dtype=np.int64) - cost
     round_2_data = np.array(round_2_df[indicator], dtype=np.int64) - cost
+    # calculate the overlap area
+    count_data1 = sorted(Counter(round_1_data).items(), key=lambda x: x[0])
+    count_data2 = sorted(Counter(round_2_data).items(), key=lambda x: x[0])
+    data1_key = np.array([x[0] for x in count_data1])
+    data1_val = np.array([x[1] for x in count_data1])
+    data2_key = np.array([x[0] for x in count_data2])
+    data2_val = np.array([x[1] for x in count_data2])
+    data1_val = data1_val / np.sum(data1_val)
+    data2_val = data2_val / np.sum(data2_val)
+    dict_data1 = dict(zip(data1_key, data1_val))
+    dict_data2 = dict(zip(data2_key, data2_val))
+    overlap = 0
+    for key2, value2 in dict_data2.items():
+        if key2 in data1_key:
+            overlap += min(dict_data1[key2], value2)
     # the condition that the two data can be distinguished
-    cond = (np.min(round_2_data) > np.quantile(round_1_data, confidence_level))
+    cond = (overlap <= confidence_level)
     dist_w = wasserstein_distance(round_1_data, round_2_data)
     return cond, dist_w
 
@@ -436,7 +451,8 @@ def variation_resolution(options_dict, pool):
     with open(resolution_res_file, 'w') as fp:
         if np.sum(cond_res) == continue_test_times:
             indicator_resolution = int(np.median(dist_w_res))
-            fp.write(f"yes\n{indicator_resolution}\n")
+            indicator_resolution_std = int(np.std(dist_w_res))
+            fp.write(f"yes\n{indicator_resolution}\n{indicator_resolution_std}\n")
             print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
         else:
             fp.write("no\n")

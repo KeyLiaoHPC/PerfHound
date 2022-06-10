@@ -14,7 +14,7 @@ from scipy.stats import wasserstein_distance
 
 # frequency = 2.6
 error_level = 0.01
-confidence_level = 0.95
+confidence_level = 0.05
 ncpus = multiprocessing.cpu_count()
 
 
@@ -281,22 +281,12 @@ def least_interval(options_dict):
     mean_nanosecs = np.mean(all_nanosecs)
     std_cycles = np.std(all_cycles)
     std_nanosecs = np.std(all_nanosecs)
-    # min_cycle = np.min(all_cycles)
-    # min_nanosec = np.min(all_nanosecs)
-    # percent_cycle = np.quantile(all_cycles, confidence_level)
-    # percent_nanosec = np.quantile(all_nanosecs, confidence_level)
-    # interval_cycle = percent_cycle - min_cycle
-    # interval_nanosec = percent_nanosec - min_nanosec
     # judge whether the conditions are satisfied
     cond_1 = ((std_cycles / mean_cycles) <= error_level)
     cond_2 = ((std_nanosecs / mean_nanosecs) <= error_level)
-    # cond_1 = (((interval_cycle / min_cycle)) <= error_level)
-    # cond_2 = (((interval_nanosec / min_nanosec)) <= error_level)
     with open(interval_res_file, 'w') as fp:
         if cond_1 and cond_2:
             fp.write(f"yes\n{test_round}\n{np.min(all_cycles)}\n{np.min(all_nanosecs)}\n")
-            # print(f"Round {test_round} passed cycle: ({percent_cycle} - {min_cycle}) / {min_cycle} <= {error_level}")
-            # print(f"Round {test_round} passed nanosec: ({percent_nanosec} - {min_nanosec}) / {min_nanosec} <= {error_level}")
             print(f"Round {test_round} passed cycle: ({round(std_cycles, 2)}) / {round(mean_cycles, 2)} <= {error_level}")
             print(f"Round {test_round} passed nanosec: ({round(std_nanosecs, 2)}) / {round(mean_nanosecs, 2)} <= {error_level}")
         else:
@@ -329,8 +319,23 @@ def variation_judge(round_1_df, round_2_df, cost, indicator):
     '''
     round_1_data = np.array(round_1_df[indicator], dtype=np.int64) - cost
     round_2_data = np.array(round_2_df[indicator], dtype=np.int64) - cost
+    # calculate the overlap area
+    count_data1 = sorted(Counter(round_1_data).items(), key=lambda x: x[0])
+    count_data2 = sorted(Counter(round_2_data).items(), key=lambda x: x[0])
+    data1_key = np.array([x[0] for x in count_data1])
+    data1_val = np.array([x[1] for x in count_data1])
+    data2_key = np.array([x[0] for x in count_data2])
+    data2_val = np.array([x[1] for x in count_data2])
+    data1_val = data1_val / np.sum(data1_val)
+    data2_val = data2_val / np.sum(data2_val)
+    dict_data1 = dict(zip(data1_key, data1_val))
+    dict_data2 = dict(zip(data2_key, data2_val))
+    overlap = 0
+    for key2, value2 in dict_data2.items():
+        if key2 in data1_key:
+            overlap += min(dict_data1[key2], value2)
     # the condition that the two data can be distinguished
-    cond = (np.min(round_2_data) > np.quantile(round_1_data, confidence_level))
+    cond = (overlap <= confidence_level)
     dist_w = wasserstein_distance(round_1_data, round_2_data)
     return cond, dist_w
 
@@ -391,7 +396,8 @@ def variation_resolution(options_dict):
     with open(resolution_res_file, 'w') as fp:
         if np.sum(cond_res) == test_num:
             indicator_resolution = int(np.median(dist_w_res))
-            fp.write(f"yes\n{indicator_resolution}\n")
+            indicator_resolution_std = int(np.std(dist_w_res))
+            fp.write(f"yes\n{indicator_resolution}\n{indicator_resolution_std}\n")
             print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
         else:
             fp.write("no\n")
