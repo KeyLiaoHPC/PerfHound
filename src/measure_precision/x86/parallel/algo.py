@@ -12,7 +12,7 @@ from sklearn.ensemble import IsolationForest
 from scipy.stats import wasserstein_distance
 
 
-# frequency = 2.5
+frequency = 2.5
 error_level = 0.01
 confidence_level = 0.05
 constant_rates = {"cas114": 2494103, "cas113": 249414}
@@ -310,56 +310,6 @@ def least_interval(options_dict, pool):
                 print(f"Round {test_round} passed nanosec: ({round(std_nanosecs, 2)}) / {round(mean_nanosecs, 2)} <= {error_level}")
 
 
-def combine_df_filter(args_tuple):
-    ''' Just a help function of `get_multi_clean_combine_dfs`
-
-        do the same thing with `get_clean_combine_df`.
-
-        Args:
-            args_tuple: (options_dict, org_combine_df).
-
-        Returns:
-            clean_combine_df: pandas.DataFrame of the result data without noise points
-    '''
-    my_options_dict = args_tuple[0]
-    org_combine_df = args_tuple[1]
-    clean_combine_file = f"{my_options_dict['output']}/clean_combine.csv"
-    if not os.path.exists(clean_combine_file):
-        # use single core to filter noise points
-        clean_combine_df = iforest_rm_noise(org_combine_df)
-        clean_combine_df.to_csv(clean_combine_file, index=False)
-    else:
-        clean_combine_df = pd.read_csv(clean_combine_file)
-    return clean_combine_df
-
-
-def get_multi_clean_combine_dfs(test_rounds, options_dict, pool):
-    ''' Help function of `variation_resolution`
-
-        Given multiple test rounds, return the clean combined
-        dataframe (no noise points) of each test round.
-
-        Args:
-            test_rounds: list of all test rounds.
-            options_dict: the original dict of parsed commandline options.
-            pool: the process pool.
-
-        Returns:
-            test_rounds_dfs: clean combined dataframes of all test rounds.
-    '''
-    input_split = options_dict["input"].split('/')
-    # prepare different option_dict for each test rounds
-    copy_options_dict_list = [copy.deepcopy(options_dict) for x in test_rounds]
-    for i, my_options_dict in enumerate(copy_options_dict_list):
-        input_split[-2] = f"cydelay_{test_rounds[i]}"
-        my_options_dict["input"] = '/'.join(input_split)
-        my_options_dict["output"] = f'{my_options_dict["input"]}/{my_options_dict["output_suffix"]}'
-    # get the original combined dataframe
-    org_combine_df_list = [get_combine_df(my_options_dict, pool) for my_options_dict in copy_options_dict_list]
-    test_rounds_dfs = pool.map(combine_df_filter, zip(copy_options_dict_list, org_combine_df_list))
-    return test_rounds_dfs
-
-
 def variation_judge(round_1_df, round_2_df, cost, indicator):
     ''' The help function of "variation resolution"
 
@@ -395,8 +345,9 @@ def variation_judge(round_1_df, round_2_df, cost, indicator):
             overlap += min(dict_data1[key2], value2)
     # the condition that the two data can be distinguished
     cond = (overlap <= confidence_level)
-    dist_w = wasserstein_distance(round_1_data, round_2_data)
-    return cond, dist_w
+    # cond = (np.quantile(round_1_data, 1 - confidence_level) <= np.min(round_2_data))
+    # dist_w = wasserstein_distance(round_1_data, round_2_data)
+    return cond
 
 
 def variation_resolution(options_dict, pool):
@@ -415,13 +366,14 @@ def variation_resolution(options_dict, pool):
             pool: the process pool.
     '''
     k = int(options_dict["fargs"][0])
-    least_round = int(options_dict["fargs"][1])
-    cost_res_file = options_dict["fargs"][2]
-    resolution_res_file = options_dict["fargs"][3]
+    cost_res_file = options_dict["fargs"][1]
+    resolution_res_file = options_dict["fargs"][2]
     if "cycle" in resolution_res_file:
         indicator = "cycle"
+        indicator_resolution = k
     elif "nanosec" in resolution_res_file:
         indicator = "nanosec"
+        indicator_resolution = int(k / frequency)
     else:
         print(f"invalid resolution file name {resolution_res_file}")
         sys.exit(-1)
@@ -435,28 +387,21 @@ def variation_resolution(options_dict, pool):
             # cost_nanosec
             cost = int(lines[1].strip())
 
-    cond_res = list()
-    dist_w_res = list()
+    round_dfs = list()
     input_split = options_dict["input"].split('/')
-    end_round = int(input_split[-2].split('_')[-1])
-    test_rounds = [x for x in range(least_round, end_round + 1, k)]
-    continue_test_times = len(test_rounds) - 1
-    test_round_dfs = get_multi_clean_combine_dfs(test_rounds, options_dict, pool)
-    for i in range(continue_test_times):
-        round_1_df = test_round_dfs[i]
-        round_2_df = test_round_dfs[i + 1]
-        cond, dist_w = variation_judge(round_1_df, round_2_df, cost, indicator)
-        cond_res.append(cond)
-        dist_w_res.append(dist_w)
+    round_2 = int(input_split[-2].split('_')[-1])
+    round_1 = round_2 - k
+    for myround in [round_1, round_2]:
+        input_split[-2] = f"cydelay_{myround}"
+        options_dict["input"] = '/'.join(input_split)
+        options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
+        round_dfs.append(get_clean_combine_df(options_dict, pool))
+    cond = variation_judge(round_dfs[0], round_dfs[1], cost, indicator)
     with open(resolution_res_file, 'w') as fp:
-        if np.sum(cond_res) == continue_test_times:
-            indicator_resolution = int(np.median(dist_w_res))
-            indicator_resolution_std = int(np.std(dist_w_res))
-            fp.write(f"yes\n{indicator_resolution}\n{indicator_resolution_std}\n")
-            print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
+        if cond == True:
+            fp.write(f"yes\n{indicator_resolution}\n")
         else:
             fp.write("no\n")
-            print(f"resolution {k} round failed, {np.sum(cond_res)} of {continue_test_times}")
 
 
 def main():

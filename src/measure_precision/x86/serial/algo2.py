@@ -12,9 +12,10 @@ from sklearn.ensemble import IsolationForest
 from scipy.stats import wasserstein_distance
 
 
-frequency = 2.6
+frequency = 2.5
 error_level = 0.01
 confidence_level = 0.05
+constant_rates = {"cas114": 2494103}
 ncpus = multiprocessing.cpu_count()
 
 
@@ -151,7 +152,7 @@ def sample_pt_diff(options_dict, rankmap_dict):
         # use the data of (end_gid, end_pid) to minus the data of (start_gid, start_pid)
         res_df = (src_df_ep - src_df_sp)[col_names]
         if options_dict["backend"] == "pfhd":
-            res_df["nanosec"] = res_df["nanosec"].apply(lambda x: int(x * 10))
+            res_df["nanosec"] = res_df["nanosec"].apply(lambda x: int(x * 1000000 // constant_rates[host_prefix]))
         # store the result data
         res_df.to_csv(dst_file, index=False)
     return res_df
@@ -355,8 +356,9 @@ def variation_resolution(options_dict):
             options_dict: the dict of parsed commandline options.
     '''
     k = int(options_dict["fargs"][0])
-    cost_res_file = options_dict["fargs"][1]
-    resolution_res_file = options_dict["fargs"][2]
+    least_round = int(options_dict["fargs"][1])
+    cost_res_file = options_dict["fargs"][2]
+    resolution_res_file = options_dict["fargs"][3]
     if "cycle" in resolution_res_file:
         indicator = "cycle"
         indicator_resolution = k
@@ -376,21 +378,30 @@ def variation_resolution(options_dict):
             # cost_nanosec
             cost = int(lines[1].strip())
 
-    round_dfs = list()
+    cond_res = list()
     input_split = options_dict["input"].split('/')
-    round_2 = int(input_split[-2].split('_')[-1])
-    round_1 = round_2 - k
-    for myround in [round_1, round_2]:
-        input_split[-2] = f"cydelay_{myround}"
-        options_dict["input"] = '/'.join(input_split)
-        options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
-        round_dfs.append(get_clean_res_df(options_dict))
-    cond = variation_judge(round_dfs[0], round_dfs[1], cost, indicator)
+    end_round = int(input_split[-2].split('_')[-1])
+    rounds = [x for x in range(least_round, end_round + 1, k)]
+    test_num = len(rounds) - 1
+    copy_options_dict_list = [copy.deepcopy(options_dict) for i in range(test_num + 1)]
+    for i, my_options_dict in enumerate(copy_options_dict_list):
+        input_split[-2] = f"cydelay_{rounds[i]}"
+        my_options_dict["input"] = '/'.join(input_split)
+        my_options_dict["output"] = f'{my_options_dict["input"]}/{my_options_dict["output_suffix"]}'
+    with multiprocessing.Pool(processes=ncpus) as pool:
+        round_dfs = pool.map(get_clean_res_df, copy_options_dict_list)
+    for i in range(test_num):
+        round_1_df = round_dfs[i]
+        round_2_df = round_dfs[i + 1]
+        cond = variation_judge(round_1_df, round_2_df, cost, indicator)
+        cond_res.append(cond)
     with open(resolution_res_file, 'w') as fp:
-        if cond == True:
+        if np.sum(cond_res) == test_num:
             fp.write(f"yes\n{indicator_resolution}\n")
+            print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
         else:
             fp.write("no\n")
+            print(f"resolution {k} round failed, {np.sum(cond_res)} of {test_num}")
 
 
 def main():

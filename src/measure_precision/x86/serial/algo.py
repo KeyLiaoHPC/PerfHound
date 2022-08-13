@@ -4,7 +4,6 @@ import copy
 import getopt
 import numpy as np
 import pandas as pd
-import multiprocessing
 from sklearn import cluster
 from functools import partial
 from collections import Counter
@@ -12,10 +11,9 @@ from sklearn.ensemble import IsolationForest
 from scipy.stats import wasserstein_distance
 
 
-# frequency = 2.5
+frequency = 2.5
 error_level = 0.01
 confidence_level = 0.05
-ncpus = multiprocessing.cpu_count()
 constant_rates = {"cas114": 2494103}
 # ins_lat = {"ADD": 1, "MUL": 3, "FMA": 4, "LD": 0.5, "ST": 1}
 
@@ -338,8 +336,9 @@ def variation_judge(round_1_df, round_2_df, cost, indicator):
             overlap += min(dict_data1[key2], value2)
     # the condition that the two data can be distinguished
     cond = (overlap <= confidence_level)
-    dist_w = wasserstein_distance(round_1_data, round_2_data)
-    return cond, dist_w
+    # cond = (np.quantile(round_1_data, 1 - confidence_level) <= np.min(round_2_data))
+    # dist_w = wasserstein_distance(round_1_data, round_2_data)
+    return cond
 
 
 def variation_resolution(options_dict):
@@ -356,13 +355,14 @@ def variation_resolution(options_dict):
             options_dict: the dict of parsed commandline options.
     '''
     k = int(options_dict["fargs"][0])
-    least_round = int(options_dict["fargs"][1])
-    cost_res_file = options_dict["fargs"][2]
-    resolution_res_file = options_dict["fargs"][3]
+    cost_res_file = options_dict["fargs"][1]
+    resolution_res_file = options_dict["fargs"][2]
     if "cycle" in resolution_res_file:
         indicator = "cycle"
+        indicator_resolution = k
     elif "nanosec" in resolution_res_file:
         indicator = "nanosec"
+        indicator_resolution = int(k / frequency)
     else:
         print(f"invalid resolution file name {resolution_res_file}")
         sys.exit(-1)
@@ -376,34 +376,21 @@ def variation_resolution(options_dict):
             # cost_nanosec
             cost = int(lines[1].strip())
 
-    cond_res = list()
-    dist_w_res = list()
+    round_dfs = list()
     input_split = options_dict["input"].split('/')
-    end_round = int(input_split[-2].split('_')[-1])
-    rounds = [x for x in range(least_round, end_round + 1, k)]
-    test_num = len(rounds) - 1
-    copy_options_dict_list = [copy.deepcopy(options_dict) for i in range(test_num + 1)]
-    for i, my_options_dict in enumerate(copy_options_dict_list):
-        input_split[-2] = f"cydelay_{rounds[i]}"
-        my_options_dict["input"] = '/'.join(input_split)
-        my_options_dict["output"] = f'{my_options_dict["input"]}/{my_options_dict["output_suffix"]}'
-    with multiprocessing.Pool(processes=ncpus) as pool:
-        round_dfs = pool.map(get_clean_res_df, copy_options_dict_list)
-    for i in range(test_num):
-        round_1_df = round_dfs[i]
-        round_2_df = round_dfs[i + 1]
-        cond, dist_w = variation_judge(round_1_df, round_2_df, cost, indicator)
-        cond_res.append(cond)
-        dist_w_res.append(dist_w)
+    round_2 = int(input_split[-2].split('_')[-1])
+    round_1 = round_2 - k
+    for myround in [round_1, round_2]:
+        input_split[-2] = f"cydelay_{myround}"
+        options_dict["input"] = '/'.join(input_split)
+        options_dict["output"] = f'{options_dict["input"]}/{options_dict["output_suffix"]}'
+        round_dfs.append(get_clean_res_df(options_dict))
+    cond = variation_judge(round_dfs[0], round_dfs[1], cost, indicator)
     with open(resolution_res_file, 'w') as fp:
-        if np.sum(cond_res) == test_num:
-            indicator_resolution = int(np.median(dist_w_res))
-            indicator_resolution_std = int(np.std(dist_w_res))
-            fp.write(f"yes\n{indicator_resolution}\n{indicator_resolution_std}\n")
-            print(f"resolution {k} round passed, {indicator_resolution} {indicator}s")
+        if cond == True:
+            fp.write(f"yes\n{indicator_resolution}\n")
         else:
             fp.write("no\n")
-            print(f"resolution {k} round failed, {np.sum(cond_res)} of {test_num}")
 
 
 def main():

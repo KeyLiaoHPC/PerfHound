@@ -7,7 +7,7 @@ kernel=ADD
 bind_core=12
 measure_num=2000
 tmin_check_num=30
-tdiff_test_num=80
+tdiff_test_num=40
 # param_arrlen = 2048
 # param_arrlen = 65536
 # param_arrlen = 1802240
@@ -37,7 +37,7 @@ function compile_and_run() {
 function tcost_test() {
     compile_and_run 0 0
     # get the cost of timing instruction
-    python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f cost_measure -a ${tcost_file}
+    python algo2.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f cost_measure -a ${tcost_file}
 }
 
 function tmin_check() {
@@ -46,7 +46,7 @@ function tmin_check() {
     for j in `seq 2 $[tmin_check_num + 1]`
     do
         compile_and_run ${arrlen} ${cydelay} ${j}
-        python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f least_interval -a ${cydelay},${tcost_file},${tmin_file}
+        python algo2.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f least_interval -a ${cydelay},${tcost_file},${tmin_file}
         passed=`cat ${tmin_file}`
         if [[ ${passed} == "no" ]]; then
             break
@@ -67,7 +67,7 @@ function tmin_test() {
         do
             let cydelay=cydelay+test_step
             compile_and_run ${arrlen} ${cydelay}
-            python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f least_interval -a ${cydelay},${tcost_file},${tmin_file}
+            python algo2.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f least_interval -a ${cydelay},${tcost_file},${tmin_file}
             passed=`cat ${tmin_file}`
             if [[ ${passed} == "no" ]]; then
                 let start=cydelay
@@ -100,31 +100,17 @@ function tdiff_test() {
         while [[ ${passed} == "no" ]]
         do
             let k=k+test_step
-            echo "try tdiff = ${k}"
-            let cnt=0
-            for i in `seq 1 ${tdiff_test_num}`
+            let end_delay=tmin_delay+k*tdiff_test_num
+            for i in `seq ${tmin_delay} ${k} ${end_delay}`
             do
-                let delay_2=tmin_delay+i*k
-                let delay_1=delay_2-k
-                # compile_and_run ${arrlen} ${delay_1}
-                compile_and_run ${arrlen} ${delay_2}
-                python algo.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f variation_resolution -a ${k},${tcost_file},${tdiff_file}
-                passed=`cat ${tdiff_file}`
-                if [[ ${passed} == "no" ]]; then
-                    echo "${delay_1} and ${delay_2} not passed"
-                    break
-                else
-                    echo "${delay_1} and ${delay_2} passed"
-                    let cnt=cnt+1
-                fi
+                compile_and_run ${arrlen} ${i}
             done
-
-            if [[ ${cnt} -eq ${tdiff_test_num} ]]; then
-                echo "tdiff = ${k} passed"
-                let right=k
-            else
-                echo "tdiff = ${k} failed"
+            python algo2.py -s 1,1 -e 1,2 -i ${output_dir} -b ${tool} -f variation_resolution -a ${k},${tmin_delay},${tcost_file},${tdiff_file}
+            passed=`cat ${tdiff_file}`
+            if [[ ${passed} == "no" ]]; then
                 let left=k
+            else
+                let right=k
             fi
         done
         let k=left
@@ -145,12 +131,12 @@ function main() {
         fi
         # step-1: measure cost test
         tcost_file="${result_dir}/${tool}_tcost.txt"
-        tcost_test
+        # tcost_test
         cost_cycle=`sed -n '1p' ${tcost_file}`
         cost_nanosec=`sed -n '2p' ${tcost_file}`
         # step-2: least measurable interval
         tmin_file="${result_dir}/${tool}_arrlen_${param_arrlen}_tmin_check_${tmin_check_num}.txt"
-        tmin_test ${param_arrlen}
+        # tmin_test ${param_arrlen}
         tmin_delay=`sed -n '2p' ${tmin_file}`
         tmin_cycle=`sed -n '3p' ${tmin_file}`
         tmin_nanosec=`sed -n '4p' ${tmin_file}`

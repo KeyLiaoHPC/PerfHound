@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #define _ISOC11_SOURCE
 
+#include <mpi.h>
 #include <time.h>
 #include <sched.h>
 #include <stdio.h>
@@ -9,7 +10,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
-#include <perfhound.h>
+#include <perfhound_mpi.h>
 
 // Tool name
 #ifndef TOOL
@@ -156,7 +157,7 @@ void one_round_test(double* arr1, double* arr2, double scalar) {
     );
 
     while ((measure_counter++) < NMEASURE) {
-        pfh_read(1, 1, 0);
+        pfhmpi_read(1, 1, 0);
 
 #pragma GCC unroll 256
         for (int i = 0; i < major_counts; ++i) {
@@ -167,7 +168,7 @@ void one_round_test(double* arr1, double* arr2, double scalar) {
             KERNEL_ADD
         }
 
-        pfh_read(1, 2, 0);
+        pfhmpi_read(1, 2, 0);
 
 #if ARRLEN
         flush_cache(arr1, arr2, scalar);
@@ -176,64 +177,69 @@ void one_round_test(double* arr1, double* arr2, double scalar) {
 }
 
 int main(int argc, char** argv) {
+    int nprocs;
     char dirname[256];
     char* op = M2S(KNAME);
     char* mode = M2S(MODE);
     char* tool = M2S(TOOL);
 
+    MPI_Init(NULL, NULL);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     // create directory
-    sprintf(dirname, "./data/%s/arrlen_%d/%s_%s_test_kp920/cydelay_%d", tool, ARRLEN, mode, op, CYDELAY);
-    if (pfh_init(dirname)) {
+    sprintf(dirname, "./data/%s/nprocs_%d/arrlen_%d/%s_%s_test_kp920/cydelay_%d", tool, nprocs, ARRLEN, mode, op, CYDELAY);
+    if (pfhmpi_init(dirname)) {
         printf("Failed at initailizing PerfHound.\n");
         exit(1);
     }
-    pfh_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
-    pfh_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
-    pfh_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
+    pfhmpi_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
+    pfhmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
+    pfhmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
 
     if (strcmp(tool, "pfhd") == 0) {
         if (strcmp(mode, "EVX") == 0) {
-            pfh_set_evt("CPU_CYCLES");
-            pfh_set_evt("INST_RETIRED");
-            pfh_set_evt("STALL_FRONTEND");
-            pfh_set_evt("STALL_BACKEND");
-            pfh_set_evt("L1D_TLB");
-            pfh_set_evt("L1D_CACHE");
-            pfh_set_evt("L1I_CACHE");
-            pfh_set_evt("L2D_CACHE");
-            pfh_set_evt("BR_RETIRED");
-            pfh_set_evt("MEM_ACCESS");
-            pfh_set_evt("L1D_TLB_REFILL");
-            pfh_set_evt("L1D_CACHE_REFILL");
+            pfhmpi_set_evt("CPU_CYCLES");
+            pfhmpi_set_evt("INST_RETIRED");
+            pfhmpi_set_evt("STALL_FRONTEND");
+            pfhmpi_set_evt("STALL_BACKEND");
+            pfhmpi_set_evt("L1D_TLB");
+            pfhmpi_set_evt("L1D_CACHE");
+            pfhmpi_set_evt("L1I_CACHE");
+            pfhmpi_set_evt("L2D_CACHE");
+            pfhmpi_set_evt("BR_RETIRED");
+            pfhmpi_set_evt("MEM_ACCESS");
+            pfhmpi_set_evt("L1D_TLB_REFILL");
+            pfhmpi_set_evt("L1D_CACHE_REFILL");
         } else if (strcmp(mode, "EV") == 0) {
-            pfh_set_evt("CPU_CYCLES");
-            pfh_set_evt("INST_RETIRED");
-            pfh_set_evt("STALL_FRONTEND");
-            pfh_set_evt("STALL_BACKEND");
+            pfhmpi_set_evt("CPU_CYCLES");
+            pfhmpi_set_evt("INST_RETIRED");
+            pfhmpi_set_evt("STALL_FRONTEND");
+            pfhmpi_set_evt("STALL_BACKEND");
         }
     } else {
         if (strcmp(mode, "EVX") == 0) {
-            pfh_set_evt("CPU_CYCLES");
-            pfh_set_evt("INST_RETIRED");
-            pfh_set_evt("STALL_FRONTEND");
-            pfh_set_evt("STALL_BACKEND");
-            pfh_set_evt("L1D_TLB");
-            pfh_set_evt("L1D_CACHE");
-            pfh_set_evt("L1I_CACHE");
-            pfh_set_evt("L2D_CACHE");
-            pfh_set_evt("BR_RETIRED");
-            pfh_set_evt("MEM_ACCESS");
-            pfh_set_evt("L1D_TLB_REFILL");
-            pfh_set_evt("L1D_CACHE_REFILL");
+            pfhmpi_set_evt("CPU_CYCLES");
+            pfhmpi_set_evt("INST_RETIRED");
+            pfhmpi_set_evt("STALL_FRONTEND");
+            pfhmpi_set_evt("STALL_BACKEND");
+            pfhmpi_set_evt("L1D_TLB");
+            pfhmpi_set_evt("L1D_CACHE");
+            pfhmpi_set_evt("L1I_CACHE");
+            pfhmpi_set_evt("L2D_CACHE");
+            pfhmpi_set_evt("BR_RETIRED");
+            pfhmpi_set_evt("MEM_ACCESS");
+            pfhmpi_set_evt("L1D_TLB_REFILL");
+            pfhmpi_set_evt("L1D_CACHE_REFILL");
         } else if (strcmp(mode, "EV") == 0) {
-            pfh_set_evt("CPU_CYCLES");
-            pfh_set_evt("INST_RETIRED");
-            pfh_set_evt("STALL_FRONTEND");
-            pfh_set_evt("STALL_BACKEND");
+            pfhmpi_set_evt("CPU_CYCLES");
+            pfhmpi_set_evt("INST_RETIRED");
+            pfhmpi_set_evt("STALL_FRONTEND");
+            pfhmpi_set_evt("STALL_BACKEND");
         }
     }
-    pfh_commit();
+    pfhmpi_commit();
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     // initial array
     double scalar;
     struct timespec tv;
@@ -248,6 +254,8 @@ int main(int argc, char** argv) {
         arr2[i] = ((rand() * 1.0) / RAND_MAX);
     }
     flush_cache(arr1, arr2, scalar);
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     one_round_test(arr1, arr2, scalar);
     /*asm volatile (
@@ -258,8 +266,10 @@ int main(int argc, char** argv) {
     );
     printf("%d\n", res);*/
 
+    MPI_Barrier(MPI_COMM_WORLD);
     free(arr1);
     free(arr2);
-    pfh_finalize();
+    pfhmpi_finalize();
+    MPI_Finalize();
     return 0;
 }

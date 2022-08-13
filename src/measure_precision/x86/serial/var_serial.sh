@@ -36,6 +36,8 @@ function main() {
     result_dir="var_serial"
     if [ ! -d ${result_dir} ]; then
         mkdir -p ${result_dir}
+    else
+        mv ${result_dir}/data .
     fi
 
     # fix the frequency
@@ -43,13 +45,7 @@ function main() {
 
     for len in 0 2048 8192 65536 262144 360448 1048576 1802240 4194304 7208960 16777216 33554432
     do
-        for cy in `seq 0 100 1000`
-        do
-            cost_measure_file="${result_dir}/${tool}_cost_arrlen_${len}_cydelay_${cy}.txt"
-            mytest $len $cy
-        done
-
-        for cy in `seq 2000 1000 10000`
+        for cy in `seq 0 100 10000`
         do
             cost_measure_file="${result_dir}/${tool}_cost_arrlen_${len}_cydelay_${cy}.txt"
             mytest $len $cy

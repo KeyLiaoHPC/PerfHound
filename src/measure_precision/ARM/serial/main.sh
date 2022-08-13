@@ -8,11 +8,8 @@ bind_core=12
 measure_num=2000
 tmin_check_num=30
 tdiff_test_num=80
-# param_arrlen = 2048
-# param_arrlen = 65536
-# param_arrlen = 1802240
-param_arrlen=7208960
-src_file=test_x86_serial.c
+param_arrlen=4096
+src_file=test_aarch64_serial.c
 
 
 function compile_and_run() {
@@ -23,7 +20,7 @@ function compile_and_run() {
     else
         run_id=${3}
     fi
-    output_dir="./data/${tool}/arrlen_${arrlen}/${mode}_${kernel}_test_6248/cydelay_${cydelay}/run_${run_id}"
+    output_dir="./data/${tool}/arrlen_${arrlen}/${mode}_${kernel}_test_kp920/cydelay_${cydelay}/run_${run_id}"
     if [ ! -d ${output_dir} ]; then
         exe=./${tool}_${mode}_${kernel}_${cydelay}.x
         flags="-O3 -std=gnu99 -DTOOL=$tool -DMODE=$mode -DKNAME=$kernel -DCYDELAY=$cydelay -DARRLEN=$arrlen -DNMEASURE=$measure_num"
@@ -58,7 +55,7 @@ function tmin_test() {
     end=0
     start=0
     cydelay=0
-    test_step=10000
+    test_step=1000
     arrlen=${1}
     while [[ ${test_step} -gt 0 ]]
     do
