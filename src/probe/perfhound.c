@@ -74,9 +74,8 @@ extern int pfh_io_wtinfo();
 /* Set system events. */
 int
 pfh_set_evt(const char *etag) {
-    // Unavailable in TS dode.
+    // Unavailable in TS mode.
 
-    // We do not support redefine events for now.
     if (pfh_ready) {
         printf("*** [Pfh-Probe] WARNING. Your setting has been committed, please set events before pfh_commit. \n");
         fflush(stdout);

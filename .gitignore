@@ -32,3 +32,6 @@ lib/
 *.btr
 rsync.sh
 test.sh
+*.cmd
+.tmp_versions
+.DS_Store
