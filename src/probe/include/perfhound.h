@@ -24,21 +24,21 @@ extern "C" {
 #endif
 
 /** 
- * Initialise PFH-Probe. This function must be called exactly once before the 
+ * Initialise PH-Probe. This function must be called exactly once before the 
  * variation detection.
  * @param data_dir      Root dir for output data.
  * @param proj_name     Project name, for intra-project data comparison.
  * @return int 
  */
-int pfh_init(char *path);
+int ph_init(char *path);
 
 /**
  * Register system events which will be recorded. 
  * @param etags         Array of event names.
  */
-int pfh_set_evt(const char *etags);
+int ph_set_evt(const char *etags);
 
-void pfh_commit();
+void ph_commit();
 
 /**
  * Get and record an pre-defined event reading.
@@ -46,27 +46,27 @@ void pfh_commit();
  * @param p_id          uint32. Collecting point index.
  * @return              int. Return error code.
  */
-void pfh_fastread(uint32_t grp_id, uint32_t p_id, double uval);
+void ph_fastread(uint32_t grp_id, uint32_t p_id, double uval);
 
-void pfh_read(uint32_t grp_id, uint32_t p_id, double uval);
+void ph_read(uint32_t grp_id, uint32_t p_id, double uval);
 
 
 /**
  * Creating tag for a collecting point.
  * 
  */
-int pfh_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
+int ph_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
 
 /**
  * Write collected data to csv files.
  */
-void pfh_dump();
+void ph_dump();
 
 
 /**
- * Exit Pfh-Probe and release resources.
+ * Exit PH-Probe and release resources.
  */
-void pfh_finalize();
+void ph_finalize();
 
 
 

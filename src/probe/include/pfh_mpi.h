@@ -15,8 +15,8 @@
  * this program. If not, see https://www.gnu.org/licenses/.
  * 
  * =================================================================================
- * pfh_mpi.h
- * Description: API for PFH-Probe
+ * ph_mpi.h
+ * Description: API for PH-Probe
  * Author: Key Liao
  * Modified: Jul. 28th, 2021
  * Email: keyliao@sjtu.edu.cn
@@ -30,21 +30,21 @@ extern "C" {
 
 #endif
 /** 
- * Initialise PFH-Probe. This function must be called exactly once before the 
+ * Initialise PH-Probe. This function must be called exactly once before the 
  * variation detection.
  * @param data_dir      Root dir for output data.
  * @param proj_name     Project name, for intra-project data comparison.
  * @return int 
  */
-int pfhmpi_init(char *path);
+int phmpi_init(char *path);
 
 /**
  * Register system events which will be recorded. 
  * @param etags         Array of event names.
  */
-int pfhmpi_set_evt(const char *etags);
+int phmpi_set_evt(const char *etags);
 
-void pfhmpi_commit();
+void phmpi_commit();
 
 /**
  * Get and record an pre-defined event reading.
@@ -52,29 +52,29 @@ void pfhmpi_commit();
  * @param p_id          uint32. Collecting point index.
  * @return              int. Return error code.
  */
-void pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval);
+void phmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval);
 
-void pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval);
+void phmpi_read(uint32_t grp_id, uint32_t p_id, double uval);
 
 
 /**
  * Creating tag for a collecting point.
  * 
  */
-int pfhmpi_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
+int phmpi_set_tag(uint32_t grp_id, uint32_t p_id, char *name);
 
 /**
  * Write collected data to csv files.
  * @param bufsize	uint64. The buffer size in Bytes. Write when the size of data
  * 			fills the buffer. Force write when bufsize=0.
  */
-void pfhmpi_dump();
+void phmpi_dump();
 
 
 /**
- * Exit Pfh-Probe and release resources.
+ * Exit PH-Probe and release resources.
  */
-void pfhmpi_finalize();
+void phmpi_finalize();
 
 #ifdef __cplusplus
 }

@@ -34,51 +34,51 @@
 #include <sched.h>
 #include <math.h>
 #include <mpi.h>
-#include "pfh_core.h"
+#include "ph_core.h"
 
-extern int pfh_io_mkhost();
-extern int pfh_io_wtrankmap();
+extern int ph_io_mkhost();
+extern int ph_io_wtrankmap();
 
 int
-pfh_mpi_rank_init() {
+ph_mpi_rank_init() {
     int np, in;
     char hname[_HOST_MAX];
     if (MPI_Comm_size(MPI_COMM_WORLD, &np)) {
         return 1;
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &in);
-    pfh_pinfo.rank = in;
-    pfh_pinfo.nrank = np;
-    pfh_pinfo.cpu = sched_getcpu();
-    pfh_pinfo.head = 0;
-    pfh_pinfo.iorank = pfh_pinfo.rank;
+    ph_pinfo.rank = in;
+    ph_pinfo.nrank = np;
+    ph_pinfo.cpu = sched_getcpu();
+    ph_pinfo.head = 0;
+    ph_pinfo.iorank = ph_pinfo.rank;
     gethostname(hname, _HOST_MAX);
-    memcpy(pfh_pinfo.host, hname, _HOST_MAX*sizeof(char));
+    memcpy(ph_pinfo.host, hname, _HOST_MAX*sizeof(char));
 
     return 0;
 }
 
 void
-pfh_mpi_barrier(MPI_Comm comm) {
+ph_mpi_barrier(MPI_Comm comm) {
     MPI_Barrier(comm);
 
     return;
 }
 
 int
-pfh_mpi_mkhost() {
+ph_mpi_mkhost() {
     int flag = 0, ioerr;
     int myrank, nrank;
-    myrank = pfh_pinfo.rank;
-    nrank = pfh_pinfo.nrank;
+    myrank = ph_pinfo.rank;
+    nrank = ph_pinfo.nrank;
     MPI_Status stat;
 
     if (myrank == 0) {
-        ioerr = pfh_io_mkhost();
+        ioerr = ph_io_mkhost();
         if (ioerr) {
             return ioerr;
         }
-        ioerr = pfh_io_wtrankmap();
+        ioerr = ph_io_wtrankmap();
         if (ioerr) {
             return ioerr;
         }
@@ -86,11 +86,11 @@ pfh_mpi_mkhost() {
         MPI_Recv(&flag, 1, MPI_INT, nrank-1, nrank-1, MPI_COMM_WORLD, &stat);
     } else {
         MPI_Recv(&flag, 1, MPI_INT, myrank-1, myrank-1, MPI_COMM_WORLD, &stat);
-        ioerr = pfh_io_mkhost();
+        ioerr = ph_io_mkhost();
         if (ioerr) {
             return ioerr;
         }
-        ioerr = pfh_io_wtrankmap();
+        ioerr = ph_io_wtrankmap();
         if (ioerr) {
             return ioerr;
         }

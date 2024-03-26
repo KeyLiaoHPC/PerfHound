@@ -49,12 +49,12 @@
 
 /* Init fixed-function registers. */
 // This call is based on https://github.com/obilaniu/libpfc
-#define _pfh_init_ts                                                \
+#define _ph_init_ts                                                \
     do {                                                            \
         PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};                \
         const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0};     \
         if (pfcInit() != 0) {                                       \
-            printf("*** [Pfh-Probe] Failed to load pfc file.\n");   \
+            printf("*** [PH-Probe] Failed to load pfc file.\n");   \
             fflush(stdout);                                         \
             exit(1);                                                \
         }                                                           \
@@ -63,12 +63,12 @@
     } while(0);                                                     \
 //    _nspt = 1 / _X86_TSC_GHZ;                            
 
-#define _pfh_fini_ts     \
+#define _ph_fini_ts     \
     pfcFini()
 
-#define _pfh_init_cy
+#define _ph_init_cy
 
-#define _pfh_reg_save                                   \
+#define _ph_reg_save                                   \
     asm volatile(                                       \
             "\n\tmov %%rax, %0"                         \
             "\n\tmov %%rcx, %1"                         \
@@ -78,7 +78,7 @@
             :                                           \
             : );                                        
 
-#define _pfh_reg_restore                                \
+#define _ph_reg_restore                                \
     asm volatile(                                       \
             "\n\tmov %0, %%rax"                         \
             "\n\tmov %1, %%rcx"                         \
@@ -90,7 +90,7 @@
 
 
 /* Read actual clock cycle from CPU_CLK_UNHALTED.THREAD */
-#define _pfh_read_cy(_cy)                               \
+#define _ph_read_cy(_cy)                               \
     do {                                                \
         register uint64_t cy;                           \
         asm volatile(                                   \
@@ -106,12 +106,12 @@
 /* Read virtual timer */
 #ifdef USE_SYSCALL_TS
 #include <sys/syscall.h>
-#define _pfh_read_ns(_ns)   struct timespec ts;                                 \
+#define _ph_read_ns(_ns)   struct timespec ts;                                 \
                             syscall(__NR_clock_gettime, CLOCK_REALTIME, &ts);   \
                             (_ns) = ts.tv_sec * 1e9 + ts.tv_nsec;
                             
 #else
-#define _pfh_read_ns(_ns)                               \
+#define _ph_read_ns(_ns)                               \
     do {                                                \
         register uint64_t ns;                           \
         asm volatile(                                   \
@@ -130,12 +130,12 @@
 
 /* Macros for reading x86_64 events */
 /* Parsing string events to hex event code */
-#define _pfh_parse_event(_code, _evstr)  \
+#define _ph_parse_event(_code, _evstr)  \
     _code = pfcParseCfg(_evstr);        \
     if(_code == 0) _code = 0xFFFFFFFF;
 
 /* Set IA32_PERFEVTSELx */
-#define _pfh_config_event(_code_arr, _nevt)  \
+#define _ph_config_event(_code_arr, _nevt)  \
     if ((_nevt)) {                                                  \
         do {                                                        \
             const PFC_CNT pfc_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0};  \
@@ -154,7 +154,7 @@
     "\n\tmov      %%rdx,   "#off"(%0)       "   \
     "\n\t"
 
-#define _pfh_read_pm_1(arr)                     \
+#define _ph_read_pm_1(arr)                     \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             :                                   \
@@ -162,7 +162,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                              
 
-#define _pfh_read_pm_2(arr)                      \
+#define _ph_read_pm_2(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -171,7 +171,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
         
-#define _pfh_read_pm_3(arr)                      \
+#define _ph_read_pm_3(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -181,7 +181,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
 
-#define _pfh_read_pm_4(arr)                      \
+#define _ph_read_pm_4(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -192,7 +192,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                              
 
-#define _pfh_read_pm_5(arr)                      \
+#define _ph_read_pm_5(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -205,7 +205,7 @@
         );                                       
 
 
-#define _pfh_read_pm_6(arr)                      \
+#define _ph_read_pm_6(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -218,7 +218,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
 
-#define _pfh_read_pm_7(arr)                      \
+#define _ph_read_pm_7(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -232,7 +232,7 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
 
-#define _pfh_read_pm_8(arr)                      \
+#define _ph_read_pm_8(arr)                      \
         asm volatile(                           \
             _pm_read(0x00000000, 0)             \
             _pm_read(0x00000001, 8)             \
@@ -247,10 +247,10 @@
             : "memory", "%rax", "%rcx", "%rdx"  \
         );                                       
 
-#define _pfh_read_pm_9(arr)
-#define _pfh_read_pm_10(arr)
-#define _pfh_read_pm_11(arr)
-#define _pfh_read_pm_12(arr)
+#define _ph_read_pm_9(arr)
+#define _ph_read_pm_10(arr)
+#define _ph_read_pm_11(arr)
+#define _ph_read_pm_12(arr)
 
-#define _pfh_read_pm_ev(_val_arr)   _pfh_read_pm_4(_val_arr);
-#define _pfh_read_pm_evx(_val_arr)  _pfh_read_pm_8(_val_arr);
+#define _ph_read_pm_ev(_val_arr)   _ph_read_pm_4(_val_arr);
+#define _ph_read_pm_evx(_val_arr)  _ph_read_pm_8(_val_arr);

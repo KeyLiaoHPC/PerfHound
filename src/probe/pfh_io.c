@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "pfh_core.h"
+#include "ph_core.h"
 
 /* Variables for files and information */
 typedef struct {
@@ -49,11 +49,11 @@ typedef struct {
     char etag[PATH_MAX]; // Perf event's descriptions.
     char rankmap[PATH_MAX]; // Perf event's descriptions.
     char rec[PATH_MAX]; // Records file.
-} pfh_path_t;
+} ph_path_t;
 
 static int runid;
 static uint64_t nrec_tot;
-static pfh_path_t pfh_paths;
+static ph_path_t ph_paths;
 static char st_timestr[16], en_timestr[16]; // Timestamp in YYYYMMDDTHHmmss.
 /**
  * create data directory for each host. Expending path to absolute
@@ -62,7 +62,7 @@ static char st_timestr[16], en_timestr[16]; // Timestamp in YYYYMMDDTHHmmss.
  * @return int 
  */
 int
-pfh_io_mkdir(char *path){
+ph_io_mkdir(char *path){
     int err;
     const char *htmp;
     char tmp_path[PATH_MAX], tmp_path_full[PATH_MAX];
@@ -87,11 +87,11 @@ pfh_io_mkdir(char *path){
         if (*p == '/') {
             // Jump the first '/' which is root directory.
             *p = '\0';
-            printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
+            printf("*** [PH-Probe] Loop into directory: %s\n", tmp_path);
             err = mkdir(tmp_path, S_IRWXU);
             if (err) {
                 if(errno != EEXIST) {
-                    printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);
+                    printf("*** [PH-Probe] Failed in mkdir, path string: %s\n", tmp_path);
                     fflush(stdout);
                     return errno;
                 }
@@ -100,10 +100,10 @@ pfh_io_mkdir(char *path){
         }
     }
 
-    printf("*** [Pfh-Probe] Loop into directory: %s\n", tmp_path);
+    printf("*** [PH-Probe] Loop into directory: %s\n", tmp_path);
     if (mkdir(tmp_path, S_IRWXU) != 0){
         if(errno != EEXIST) {
-            printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", tmp_path);
+            printf("*** [PH-Probe] Failed in mkdir, path string: %s\n", tmp_path);
             fflush(stdout);
             return errno;
         }
@@ -120,7 +120,7 @@ pfh_io_mkdir(char *path){
  * Create files. 
  */
 int
-pfh_io_touch(char *path, char *mode){
+ph_io_touch(char *path, char *mode){
     FILE *fp;
     
     fp = fopen(path, mode);
@@ -133,7 +133,7 @@ pfh_io_touch(char *path, char *mode){
 
 /* Get timestamp of starting point. */
 int
-pfh_io_getstamp(char *path, char *timestr, int *run_id) {
+ph_io_getstamp(char *path, char *timestr, int *run_id) {
     long int tstamp_size;
     char stampfile[PATH_MAX];
     time_t t = time(0);
@@ -160,7 +160,7 @@ pfh_io_getstamp(char *path, char *timestr, int *run_id) {
 
 /* When varapi ends successfully, put tstamp in tstamp.log in every host directory.*/
 void
-pfh_io_putstamp(char *path, char *timestr) {
+ph_io_putstamp(char *path, char *timestr) {
     FILE *fp;
     char tstampfile[PATH_MAX];
     
@@ -173,7 +173,7 @@ pfh_io_putstamp(char *path, char *timestr) {
 
 /* Logging */
 void
-pfh_io_log(FILE *fp, char *fmt, ...) {
+ph_io_log(FILE *fp, char *fmt, ...) {
     /* Generate natural timestamp. */
     time_t t = time(0);
     struct tm *lt = localtime(&t);
@@ -195,7 +195,7 @@ pfh_io_log(FILE *fp, char *fmt, ...) {
 
 
 int
-pfh_io_mkname(char *root) {
+ph_io_mkname(char *root) {
     int nrun;
     char tmp_path[PATH_MAX];
     char *p_realpath = NULL;
@@ -207,39 +207,39 @@ pfh_io_mkname(char *root) {
     if (p_realpath == NULL) {
         return errno;
     }
-    strcpy(pfh_paths.proj_dir, p_realpath);
+    strcpy(ph_paths.proj_dir, p_realpath);
     free(p_realpath);
 
     /* Run path */
     nrun = 0;    
     while (1) {
         nrun += 1;
-        sprintf(tmp_path, "%s/run_%d", pfh_paths.proj_dir, nrun);
+        sprintf(tmp_path, "%s/run_%d", ph_paths.proj_dir, nrun);
         if( access( tmp_path, F_OK ) != 0 ) {
             break;
         } 
     }
     runid = nrun;
-    sprintf(pfh_paths.run_dir, "%s/run_%d", pfh_paths.proj_dir, runid);
+    sprintf(ph_paths.run_dir, "%s/run_%d", ph_paths.proj_dir, runid);
 
     /* run_info.csv */
-    sprintf(pfh_paths.runinfo, "%s/run_info.csv", pfh_paths.proj_dir); 
+    sprintf(ph_paths.runinfo, "%s/run_info.csv", ph_paths.proj_dir); 
 
     /* Creating ctags.csv. Write headers to ctags.csv */
-    sprintf(pfh_paths.ctag, "%s/ctag.csv", pfh_paths.run_dir);
+    sprintf(ph_paths.ctag, "%s/ctag.csv", ph_paths.run_dir);
 
     /* etag.csv */
-    sprintf(pfh_paths.etag, "%s/etag.csv", pfh_paths.run_dir);
+    sprintf(ph_paths.etag, "%s/etag.csv", ph_paths.run_dir);
     
     /* rankmap.csv */
-    sprintf(pfh_paths.rankmap, "%s/rankmap.csv", pfh_paths.run_dir);
+    sprintf(ph_paths.rankmap, "%s/rankmap.csv", ph_paths.run_dir);
 
     /** Considering parallel PerfHound, fill host directory and record file 
      *  without actually creating.
      */
-    sprintf(pfh_paths.host_dir, "%s/%s", pfh_paths.run_dir, pfh_pinfo.host);
-    sprintf(pfh_paths.rec, "%s/r%dc%d.csv", 
-        pfh_paths.host_dir, pfh_pinfo.rank, pfh_pinfo.cpu);
+    sprintf(ph_paths.host_dir, "%s/%s", ph_paths.run_dir, ph_pinfo.host);
+    sprintf(ph_paths.rec, "%s/r%dc%d.csv", 
+        ph_paths.host_dir, ph_pinfo.rank, ph_pinfo.cpu);
 
     /* Get start timestamp. */
     do{
@@ -254,22 +254,22 @@ pfh_io_mkname(char *root) {
 }
 
 int
-pfh_io_mkfile() {
+ph_io_mkfile() {
     int ioerr;
     FILE *fp;
 
-    ioerr = pfh_io_mkdir(pfh_paths.proj_dir);
+    ioerr = ph_io_mkdir(ph_paths.proj_dir);
     if (ioerr) {
         return ioerr;
     }
 
     /* Run path. */
-    ioerr = mkdir(pfh_paths.run_dir, S_IRWXU);
+    ioerr = mkdir(ph_paths.run_dir, S_IRWXU);
     if (ioerr) {
         return ioerr;
     }
 
-    fp = fopen(pfh_paths.runinfo, "a");
+    fp = fopen(ph_paths.runinfo, "a");
     if (fp == NULL) {
         return -1;
     }
@@ -280,20 +280,20 @@ pfh_io_mkfile() {
     }
     fclose(fp);
 
-    fp = fopen(pfh_paths.ctag, "w");
+    fp = fopen(ph_paths.ctag, "w");
     if (fp == NULL) {
         return -1;
     }
     fprintf(fp, "gid,pid,description\n");
     fclose(fp);
 
-    fp = fopen(pfh_paths.etag, "w");
+    fp = fopen(ph_paths.etag, "w");
     if (fp == NULL) {
         return -1;
     }
     fprintf(fp, "id,name,code\n");
     fclose(fp);
-    fp = fopen(pfh_paths.rankmap, "w");
+    fp = fopen(ph_paths.rankmap, "w");
     if (fp == NULL) {
         return -1;
     }
@@ -308,14 +308,14 @@ pfh_io_mkfile() {
  * @return int 
  */
 int
-pfh_io_mkhost() {
+ph_io_mkhost() {
     int ioerr = 0;
 
-    if (access(pfh_paths.host_dir, F_OK) != 0) {
-        ioerr = mkdir(pfh_paths.host_dir, S_IRWXU);
+    if (access(ph_paths.host_dir, F_OK) != 0) {
+        ioerr = mkdir(ph_paths.host_dir, S_IRWXU);
         if (ioerr) {
             if(errno != EEXIST) {
-                printf("*** [Pfh-Probe] Failed in mkdir, path string: %s\n", pfh_paths.host_dir);
+                printf("*** [PH-Probe] Failed in mkdir, path string: %s\n", ph_paths.host_dir);
                 fflush(stdout);
                 return errno;
             }
@@ -326,18 +326,18 @@ pfh_io_mkhost() {
 }
 
 int
-pfh_io_mkrec() {
+ph_io_mkrec() {
     FILE *fp = NULL;
     
     // NULL for single-process run, import the record file address for
     // processing IO for multiple processes.
-    fp = fopen(pfh_paths.rec, "w");
+    fp = fopen(ph_paths.rec, "w");
     if (fp == NULL) {
         return errno;
     }
 
     fprintf(fp, "gid,pid,cycle,nanosec,uval");
-    for (int i = 1; i <= pfh_nev; i ++) {
+    for (int i = 1; i <= ph_nev; i ++) {
         fprintf(fp, ",ev%d", i);
     }
     fprintf(fp, "\n");
@@ -349,8 +349,8 @@ pfh_io_mkrec() {
 }
 
 int
-pfh_io_wtctag(uint32_t gid, uint32_t pid, const char *tagstr) {
-    FILE *fp = fopen(pfh_paths.ctag, "a");
+ph_io_wtctag(uint32_t gid, uint32_t pid, const char *tagstr) {
+    FILE *fp = fopen(ph_paths.ctag, "a");
 
     fprintf(fp, "%u,%u,%s\n", gid, pid, tagstr);
 
@@ -368,8 +368,8 @@ pfh_io_wtctag(uint32_t gid, uint32_t pid, const char *tagstr) {
  * @return int 
  */
 int
-pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode) {
-    FILE *fp = fopen(pfh_paths.etag, "a");
+ph_io_wtetag(int id, const char *evtstr, uint64_t evcode) {
+    FILE *fp = fopen(ph_paths.etag, "a");
 
     fprintf(fp, "%d,%s,0x%llx\n", id, evtstr, evcode);
 
@@ -380,11 +380,11 @@ pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode) {
 }
 
 
-int pfh_io_wtrankmap() {
+int ph_io_wtrankmap() {
     FILE *fp;
-    fp = fopen(pfh_paths.rankmap, "a");
+    fp = fopen(ph_paths.rankmap, "a");
 
-    fprintf(fp, "%d,%s,%d,%d,%d\n", pfh_pinfo.rank, pfh_pinfo.host, pfh_pinfo.cpu, pfh_pinfo.head, pfh_pinfo.iorank);
+    fprintf(fp, "%d,%s,%d,%d,%d\n", ph_pinfo.rank, ph_pinfo.host, ph_pinfo.cpu, ph_pinfo.head, ph_pinfo.iorank);
 
     fflush(fp);
     fclose(fp);
@@ -393,7 +393,7 @@ int pfh_io_wtrankmap() {
 }
 
 
-int pfh_io_wtinfo() {
+int ph_io_wtinfo() {
     // id, mode, nrank, nrec, start_time, end_time, description, 
     /* Get end timestamp. */
     do{
@@ -404,13 +404,13 @@ int pfh_io_wtinfo() {
                 lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
     } while(0);
 
-    FILE *fp = fopen(pfh_paths.runinfo, "a");
+    FILE *fp = fopen(ph_paths.runinfo, "a");
 
     if (fp == NULL) {
         return 1;
     }
     fprintf(fp, "%d,%d,%d,%d,%s,%s,\n",
-        runid, pfh_pinfo.nrank, pfh_nev, nrec_tot, st_timestr, en_timestr);
+        runid, ph_pinfo.nrank, ph_nev, nrec_tot, st_timestr, en_timestr);
 
     fflush(fp);
     fclose(fp);
@@ -421,34 +421,34 @@ int pfh_io_wtinfo() {
  * @brief 
  */
 int
-pfh_io_wtrec(int nrec) {
+ph_io_wtrec(int nrec) {
     FILE *p_recfile;
 
     nrec_tot += nrec;
 
-    p_recfile = fopen(pfh_paths.rec, "a");
+    p_recfile = fopen(ph_paths.rec, "a");
 
     if (p_recfile == NULL) {
         return 1;
     }
-#ifdef PFH_OPT_PAPI
+#ifdef PH_OPT_PAPI
 
     for (int i = 0; i < nrec; i ++) {
         fprintf(p_recfile, "%u,%u,%lld,%lld,%f", 
-                pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
-                pfh_precs[i].cy, pfh_precs[i].ns, pfh_precs[i].uval);
-        for (int j = 0; j < pfh_nev; j++) {
-            fprintf(p_recfile, ",%lld", pfh_precs[i].ev[j]);
+                ph_precs[i].ctag[0], ph_precs[i].ctag[1], 
+                ph_precs[i].cy, ph_precs[i].ns, ph_precs[i].uval);
+        for (int j = 0; j < ph_nev; j++) {
+            fprintf(p_recfile, ",%lld", ph_precs[i].ev[j]);
         }
         fprintf(p_recfile, "\n");
     }
 #else
     for (int i = 0; i < nrec; i ++) {
         fprintf(p_recfile, "%u,%u,%llu,%llu,%f", 
-                pfh_precs[i].ctag[0], pfh_precs[i].ctag[1], 
-                pfh_precs[i].cy, pfh_precs[i].ns, pfh_precs[i].uval);
-        for (int j = 0; j < pfh_nev; j++) {
-            fprintf(p_recfile, ",%llu", pfh_precs[i].ev[j]);
+                ph_precs[i].ctag[0], ph_precs[i].ctag[1], 
+                ph_precs[i].cy, ph_precs[i].ns, ph_precs[i].uval);
+        for (int j = 0; j < ph_nev; j++) {
+            fprintf(p_recfile, ",%llu", ph_precs[i].ev[j]);
         }
         fprintf(p_recfile, "\n");
     }

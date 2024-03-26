@@ -43,7 +43,7 @@
 #include <sched.h>
 #include <math.h>
 #include <mpi.h>
-#include "pfhprobe_core.h"
+#include "phprobe_core.h"
 
 /* Vars for IO group communicator. */
 MPI_Comm comm_iogrp;
@@ -53,7 +53,7 @@ MPI_Datatype vt_mpirec_t;  // MPI datatype for event data.
 int64_t bns, wait_ns;                // bns = tx - t0, dnsclock bias to rank 0;
 
 int
-pfh_mpi_rank_init(proc_t *pinfo) {
+ph_mpi_rank_init(proc_t *pinfo) {
     int np, in;
     char hname[_HOST_MAX];
     if (MPI_Comm_size(MPI_COMM_WORLD, &np)) {
@@ -64,7 +64,7 @@ pfh_mpi_rank_init(proc_t *pinfo) {
     pinfo->nrank = np;
     pinfo->cpu = sched_getcpu();
     pinfo->head = 0;
-    pinfo->iorank = pfh_pinfo.rank;
+    pinfo->iorank = ph_pinfo.rank;
     gethostname(hname, _HOST_MAX);
     memcpy(pinfo->host, hname, _HOST_MAX*sizeof(char));
 
@@ -87,7 +87,7 @@ vt_get_rank(uint32_t *nrank, uint32_t *myrank) {
 
 /* Sync and init Varapi MPI map info. */
 int 
-pfhmpi_rankinfo( uint32_t *head, int *iorank, 
+phmpi_rankinfo( uint32_t *head, int *iorank, 
                  uint32_t *vt_iogrp_size, uint32_t *vt_iogrp_grank, uint32_t *vt_iogrp_gcpu) {
     int i, j;
     int *cpu_all = NULL, mycpu;
@@ -405,14 +405,14 @@ vt_get_bias(int r0, int r1) {
  *
  */
     // warm icache
-    _pfh_read_ns(ns0);
+    _ph_read_ns(ns0);
 
     if (my_grank == r0) {
-        _pfh_read_ns(ns0);
+        _ph_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 101, MPI_COMM_WORLD);
         // First sync
         MPI_Recv(&ns0, 1, MPI_UINT64_T, r1, 102, MPI_COMM_WORLD, &st);
-        _pfh_read_ns(ns0);
+        _ph_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r1, 103, MPI_COMM_WORLD);
         bns = 0;
     }
@@ -420,10 +420,10 @@ vt_get_bias(int r0, int r1) {
     if (my_grank == r1) {
         MPI_Recv(&ns0, 1, MPI_UINT64_T, r0, 101, MPI_COMM_WORLD, &st);
         // First sync
-        _pfh_read_ns(ns0);
+        _ph_read_ns(ns0);
         MPI_Send(&ns0, 1, MPI_UINT64_T, r0, 102, MPI_COMM_WORLD);
         MPI_Recv(&ns1, 1, MPI_UINT64_T, r0, 103, MPI_COMM_WORLD, &st);
-        _pfh_read_ns(ns2);
+        _ph_read_ns(ns2);
 
         d_bns = (double)ns1 - (double)(ns2 - ns0) * 0.5 - (double)ns0;
         bns = (int64_t)d_bns;
@@ -441,17 +441,17 @@ vt_tsync() {
     struct timespec ts;
 
     MPI_Barrier(MPI_COMM_WORLD);
-    _pfh_read_ns(ns);
+    _ph_read_ns(ns);
     MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
-    _pfh_read_ns(ns_mpi);
+    _ph_read_ns(ns_mpi);
     MPI_Bcast(&ns_mpi, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // Double broadcast to guarantee the offset won't less than the actual bias.
     ns = ns_mpi + (ns_mpi - ns) + _SYNC_NS_OFFSET + bns;
     //ns = bns < 0? (ns - abs(bns)) : (ns + bns);
 
-    _pfh_read_ns(ns_new);
+    _ph_read_ns(ns_new);
     while (ns_new < ns) {
-        _pfh_read_ns(ns_new);
+        _ph_read_ns(ns_new);
     }
 
     return;
@@ -463,7 +463,7 @@ vt_get_cur_bias() {
     uint64_t ns, ns_r0;
     struct timespec ts;
 
-    _pfh_read_ns(ns);
+    _ph_read_ns(ns);
     ns_r0 = ns;
     MPI_Bcast(&ns_r0, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // wait_ns < 0: This rank is running slower (reach the sync point later) than rank 0,
@@ -483,16 +483,16 @@ vt_recover_bias() {
     // How much slower from the slowest rank ? Get the minimum wait_ns;
     MPI_Allreduce(&wait_ns, &wait_ns_min, 1, MPI_INT64_T, MPI_MIN, MPI_COMM_WORLD);
     // Current rank 0 reading
-    _pfh_read_ns(ns);
+    _ph_read_ns(ns);
     MPI_Bcast(&ns, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
     // offset needs to contain the minimum wait_ns
     tmp = bns + _SYNC_NS_OFFSET - wait_ns_min - wait_ns;
     ns = ns + (uint64_t)tmp;
     // Reset the unbalance
 
-    _pfh_read_ns(ns_new);
+    _ph_read_ns(ns_new);
     while (ns_new < ns) {
-        _pfh_read_ns(ns_new);
+        _ph_read_ns(ns_new);
     }
 
     return;

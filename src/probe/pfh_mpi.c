@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #define _ISOC11_SOURCE
-#define _PFH_MPI
+#define _PH_MPI
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,38 +13,38 @@
 #include <errno.h>
 #include <mpi.h>
 
-#include "pfh_core.h"
-#include "pfh_mpi.h"
+#include "ph_core.h"
+#include "ph_mpi.h"
 
 
-#define PFH_PRINTF(_msg)    if(pfh_pinfo.rank == 0) {  \
+#define PH_PRINTF(_msg)    if(ph_pinfo.rank == 0) {  \
                                 printf(_msg);          \
                                 fflush(stdout);         \
                             }  
 
-extern int pfh_io_mkname(char *root);
-extern int pfh_io_mkdir(char *path);
-extern int pfh_io_mkfile();
-extern int pfh_io_mkrec();
-extern int pfh_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
-extern int pfh_io_wtetag(int id, const char *evtstr, uint64_t evcode);
-extern int pfh_io_wtrankmap();
-extern int pfh_io_wtrec(int nrec);
-extern int pfh_io_wtinfo();
+extern int ph_io_mkname(char *root);
+extern int ph_io_mkdir(char *path);
+extern int ph_io_mkfile();
+extern int ph_io_mkrec();
+extern int ph_io_wtctag(uint32_t gid, uint32_t pid, char *tagstr);
+extern int ph_io_wtetag(int id, const char *evtstr, uint64_t evcode);
+extern int ph_io_wtrankmap();
+extern int ph_io_wtrec(int nrec);
+extern int ph_io_wtinfo();
 
-extern int pfh_mpi_rank_init();
-extern void pfh_mpi_barrier(MPI_Comm comm);
-extern int pfh_mpi_mkhost();
+extern int ph_mpi_rank_init();
+extern void ph_mpi_barrier(MPI_Comm comm);
+extern int ph_mpi_mkhost();
 
 /* Local Global */
 static uint32_t buf_nbyte, buf_nrec; // size and # of data buffered in ram.
-static uint32_t pfh_irec;            // Index for counter readings.
-static int pfh_ready;
+static uint32_t ph_irec;            // Index for counter readings.
+static int ph_ready;
 
 /* Global */
-rec_t *pfh_precs; // raw data.
-proc_t pfh_pinfo;
-int pfh_nev;
+rec_t *ph_precs; // raw data.
+proc_t ph_pinfo;
+int ph_nev;
 
 
 
@@ -53,19 +53,19 @@ int pfh_nev;
 
 /* Set system events. */
 int
-pfhmpi_set_evt(const char *etag) {
+phmpi_set_evt(const char *etag) {
     // We do not support redefine events for now.
-    if (pfh_ready) {
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] WARNING. Your setting has been committed, please set events before pfh_commit. \n");
+    if (ph_ready) {
+        if (ph_pinfo.rank == 0) {
+            printf("*** [PH-Probe] WARNING. Your setting has been committed, please set events before ph_commit. \n");
             fflush(stdout);
         }
         return 1;
     }
     
-    if (pfh_nev >= pfh_nev_max) {
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] WARNING. Too many events, this event will be omitted. \n");
+    if (ph_nev >= ph_nev_max) {
+        if (ph_pinfo.rank == 0) {
+            printf("*** [PH-Probe] WARNING. Too many events, this event will be omitted. \n");
             fflush(stdout);
         }
         return 2;     
@@ -73,24 +73,24 @@ pfhmpi_set_evt(const char *etag) {
 
     uint64_t evcode = 0;
 
-    _pfh_parse_event (evcode, etag);
+    _ph_parse_event (evcode, etag);
 
     if (evcode <= 0xFFFFFFFF - 1) {
-        pfh_evcodes[pfh_nev] = evcode;
-        pfh_nev ++;
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] %d Event %s added, evcode=0x%x. \n", pfh_nev, etag, evcode);
+        ph_evcodes[ph_nev] = evcode;
+        ph_nev ++;
+        if (ph_pinfo.rank == 0) {
+            printf("*** [PH-Probe] %d Event %s added, evcode=0x%x. \n", ph_nev, etag, evcode);
         }
     } else {
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] Event %s doesn't exist or have not been supported. \n", etag);
+        if (ph_pinfo.rank == 0) {
+            printf("*** [PH-Probe] Event %s doesn't exist or have not been supported. \n", etag);
             fflush(stdout);
         }
     }
     
 
-    if (pfh_pinfo.rank == 0) {
-        pfh_io_wtetag(pfh_nev, etag, pfh_evcodes[pfh_nev-1]);
+    if (ph_pinfo.rank == 0) {
+        ph_io_wtetag(ph_nev, etag, ph_evcodes[ph_nev-1]);
         
     }
     return 0;
@@ -98,130 +98,130 @@ pfhmpi_set_evt(const char *etag) {
 
 /* Commit events and configure event registers. */
 void
-pfhmpi_commit() {
+phmpi_commit() {
     int err;
-    if (pfh_nev) {
-        _pfh_config_event (pfh_evcodes, pfh_nev);
-        if (pfh_pinfo.rank == 0) {
-            printf("*** [Pfh-Probe] %d events have been written. \n", pfh_nev);
+    if (ph_nev) {
+        _ph_config_event (ph_evcodes, ph_nev);
+        if (ph_pinfo.rank == 0) {
+            printf("*** [PH-Probe] %d events have been written. \n", ph_nev);
         }
     } 
 
-    err = pfh_io_mkrec();
+    err = ph_io_mkrec();
     if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create record file.\n", err);
+        printf("*** [PH-Probe] EXIT %d. Failed to create record file.\n", err);
         fflush(stdout);
         exit(1);
     }
-    pfh_ready = 1;
-    pfh_irec = 0;
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-    pfhmpi_fastread(0, 1, 0);
+    ph_ready = 1;
+    ph_irec = 0;
+    ph_mpi_barrier(MPI_COMM_WORLD);
+    phmpi_fastread(0, 1, 0);
     return;
 }
 
 
 /* Set counting points' tag. */
 int 
-pfhmpi_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
-    if (pfh_pinfo.rank == 0) {
-        pfh_io_wtctag(gid, pid, tagstr);
+phmpi_set_tag(uint32_t gid, uint32_t pid, char *tagstr) {
+    if (ph_pinfo.rank == 0) {
+        ph_io_wtctag(gid, pid, tagstr);
     }
-    if (pfh_pinfo.rank == 0) {
+    if (ph_pinfo.rank == 0) {
         if (pid) {
-            printf("*** [Pfh-Probe] GID:%u PID:%u TAG:%s \n",
+            printf("*** [PH-Probe] GID:%u PID:%u TAG:%s \n",
                 gid, pid, tagstr);
         } else {
-            printf("*** [Pfh-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
+            printf("*** [PH-Probe] New Group, GID:%u, TAG:%s \n", gid, tagstr);
         }
     } 
 
-    pfh_mpi_barrier(MPI_COMM_WORLD);
+    ph_mpi_barrier(MPI_COMM_WORLD);
     return 0;
 }
 
 
 /* Get and record an event reading without boundary check. */
 void
-pfhmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
+phmpi_fastread(uint32_t grp_id, uint32_t p_id, double uval) {
     // uint64_t r1 = 0, r2 = 0, r3 = 0;
 
-    // _pfh_reg_save;
+    // _ph_reg_save;
 
-    pfh_precs[pfh_irec].ctag[0] = grp_id;
-    pfh_precs[pfh_irec].ctag[1] = p_id;
-    _pfh_read_cy (pfh_precs[pfh_irec].cy);
-    _pfh_read_ns (pfh_precs[pfh_irec].ns);
-    pfh_precs[pfh_irec].uval = uval;
+    ph_precs[ph_irec].ctag[0] = grp_id;
+    ph_precs[ph_irec].ctag[1] = p_id;
+    _ph_read_cy (ph_precs[ph_irec].cy);
+    _ph_read_ns (ph_precs[ph_irec].ns);
+    ph_precs[ph_irec].uval = uval;
     
-    // _pfh_reg_restore;
+    // _ph_reg_restore;
 
     /* Read system event */
-    switch (pfh_nev){
+    switch (ph_nev){
         case 1: 
-            _pfh_read_pm_1 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_1 (ph_precs[ph_irec].ev);
             break;
         case 2: 
-            _pfh_read_pm_2 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_2 (ph_precs[ph_irec].ev);
             break;
         case 3: 
-            _pfh_read_pm_3 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_3 (ph_precs[ph_irec].ev);
             break;
         case 4: 
-            _pfh_read_pm_4 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_4 (ph_precs[ph_irec].ev);
             break;
         case 5: 
-            _pfh_read_pm_5 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_5 (ph_precs[ph_irec].ev);
             break;
         case 6: 
-            _pfh_read_pm_6 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_6 (ph_precs[ph_irec].ev);
             break;
         case 7: 
-            _pfh_read_pm_7 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_7 (ph_precs[ph_irec].ev);
             break;
         case 8: 
-            _pfh_read_pm_8 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_8 (ph_precs[ph_irec].ev);
             break;
         case 9: 
-            _pfh_read_pm_9 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_9 (ph_precs[ph_irec].ev);
             break;
         case 10: 
-            _pfh_read_pm_10 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_10 (ph_precs[ph_irec].ev);
             break;
         case 11: 
-            _pfh_read_pm_11 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_11 (ph_precs[ph_irec].ev);
             break;
         case 12: 
-            _pfh_read_pm_12 (pfh_precs[pfh_irec].ev);
+            _ph_read_pm_12 (ph_precs[ph_irec].ev);
             break;
         default:
             break;
     }
 
-#ifdef PFH_OPT_PAPI
-    pfh_precs[pfh_irec].cy = pfh_precs[pfh_irec].ev[0];
+#ifdef PH_OPT_PAPI
+    ph_precs[ph_irec].cy = ph_precs[ph_irec].ev[0];
 #endif
 
-    pfh_irec ++;
+    ph_irec ++;
        
 }
 
 void
-pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
-    if (pfh_irec+1 >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-            pfh_pinfo.rank, pfh_irec);
+phmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
+    if (ph_irec+1 >= buf_nrec) {
+        printf("*** [PH-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+            ph_pinfo.rank, ph_irec);
         fflush(stdout);
-        pfhmpi_dump();
-        pfh_irec = 0;
-        pfhmpi_fastread(grp_id, p_id, uval);
+        phmpi_dump();
+        ph_irec = 0;
+        phmpi_fastread(grp_id, p_id, uval);
     } else {
-        pfhmpi_fastread(grp_id, p_id, uval);
-        if (pfh_irec+1 >= buf_nrec) {
-            printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
-                pfh_pinfo.rank, pfh_irec);
+        phmpi_fastread(grp_id, p_id, uval);
+        if (ph_irec+1 >= buf_nrec) {
+            printf("*** [PH-Probe] RANK %d WARNING. NREC = %d, auto dump now.\n", 
+                ph_pinfo.rank, ph_irec);
             fflush(stdout);
-            pfhmpi_dump();
+            phmpi_dump();
         }
     }
 }
@@ -229,26 +229,26 @@ pfhmpi_read(uint32_t grp_id, uint32_t p_id, double uval) {
 /**
  * Dumping collected records if the number has larger than nrec. 
  * Force dumping if nrec is set to 0. 
- * The function returns directly if pfh_irec == 0.
+ * The function returns directly if ph_irec == 0.
  */
 void
-pfhmpi_dump() {
+phmpi_dump() {
 
-    if (pfh_irec == 0) {
+    if (ph_irec == 0) {
         // Return empty request.
         return;
     }
 
-    if (pfh_irec >= buf_nrec) {
-        printf("*** [Pfh-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
-        pfh_pinfo.rank, pfh_irec);
-        pfh_irec = buf_nrec - 1; // Step back for recording writing time.
+    if (ph_irec >= buf_nrec) {
+        printf("*** [PH-Probe] RANK %d WARNING. NREC = %d, Buffer exceeded at dumping, last data will be omitted. \n", 
+        ph_pinfo.rank, ph_irec);
+        ph_irec = buf_nrec - 1; // Step back for recording writing time.
     }
 
-    pfhmpi_fastread(0, 3, 0);
-    pfh_io_wtrec(pfh_irec);
-    pfh_irec = 0;
-    pfhmpi_fastread(0, 4, 0);
+    phmpi_fastread(0, 3, 0);
+    ph_io_wtrec(ph_irec);
+    ph_irec = 0;
+    phmpi_fastread(0, 4, 0);
     
     return;
 }
@@ -256,160 +256,160 @@ pfhmpi_dump() {
 /**
  * Initializing PerfHound
  * Directory tree:
- * pfh_root/ ------- run_#/ ------------ host/ -------- r#c#.csv 
+ * ph_root/ ------- run_#/ ------------ host/ -------- r#c#.csv 
  *                   run_info.csv        ctags.csv      
  *                                       etags.csv
  *                                       rankmap.csv
  */
 int
-pfhmpi_init(char *path) {
+phmpi_init(char *path) {
     // User-defined data root and project name.
     char root[PATH_MAX]; // data root path, hostname.
     int i, err = 0;
 
     /* Init basic rank information */
-    err = pfh_mpi_rank_init();
+    err = ph_mpi_rank_init();
     if (err) {
-        printf("*** [Pfh-Probe] EXIT. Failed to init MPI.\n");
+        printf("*** [PH-Probe] EXIT. Failed to init MPI.\n");
         exit(1);
     }
 
     /* Grouping ranks on the same host and get group information. */
-    //err = pfh_mpi_host_init(&pfh_pinfo);
+    //err = ph_mpi_host_init(&ph_pinfo);
 
 
 
     /* Gnerate path. */
     if (path == NULL) {
-        sprintf(root, "./pfh_data");
+        sprintf(root, "./ph_data");
     } else {
         // TODO: for now, no path syntax check here.
         strcpy(root, path);
     }
 
     /* Initializing run directory tree */
-    PFH_PRINTF ("*** [Pfh-Probe] Creating data directory tree. \n");
+    PH_PRINTF ("*** [PH-Probe] Creating data directory tree. \n");
     fflush(stdout);   
-    if (pfh_pinfo.rank == 0) {
+    if (ph_pinfo.rank == 0) {
         // Rank 0 first creates root directory.
-        err = pfh_io_mkdir(root);
+        err = ph_io_mkdir(root);
         if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to build data root path.\n", err);
+            printf("*** [PH-Probe] EXIT %d. Failed to build data root path.\n", err);
             fflush(stdout);
             exit(1);
         }
-        printf("*** [Pfh-Probe] Data directory: %s\n", root);
+        printf("*** [PH-Probe] Data directory: %s\n", root);
         fflush(stdout);
     }
     // All ranks wait here.
     MPI_Barrier(MPI_COMM_WORLD);
 
-    err = pfh_io_mkname(root);
+    err = ph_io_mkname(root);
     if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to parse data root path.\n", err);
+        printf("*** [PH-Probe] EXIT %d. Failed to parse data root path.\n", err);
         fflush(stdout);
         exit(1);
     }
     MPI_Barrier(MPI_COMM_WORLD);
-    if (pfh_pinfo.rank == 0) {
-        err = pfh_io_mkfile();
+    if (ph_pinfo.rank == 0) {
+        err = ph_io_mkfile();
         if (err) {
-            printf("*** [Pfh-Probe] EXIT %d. Failed to create files.\n", err);
+            printf("*** [PH-Probe] EXIT %d. Failed to create files.\n", err);
             fflush(stdout);
             exit(1);
         }
     }
 
     /* Initializing host directory tree */
-    err = pfh_mpi_mkhost();
+    err = ph_mpi_mkhost();
     if (err) {
-        printf("*** [Pfh-Probe] EXIT %d. Failed to create host directory.\n", err);
+        printf("*** [PH-Probe] EXIT %d. Failed to create host directory.\n", err);
         fflush(stdout);
         exit(1);
     }
-    pfh_mpi_barrier(MPI_COMM_WORLD);
+    ph_mpi_barrier(MPI_COMM_WORLD);
 
 
     /* Init data space. */
 
-    buf_nbyte = PFH_OPT_BUFSIZE * 1024;
+    buf_nbyte = PH_OPT_BUFSIZE * 1024;
     buf_nrec = buf_nbyte / sizeof(rec_t);
-    pfh_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
-    if (pfh_precs == NULL) {
-        printf("*** [Pfh-Probe] Failed at allocating memory for counter readings. \n");
+    ph_precs = (rec_t *)aligned_alloc(ALIGN, buf_nbyte);
+    if (ph_precs == NULL) {
+        printf("*** [PH-Probe] Failed at allocating memory for counter readings. \n");
         fflush(stdout);
         exit(1);
     }
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Buffer: %d KiB, %d Records. \n", PFH_OPT_BUFSIZE, buf_nrec);
+    if (ph_pinfo.rank == 0) {
+        printf("*** [PH-Probe] Buffer: %d KiB, %d Records. \n", PH_OPT_BUFSIZE, buf_nrec);
         fflush(stdout);
     }
 
     /* Set all event codes to 0. */
-    for (i = 0; i < 12; i ++) {
-        pfh_evcodes[i] = 0;
+    for (i = 0; i < PH_NEV; i ++) {
+        ph_evcodes[i] = 0;
     }
 
-    pfh_irec = 0;
-    pfh_nev = 0;
+    ph_irec = 0;
+    ph_nev = 0;
 
     /* Init wall clock timer. Implenmetations vary with predefined macros. */
-    _pfh_init_ts;
-    _pfh_init_cy;
-    pfh_ready = 0;
+    _ph_init_ts;
+    _ph_init_cy;
+    ph_ready = 0;
 
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Timer has been set. \n");
+    if (ph_pinfo.rank == 0) {
+        printf("*** [PH-Probe] Timer has been set. \n");
         fflush(stdout);
     }
 
-    pfhmpi_set_tag(0, 0, "PFHGroup");
-    pfhmpi_set_tag(0, 1, "PFH Start");
-    pfhmpi_set_tag(0, 2, "PFH End");
-    pfhmpi_set_tag(0, 3, "PFH Wt Start");
-    pfhmpi_set_tag(0, 4, "PFH Wt End");
-    if (pfh_pinfo.rank == 0) {
-        printf("*** [Pfh-Probe] Directory tree initialized. \n");
+    phmpi_set_tag(0, 0, "PHGroup");
+    phmpi_set_tag(0, 1, "PH Start");
+    phmpi_set_tag(0, 2, "PH End");
+    phmpi_set_tag(0, 3, "PH Wt Start");
+    phmpi_set_tag(0, 4, "PH Wt End");
+    if (ph_pinfo.rank == 0) {
+        printf("*** [PH-Probe] Directory tree initialized. \n");
     }
 
 
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-    pfh_mpi_barrier(MPI_COMM_WORLD);
+    ph_mpi_barrier(MPI_COMM_WORLD);
+    ph_mpi_barrier(MPI_COMM_WORLD);
 
     return 0;
 } // END: int vt_init()
 
 /* Exiting varapi */
 void
-pfhmpi_finalize() {
+phmpi_finalize() {
     int err;
 
-    PFH_PRINTF ("*** [Pfh-Probe] User invokes finalization. \n");
-    PFH_PRINTF ("*** [Pfh-Probe] Waiting for all finish. \n");
-    pfh_mpi_barrier(MPI_COMM_WORLD);
+    PH_PRINTF ("*** [PH-Probe] User invokes finalization. \n");
+    PH_PRINTF ("*** [PH-Probe] Waiting for all finish. \n");
+    ph_mpi_barrier(MPI_COMM_WORLD);
 
-    pfhmpi_read(0, 2, 0);
-    PFH_PRINTF ("*** [Pfh-Probe] Writing records. \n");
-    err = pfh_io_wtrec(pfh_irec);
+    phmpi_read(0, 2, 0);
+    PH_PRINTF ("*** [PH-Probe] Writing records. \n");
+    err = ph_io_wtrec(ph_irec);
     if (err) {
-        printf("*** [Pfh-Probe] Rank %d Exit %d, failed at writing reading records. \n", pfh_pinfo.rank, err);
+        printf("*** [PH-Probe] Rank %d Exit %d, failed at writing reading records. \n", ph_pinfo.rank, err);
         fflush(stdout);
     }
-    PFH_PRINTF ("*** [Pfh-Probe] Writing running info. \n");
+    PH_PRINTF ("*** [PH-Probe] Writing running info. \n");
 
-    if (pfh_pinfo.rank == 0) {
-        err = pfh_io_wtinfo();
+    if (ph_pinfo.rank == 0) {
+        err = ph_io_wtinfo();
         if (err) {
-            printf("*** [Pfh-Probe] Exit %d, failed at writing run info. \n", err);
+            printf("*** [PH-Probe] Exit %d, failed at writing run info. \n", err);
             fflush(stdout);
         }
     }
 
-    PFH_PRINTF ("*** [Pfh-Probe] Pfh-Probe Exited. \n");
-    _pfh_fini_ts;
+    PH_PRINTF ("*** [PH-Probe] PH-Probe Exited. \n");
+    _ph_fini_ts;
 
-    pfh_mpi_barrier(MPI_COMM_WORLD);
-    free(pfh_precs);
+    ph_mpi_barrier(MPI_COMM_WORLD);
+    free(ph_precs);
 
 }
 

@@ -46,8 +46,8 @@
 #define _SYNC_NS_OFFSET 1e4     // Offset of sync, 1 sec for default.
 
 /* 256 pieces/ 4 Kib for buffering counting messages */
-#ifndef PFH_OPT_BUFSIZE 
-#define PFH_OPT_BUFSIZE  2048      // 4 KiB
+#ifndef PH_OPT_BUFSIZE 
+#define PH_OPT_BUFSIZE  2048      // 4 KiB
 #endif
 
 #define ALIGN           64
@@ -57,38 +57,38 @@
 
 /**
  * Define record size for PerfHound.
- * PFH_OPT_TS: 32Bytes. Timestamp mode. (Default)
- * PFH_OPT_EV: 64Bytes. Up to 4 Events.
- * PFH_OPT_EVX: 128Bytes. Up to 12 Events.
+ * PH_OPT_TS: 32Bytes. Timestamp mode. (Default)
+ * PH_OPT_EV: 64Bytes. Up to 4 Events.
+ * PH_OPT_EVX: 128Bytes. Up to 12 Events.
  */
 
-#ifdef PFH_OPT_EVX
+#ifdef PH_OPT_EVX
 
 #ifdef __x86_64__
-static int pfh_nev_max = 8;
+static int ph_nev_max = 8;
 #else
-static int pfh_nev_max = 12;
+static int ph_nev_max = 12;
 #endif
 
 #else
-static int pfh_nev_max = 4;
+static int ph_nev_max = 4;
 #endif
 
-#ifdef PFH_OPT_EVX
-#define PFH_NEV 12
+#ifdef PH_OPT_EVX
+#define PH_NEV 12
 #else
-#define PFH_NEV 4
+#define PH_NEV 4
 #endif
 
-/* Pfh-Probe record data type */
+/* PH-Probe record data type */
 typedef struct __attribute__((packed)){
     uint32_t ctag[2];
     int64_t cy, ns;    
     double uval;        // 32 Bytes
-#ifdef PFH_OPT_PAPI
-    int64_t ev[PFH_NEV];
+#ifdef PH_OPT_PAPI
+    int64_t ev[PH_NEV];
 #else
-    uint64_t ev[PFH_NEV];
+    uint64_t ev[PH_NEV];
 #endif
 } rec_t;
 
@@ -110,29 +110,29 @@ typedef struct {
     int *prank;
 } hinfo_t;
 
-extern rec_t *pfh_precs; // raw data.
-extern proc_t pfh_pinfo;
-extern int pfh_nev;
+extern rec_t *ph_precs; // raw data.
+extern proc_t ph_pinfo;
+extern int ph_nev;
 
-#ifdef PFH_OPT_PAPI
-#include "pfh_pm_papi.h"
+#ifdef PH_OPT_PAPI
+#include "ph_pm_papi.h"
 
-static int pfh_evcodes[PFH_NEV];
+static int ph_evcodes[PH_NEV];
 
 #else
 #ifdef __x86_64__
-#include "pfh_pm_x86_64.h"
-#include "pfh_evt_clx.h"
+#include "ph_pm_x86_64.h"
+#include "ph_evt_clx.h"
 
 #elif  __aarch64__
-#include "pfh_pm_aarch64.h"
-#include "pfh_evt_aarch64.h"
+#include "ph_pm_aarch64.h"
+#include "ph_evt_aarch64.h"
 
 #endif // END: #ifdef __x86_64__
 
 
-static uint64_t pfh_evcodes[PFH_NEV];
-#endif // END: #ifdef PFH_OPT_PAPI
+static uint64_t ph_evcodes[PH_NEV];
+#endif // END: #ifdef PH_OPT_PAPI
 
 
 #endif // END: #ifndef __VARAPI_CORE_H__
