@@ -1,195 +1,168 @@
-# 盘瓠（PerfHound）
+[English](README.md) | [中文](README_CN.md)
 
-盘瓠（PerfHound）是一个代码级profiling工具套件，可用于并行代码性能分析和超算集群性能波动探测。
+# PerfHound
 
-PerfHound is a toolset for code-level profiling. It is an ideal tool for performance analysis of performance applications, and performance variation detecting on HPC Clusters.
+PerfHound is a lightweight toolset for code-level performance profiling, specifically designed for performance analysis of parallel computing applications and performance variation detection on HPC clusters.
 
-Both Chinses and English documentation can be found in **docs/**.
+For detailed documentation in Chinese and English, please refer to the **docs/** directory.
 
-## 1 盘瓠的功能与特性
+## 1. Core Features
 
-- 通过代码插桩的方式进行性能计数器的读取。
-- 支持代码插桩位置的自定义标注。
-- 支持rdtsc（x86）、多种计时器。
+PerfHound mainly serves the following three goals:
+1. **Instrumentation Profiling**: By instrumenting the critical paths of the code, it uses high-precision timestamps (cycle counts, wall-clock time) to characterize the execution time distribution and performance hotspots of code sections.
+2. **Performance Counter Sampling**: Synchronously reads hardware PMU (Performance Monitor Unit) events (such as instruction count, cache hit rate, branch prediction, etc.) at the instrumentation points, supporting x86-64 and Armv8-A architectures.
+3. **Performance Variation Analysis**: Performs a large number of repeated measurements on the same code section to statistically analyze the execution time distribution, measurement overhead, and the minimum performance variation distinguishable by the system.
 
-## 2 使用方法
+**Key Characteristics:**
+- **Extremely Low Overhead**: Directly reads underlying registers (such as `rdtsc`/`rdpmc` on x86, `cntvct_el0` on Arm) via the `PHASM` backend, avoiding the extra overhead caused by system calls.
+- **Compile-time Static Configuration**: Solidifies the sampling mode (`TS`/`EV`/`EVX`) and buffer size at compile time via `make.config`, minimizing runtime conditional branch judgments.
+- **Lock-free Concurrent Writing**: For MPI multi-node and multi-core scenarios, it adopts a strategy of splitting files independently by `(hostname, rank, cpu)`, completely avoiding file lock contention.
 
-### 2.1 系统和环境要求
+## 2. Installation and Compilation
 
-### 2.2 编译与安装
+### 2.1 Prepare Kernel Modules (Obtain User-Space PMU Access)
 
-#### 2.2.1 编译PerfHound API
+To read hardware performance counters with low latency in user space, the corresponding kernel module needs to be loaded:
 
-#### 2.2.2 编译并加载内核模块
+- **Armv8-A Platform**:
+  Enter the `src/kmod/armv8a/` directory, compile and load the provided kernel module:
+  ```bash
+  cd src/kmod/armv8a
+  make
+  sudo insmod ./enable_pmu.ko
+  ```
+- **x86-64 Platform**:
+  Requires depending on and loading the [libpfc](https://github.com/obilaniu/libpfc) kernel module. After loading, you need to disable `nmi_watchdog` and unload the conflicting `iTCO_wdt` module.
 
-##### 1) 编译PerfHound API
+### 2.2 Configure and Compile PH-Probe API
 
-```
-// 在x86-64服务器上以默认配置编译
-$ git clone https://git.computing.sjtu.edu.cn/keymorrislane/perfhound
-$ cd perfhound/src
-$ make
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ts.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ts.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ts.o -c api/vt_mpi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ts.so varapi.mpi_ts.o file_op.mpi_ts.o vt_mpi.mpi_ts.o
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.mpi_ev.o -c api/varapi.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.mpi_ev.o -c api/file_op.c 
-mpicc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC -DUSE_MPI  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o vt_mpi.mpi_ev.o -c api/vt_mpi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_mpi_ev.so varapi.mpi_ev.o file_op.mpi_ev.o vt_mpi.mpi_ev.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ts.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_TS -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ts.o -c api/file_op.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ts.so varapi.ts.o file_op.ts.o
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o varapi.ev.o -c api/varapi.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -DUSE_VARAPI  -DPFH_OPT_EV -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src -lpfc -o file_op.ev.o -c api/file_op.c 
-gcc -O2 -fno-builtin -I/include -I/lustre/home/acct-hpc/hpckey/03-Project/perfhound/src/include -fPIC  -lpfc  -lpfc -shared -o libvtapi_ev.so varapi.ev.o file_op.ev.o
-mkdir -p ./lib
-mkdir -p ./include
-mkdir -p ./bin
-mv ./*.so ./lib
-Pfh-Probe has been installed in .
+The core probe of PerfHound supports high customization. Before compiling, please modify the `src/probe/make.config` file:
+
+```makefile
+# Example of common configuration
+PH_API = PHASM       # Use the underlying PHASM backend (recommended) or PAPI
+PH_EVMODE = TS       # Sampling mode: TS (Timestamp only), EV (+4 events), EVX (Extended events)
+PH_PARMODE = MPI     # Target program type: SERIAL or MPI
+PH_BUFSIZE = 4       # Memory buffer size (in KiB)
+PH_DEBUG = NO        # Whether to enable debug logging (set to NO for formal measurements)
 ```
 
-完成后，会在src目录下生成./include/varapi.h和./lib/libvarapi\*.so。需要在环境变量CPATH、LIBRARY\_PATH和LD\_LIBRARY\_PATH中添加对应位置，在之后对被测代码进行插桩的时候，要将这些组件一起编译进被测代码。
+After configuration, execute the compilation:
 
-##### 2) 在x86-64服务器上编译并加载libpfc内核模块
-
-在x86\_64平台上，需要通过libpfc内核模块导出寄存器信息。首先编译libpfc（https://github.com/obilaniu/libpfc）。
-
-编译完成后，加载libpfc内核模块。进入libpfc安装目录，以root权限运行modprobe ./libpfc.ko。若模块被正常加载，可以在/var/log/messages中看到pfc输出了CPU信息和部分寄存器信息。以下是在pi-2.0 CPU队列计算节点上的输出：
-
+```bash
+cd src/probe
+make clean && make
+make install
 ```
-Mar 16 13:07:43 cas111 kernel: pfc: Kernel Module loading on processor Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz (Family 6 (6), Model 85 (055), Stepping 7 (7))
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x0.0x0:        EAX=00000016, EBX=756e6547, ECX=6c65746e, EDX=49656e69
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x1.0x0:        EAX=00050657, EBX=02400800, ECX=7ffefbff, EDX=bfebfbff
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x6.0x0:        EAX=00000ff7, EBX=00000002, ECX=00000009, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0xA.0x0:        EAX=07300804, EBX=00000000, ECX=00000000, EDX=00000603
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000000.0x0: EAX=80000008, EBX=00000000, ECX=00000000, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000001.0x0: EAX=00000000, EBX=00000000, ECX=00000121, EDX=2c100800
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000002.0x0: EAX=65746e49, EBX=2952286c, ECX=6f655820, EDX=2952286e
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000003.0x0: EAX=6c6f4720, EBX=32362064, ECX=43203834, EDX=40205550
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000004.0x0: EAX=352e3220, EBX=7a484730, ECX=00000000, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: PM Arch Version:      4
-Mar 16 13:07:43 cas111 kernel: pfc: Fixed-function  PMCs: 3#011Mask 0000ffffffffffff (48 bits)
-Mar 16 13:07:43 cas111 kernel: pfc: General-purpose PMCs: 8#011Mask 0000ffffffffffff (48 bits)
-Mar 16 13:07:43 cas111 kernel: pfc: Module pfc loaded successfully. Make sure to execute
-Mar 16 13:07:43 cas111 kernel: pfc:     modprobe -ar iTCO_wdt iTCO_vendor_support
-Mar 16 13:07:43 cas111 kernel: pfc:     echo 0 > /proc/sys/kernel/nmi_watchdog
-Mar 16 13:07:43 cas111 kernel: pfc: and blacklist iTCO_vendor_support and iTCO_wdt, since the CR4.PCE register
-Mar 16 13:07:43 cas111 kernel: pfc: initialization is periodically undone by an unknown agent.
+Upon completion, `libph.so` (serial) and `libphmpi.so` (MPI) will be generated under `src/probe/lib`, and public header files will be generated under `src/probe/include`.
+
+### 2.3 Link the Instrumented Program
+
+When compiling your application, include the PerfHound header files and dynamic libraries:
+
+```bash
+# Serial program
+gcc -O2 -I./src/probe/include -L./src/probe/lib -o myapp myapp.c -lph
+
+# MPI program
+mpicc -O2 -I./src/probe/include -L./src/probe/lib -o myapp_mpi myapp.c -lphmpi
+```
+Before running, make sure to add the directory containing `libph.so` to the `LD_LIBRARY_PATH` environment variable.
+
+## 3. API Usage Guide
+
+The PerfHound API has a strict calling sequence: `init` -> `set_tag` -> `set_evt` -> `commit` -> `read` -> `finalize`.
+
+### 3.1 Serial Program Example
+
+```c
+#include <perfhound.h>
+
+int main() {
+    // 1. Initialize and specify the data output directory
+    ph_init("./ph_data");
+
+    // 2. Register instrumentation point tags (gid >= 1)
+    ph_set_tag(1, 1, "Compute_Start");
+    ph_set_tag(1, 2, "Compute_End");
+
+    // 3. Register performance events (valid only in EV/EVX mode, must be called before commit)
+    ph_set_evt("CPU_CYCLES");
+    ph_set_evt("INST_RETIRED");
+
+    // 4. Commit configuration
+    ph_commit();
+
+    // 5. Sample in the critical path (hot path)
+    for (int i = 0; i < 1000; i++) {
+        ph_read(1, 1, 0.0);
+        // ... your core computation code ...
+        ph_read(1, 2, 0.0);
+    }
+
+    // 6. Finalize and flush to disk
+    ph_finalize();
+    return 0;
+}
 ```
 
-然后需要关闭nmi\_watchdog，卸载iTCO\_wdt和iTCO\_vendor\_support两个模块（如果有）。
+### 3.2 MPI Program Example
 
-设置如下环境变量：
+The usage for MPI programs is similar, just change the prefix to `phmpi_`, and ensure they are called after `MPI_Init` and before `MPI_Finalize`:
 
-```
-LIBPFC=~/apps/libpfc
-PERFHOUND=~/apps/perfhound
-LD\_LIBRARY\_PATH=$LIBPFC/lib:$PERFOUND/lib:$LD\_LIBRARY\_PATH
-LIBRARY\_PATH=$LIBPFC/lib:$PERFOUND/lib:$LIBRARY\_PATH
+```c
+#include <mpi.h>
+#include <ph_mpi.h>
 
-```
+int main(int argc, char **argv) {
+    MPI_Init(&argc, &argv);
 
-然后可以运行pfcdemo检查libpfc是否已经正确加载。
+    phmpi_init("./ph_data");
+    phmpi_set_tag(1, 1, "MPI_Work_Start");
+    phmpi_set_tag(1, 2, "MPI_Work_End");
+    phmpi_commit(); // Internally includes MPI_Barrier synchronization
 
-##### 3) 在Armv8\_64平台上，编译并加载enable\_pmu内核模块。
+    phmpi_read(1, 1, 0.0);
+    // ... computation and communication ...
+    phmpi_read(1, 2, 0.0);
 
-#### 2.2.3 运行测试
-
-##### 1) 修改被测代码。
-
-以perhound/src/samples/stream\_mpi.c为例，对源代码进行插桩。
-
-编译stream\_mpi.c。
-
-```
-$ cd samples && make
-
+    phmpi_finalize();
+    MPI_Finalize();
+    return 0;
+}
 ```
 
-##### 2) 运行测试
+## 4. Output Data Structure
 
-按正常方式运行stream\_mpi。
+After the run finishes, the data will be saved in the directory specified by `ph_init` (e.g., `./ph_data`), and a `run_<N>` folder will be automatically generated with an incremented number for each run:
 
-运行后，进入数据文件夹./ph\_data，可以获取收集到的性能数据。
+```text
+ph_data/
+├── run_info.csv              # Global run metadata
+└── run_1/
+    ├── ctag.csv              # Instrumentation point tag dictionary
+    ├── etag.csv              # Performance event dictionary
+    ├── rankmap.csv           # Mapping from Rank to physical node/CPU
+    └── node01.example.com/   # Directory categorized by hostname
+        ├── r0c0.csv          # Sampling data for Rank 0, CPU 0
+        └── r1c1.csv          # Sampling data for Rank 1, CPU 1
+```
 
-### 2.3 PerfHound API
+For detailed descriptions of the output fields, please refer to [`docs/output_file_CN.md`](docs/output_file_CN.md). The internally used GID 0 markers (such as `PH_S_main`, `PH_S_ph_dump`) are used to record the probe's own overhead and lifecycle.
 
-#### 2.3.1 入门案例
+## 5. Examples and Tools
 
-此处以STREAM Benchmark为例，进行代码插桩。
+You can use the code in the `examples/` directory to reproduce the cases on your own computing platform, so as to quickly get started with PerfHound:
+- `test2_asm_armv8.c` / `test1_asm_x86.c`: Serial instrumentation and PMU sampling examples
+- `test4_asmmpi_armv8.c` / `test3_asmmpi_x86.c`: MPI parallel instrumentation examples
+- `test5_vardist_add.c`: Performance variation distribution data collection example
 
-#### 2.3.2 API列表
+For post-processing scripts and multi-level detection workflows for variation analysis, please refer to `src/resolution_test/` and `src/varstat/`.
 
-##### pfh\_init 
-初始化PerfHound API
-##### pfh\_set\_tag
-为插桩点设置标记。
-##### pfh\_set\_evt
-设置需要收集的性能事件。
-##### pfh\_commit 
-提交PerfHound的配置。
-##### pfh\_read
-读取时间戳和性能计数器。
-##### pfh\_dump
-强制写入文件。
-##### pfh\_finalize
-终止PerfHound。
+## 6. Current Limitations and Development Plan
 
-#### 2.3.3 编译设置
-
-盘瓠支持多种工作模式，包括不同的计数器读取方式，不同的PMU读取个数，不同的串行模式等。大多数工作模式均在编译前指定，虽然这降低了程序的灵活性，并且对使用带来了一些困难，但是这种方式也有效地降低了数据收集中的性能波动，以换取更高的计时精度和更小的技术误差。
-
-
-### 2.4 性能数据分析
-
-#### 2.4.1 PerfHound数据的存储结构
-
-工程中包含如下文件：
-- \<project\>: 以工程名称命名的根目录。
-  - \<host\_dir\>：在某一节点上收集到的数据，以节点名称命名。
-    - run\<RunID\>\_r\<RankID\>\_c\<CoreID\>\_all.csv
-    - varapi\_run\<RunID\>\_\<HostName\>\_\<TimeStamp\>.log
-  - run\<RunID\>\_ctags.csv
-  - run\<RunID\>\_etags.csv
-  - run\<RunID\>\_rankmap.csv
-  - tstamp.log
-
-#### 2.4.2 特殊标记点列表
-
-GID为0的标记组为盘瓠内部定义的特殊标记点，用于盘瓠自身事件追踪。
-
-| GID | CID | 描述 |
-| --- | --- | --- |
-| 0 | 0 | PFH-Probe标记组 |
-| 0 | 1 | PFH-Probe开始运行 |
-| 0 | 2 | PFH-Probe被用户终止 |
-| 0 | 3 | PFH-Probe开始导出收集到的数据 |
-| 0 | 4 | PFH-Probe数据导出完成 |
-
-## 3 案例
-
-你可以使用samples/目录下的代码，在自己的计算平台上复现如下案例，以便快速上手盘瓠。
-
-### 3.2 HPL Benchmark 性能热点分析
-
-### 3.2 STREAM Benchmark 性能波动数据收集
-
-## 4 其他工具
-
-## 5 开发计划
-
-### 5.1 当前的局限性
-
-- 不支持运行中更换进程与核心的绑定关系。
-- 不支持OpenMP。
-- armv8\_64的内核模块无法正常退出。
-- 修改目标代码后，编译过程过于复杂，无法适配大型软件。
-- 留有显式的write、commit、clean等接口，接口定义模糊，且需要遵循一定的调用次序，使用时容易发生错误。
-- 未测试过对较复杂的科学计算软件进行性能收集。
-- ph\_vis未完成。
-- ph\_stat未完成。
-
-### 5.2 下一版本需要解决的问题
-
+- Dynamically changing the binding relationship between processes and CPU cores during runtime is not supported.
+- OpenMP thread-level profiling is not supported yet.
+- The kernel module for Armv8-A (`enable_pmu.ko`) may not unload cleanly in some environments.
+- An explicit `ph_dump` interface is retained, and the API calling sequence is strictly required; incorrect sequence may cause runtime exceptions.
+- Post-processing and statistical analysis tools (`ph_vis`, `ph_stat`) are still being refined.
