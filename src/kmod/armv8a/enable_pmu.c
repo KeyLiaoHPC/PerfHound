@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 // PMUSERENR_EL0
 #define PMUSER_ON   0x00000001
@@ -19,7 +20,8 @@
 #define PMCR_P      0x00000002
 // Enable
 #define PMCR_E      0x00000001
-// PMCNTENCLR_EL0
+// Same mask written to PMCNTENSET_EL0 in enable_counters()
+#define PMCNTEN_ALL 0x8000ffff
 
 static void
 enable_counters(void *p){
@@ -61,27 +63,46 @@ enable_counters(void *p){
 
 static void
 disable_counters(void *p){
-    u32 reg_in = 0;
-    asm volatile("msr pmuserenr_el0, %0": : "r" (reg_in));
-    asm volatile("msr pmcr_el0, %0": : "r" (reg_in));
+    u32 reg_in;
+
+    /* Clear the same counter enables set at load time. */
+    reg_in = PMCNTEN_ALL;
+    asm volatile(
+        "msr pmcntenclr_el0, %0"    "\n\t"
+        "isb"
+        :
+        : "r" (reg_in)
+    );
+
+    /* Disable PMU, then revoke EL0 access; isb so MSR completes before IPI returns. */
+    reg_in = 0;
+    asm volatile(
+        "msr pmcr_el0, %0"          "\n\t"
+        "msr pmuserenr_el0, %0"     "\n\t"
+        "isb"
+        :
+        : "r" (reg_in)
+    );
 }
 
-int init(void){
+static int __init
+enable_pmu_init(void){
     on_each_cpu(enable_counters, NULL, 1);
     printk("PMU is on.");
     return 0;
 }
 
 
-void fini(void){
+static void __exit
+enable_pmu_exit(void){
     on_each_cpu(disable_counters, NULL, 1);
     printk("PMU is off.");
 }
 
 
 MODULE_AUTHOR("Key Liao");
-MODULE_LICENSE("Dual GPLv3");
+MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Enables user-mode access to ARMv8-a PMU counters");
 MODULE_VERSION("1.0");
-module_init(init);
-module_exit(fini);
+module_init(enable_pmu_init);
+module_exit(enable_pmu_exit);
