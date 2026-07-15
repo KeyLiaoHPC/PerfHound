@@ -2,7 +2,7 @@
 
 Applies to all AI-assisted contributions. Breaching these rules can result in automatic banning.
 
-Basic scope: code-level profiling via PH-Probe instrumentation (serial and MPI), plus platform PMU enablement (x86 libpfc / Armv8 kmod) and supporting analysis utilities.
+Basic scope: code-level profiling via PH-Probe instrumentation (serial and MPI), plus platform PMU enablement (`src/kmod/` unified `ph_enable_pmu.ko`) and supporting analysis utilities.
 
 ## Must Follow
 
@@ -59,8 +59,13 @@ ph_finalize();
 Optional platform checks:
 
 ```bash
-# x86: build/load libpfc, disable nmi_watchdog, then run a short instrumented example
-# Armv8: build/load enable_pmu.ko from src/kmod/armv8a/ (or src/pmu/)
+# Build unified kmod (auto-selects x86 or aarch64 by uname -m)
+cd src/kmod && make clean && make
+sudo insmod src/kmod/<arch>/ph_enable_pmu.ko
+cd src/kmod && make check
+
+# x86 PHASM: module handles nmi_watchdog / iTCO cleanup on load
+# Arm: EL0 PMU access only; no sysfs control plane
 ```
 
 Data check after a successful run: look under the path passed to `ph_init` (default `./ph_data`) for `run_<N>/`, `ctag.csv`, `etag.csv`, host dirs, and `r<rank>c<cpu>.csv`.
@@ -78,7 +83,8 @@ Data check after a successful run: look under the path passed to `ph_init` (defa
 | PMU backends    | `src/probe/include/ph_pm_{x86_64,aarch64,papi}.h` | Low-level`_ph_*` read/config macros                  |
 | Event tables    | `src/probe/include/ph_evt_*.h`                    | Named event → code maps                               |
 | Probe build     | `src/probe/Makefile`, `make.config`             | Compile-time modes and install                         |
-| Arm PMU kmod    | `src/kmod/armv8a/`, `src/pmu/`                  | Enable user-space PMU access on Armv8                  |
+| PMU kmod        | `src/kmod/{x86,aarch64}/`                         | Unified `ph_enable_pmu.ko`; `make check` verifies load |
+| x86 PMU client  | `src/probe/ph_pmu_x86.c`, `ph_evt_x86.c`          | Internal sysfs client (PHASM x86 only)               |
 | Examples        | `examples/`                                       | Asm / STREAM / MPI instrumentation demos               |
 | Resolution test | `src/resolution_test/`                            | Multi-level variation resolution measurement           |
 | Utils           | `src/utils/`                                      | Interval→CSV, PMU sanity checks, timers               |
@@ -132,8 +138,8 @@ Supporting / rarely touched: root `Makefile` (TPBench leftover — do not use), 
 
 ### Kernel module (Armv8)
 
-1. Edit `src/kmod/armv8a/enable_pmu.c` (prefer this tree over the duplicate under `src/pmu/` unless the user specifies otherwise).
-2. Build with the in-tree `Makefile` against the running kernel headers.
+1. Edit `src/kmod/aarch64/enable_pmu_aarch64.c` or `src/kmod/x86/enable_pmu_x86.c`.
+2. Build with `cd src/kmod && make`.
 3. Document load/unload and any `sysctl` / blacklist steps in the user manual.
 
 ## Probe Layout (PH-Probe)

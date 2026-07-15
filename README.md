@@ -22,17 +22,21 @@ PerfHound mainly serves the following three goals:
 
 ### 2.1 Prepare Kernel Modules (Obtain User-Space PMU Access)
 
-To read hardware performance counters with low latency in user space, the corresponding kernel module needs to be loaded:
+To read hardware performance counters with low latency in user space, build and load the unified kernel module:
 
-- **Armv8-A Platform**:
-  Enter the `src/kmod/armv8a/` directory, compile and load the provided kernel module:
-  ```bash
-  cd src/kmod/armv8a
-  make
-  sudo insmod ./enable_pmu.ko
-  ```
-- **x86-64 Platform**:
-  Requires depending on and loading the [libpfc](https://github.com/obilaniu/libpfc) kernel module. After loading, you need to disable `nmi_watchdog` and unload the conflicting `iTCO_wdt` module.
+```bash
+cd src/kmod
+make
+sudo insmod src/kmod/x86/ph_enable_pmu.ko      # x86-64
+# or
+sudo insmod src/kmod/aarch64/ph_enable_pmu.ko  # Armv8-A
+make check   # fails if module not loaded; run after insmod
+```
+
+- **x86-64**: `ph_enable_pmu.ko` enables user-space `rdpmc`, exposes sysfs `config`/`counts` for counter programming, and on load attempts to disable `nmi_watchdog` and unload `iTCO_*` modules.
+- **Armv8-A**: `ph_enable_pmu.ko` enables EL0 PMU register access (`PMUSERENR_EL0`). No external libpfc dependency.
+
+Unload: `sudo rmmod ph_enable_pmu`
 
 ### 2.2 Configure and Compile PH-Probe API
 
@@ -163,6 +167,6 @@ For post-processing scripts and multi-level detection workflows for variation an
 
 - Dynamically changing the binding relationship between processes and CPU cores during runtime is not supported.
 - OpenMP thread-level profiling is not supported yet.
-- The kernel module for Armv8-A (`enable_pmu.ko`) may not unload cleanly in some environments.
+- The Armv8-A kernel module (`ph_enable_pmu.ko`) may not unload cleanly in some environments.
 - An explicit `ph_dump` interface is retained, and the API calling sequence is strictly required; incorrect sequence may cause runtime exceptions.
 - Post-processing and statistical analysis tools (`ph_vis`, `ph_stat`) are still being refined.

@@ -52,48 +52,28 @@ Pfh-Probe has been installed in .
 
 完成后，会在src目录下生成./include/varapi.h和./lib/libvarapi\*.so。需要在环境变量CPATH、LIBRARY\_PATH和LD\_LIBRARY\_PATH中添加对应位置，在之后对被测代码进行插桩的时候，要将这些组件一起编译进被测代码。
 
-##### 2) 在x86-64服务器上编译并加载libpfc内核模块
+##### 2) 编译并加载 ph_enable_pmu 内核模块（x86-64 / Armv8-A）
 
-在x86\_64平台上，需要通过libpfc内核模块导出寄存器信息。首先编译libpfc（https://github.com/obilaniu/libpfc）。
+统一源码树 `src/kmod/`，按架构自动选择子目录，产物均为 `ph_enable_pmu.ko`：
 
-编译完成后，加载libpfc内核模块。进入libpfc安装目录，以root权限运行modprobe ./libpfc.ko。若模块被正常加载，可以在/var/log/messages中看到pfc输出了CPU信息和部分寄存器信息。以下是在pi-2.0 CPU队列计算节点上的输出：
-
-```
-Mar 16 13:07:43 cas111 kernel: pfc: Kernel Module loading on processor Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz (Family 6 (6), Model 85 (055), Stepping 7 (7))
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x0.0x0:        EAX=00000016, EBX=756e6547, ECX=6c65746e, EDX=49656e69
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x1.0x0:        EAX=00050657, EBX=02400800, ECX=7ffefbff, EDX=bfebfbff
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x6.0x0:        EAX=00000ff7, EBX=00000002, ECX=00000009, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0xA.0x0:        EAX=07300804, EBX=00000000, ECX=00000000, EDX=00000603
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000000.0x0: EAX=80000008, EBX=00000000, ECX=00000000, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000001.0x0: EAX=00000000, EBX=00000000, ECX=00000121, EDX=2c100800
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000002.0x0: EAX=65746e49, EBX=2952286c, ECX=6f655820, EDX=2952286e
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000003.0x0: EAX=6c6f4720, EBX=32362064, ECX=43203834, EDX=40205550
-Mar 16 13:07:43 cas111 kernel: pfc: cpuid.0x80000004.0x0: EAX=352e3220, EBX=7a484730, ECX=00000000, EDX=00000000
-Mar 16 13:07:43 cas111 kernel: pfc: PM Arch Version:      4
-Mar 16 13:07:43 cas111 kernel: pfc: Fixed-function  PMCs: 3#011Mask 0000ffffffffffff (48 bits)
-Mar 16 13:07:43 cas111 kernel: pfc: General-purpose PMCs: 8#011Mask 0000ffffffffffff (48 bits)
-Mar 16 13:07:43 cas111 kernel: pfc: Module pfc loaded successfully. Make sure to execute
-Mar 16 13:07:43 cas111 kernel: pfc:     modprobe -ar iTCO_wdt iTCO_vendor_support
-Mar 16 13:07:43 cas111 kernel: pfc:     echo 0 > /proc/sys/kernel/nmi_watchdog
-Mar 16 13:07:43 cas111 kernel: pfc: and blacklist iTCO_vendor_support and iTCO_wdt, since the CR4.PCE register
-Mar 16 13:07:43 cas111 kernel: pfc: initialization is periodically undone by an unknown agent.
+```bash
+cd src/kmod
+make
+sudo insmod src/kmod/x86/ph_enable_pmu.ko       # x86-64
+# 或
+sudo insmod src/kmod/aarch64/ph_enable_pmu.ko   # Armv8-A
+cd src/kmod && make check
 ```
 
-然后需要关闭nmi\_watchdog，卸载iTCO\_wdt和iTCO\_vendor\_support两个模块（如果有）。
+**x86-64**：模块通过 sysfs `/sys/module/ph_enable_pmu/{config,counts,masks}` 配置计数器，并尝试关闭 `nmi_watchdog`、卸载 `iTCO_wdt` / `iTCO_vendor_support`。不再依赖外部 libpfc。
 
-设置如下环境变量：
+**Armv8-A**：模块在每个 CPU 上打开 EL0 PMU 访问权限。
 
-```
-LIBPFC=~/apps/libpfc
-PERFHOUND=~/apps/perfhound
-LD\_LIBRARY\_PATH=$LIBPFC/lib:$PERFOUND/lib:$LD\_LIBRARY\_PATH
-LIBRARY\_PATH=$LIBPFC/lib:$PERFOUND/lib:$LIBRARY\_PATH
+卸载：`sudo rmmod ph_enable_pmu`
 
-```
+##### 3) （已废弃）旧版 libpfc / armv8a 路径
 
-然后可以运行pfcdemo检查libpfc是否已经正确加载。
-
-##### 3) 在Armv8\_64平台上，编译并加载enable\_pmu内核模块。
+历史文档中的 libpfc meson/ninja 与 `src/kmod/armv8a/enable_pmu.ko` 已整合为上述流程。
 
 #### 2.2.3 运行测试
 

@@ -40,7 +40,7 @@
 ## 1. 工程工作过程总览
 
 ```text
-① 平台准备（Arm：编译并加载 enable_pmu.ko）
+① 平台准备（编译并加载 ph_enable_pmu.ko；`make check` 验证）
         ↓
 ② 配置并编译 PH-Probe（make.config → make && make install）
         ↓
@@ -60,21 +60,25 @@
 
 ---
 
-## 2. 安装与编译（Arm）
+## 2. 安装与编译（平台准备 + PH-Probe）
 
-### 2.1 启用用户态 PMU 访问
+### 2.1 编译并加载 ph_enable_pmu.ko
 
-Arm 上用户态直接读 PMU 通常需要内核模块打开 `PMUSERENR_EL0` 等权限。源码在 `src/kmod/armv8a/`：
+x86 与 Arm 使用统一构建入口 `src/kmod/`，按本机架构生成 `ph_enable_pmu.ko`：
 
 ```bash
-cd src/kmod/armv8a
+cd src/kmod
 make
-sudo insmod ./enable_pmu.ko
+sudo insmod src/kmod/x86/ph_enable_pmu.ko       # x86-64
+# 或
+sudo insmod src/kmod/aarch64/ph_enable_pmu.ko   # Armv8-A
+make check   # 第一步检查模块是否已加载；未加载则报错退出
 ```
 
-模块对每个 CPU 配置用户态 PMU 访问并复位/使能计数器。加载后即可使用 `PHASM` 后端。
+- **Arm**：模块打开 `PMUSERENR_EL0` 等权限，使 `PHASM` 可在用户态读 PMU。
+- **x86**：模块开启 `rdpmc`、暴露 sysfs 配置计数器，并尝试关闭 `nmi_watchdog` / 卸载 `iTCO_*`。
 
-> 说明：部分环境卸载该模块可能不干净；测量节点上保持加载即可。
+> 说明：部分环境卸载模块可能不干净；测量节点上保持加载即可。
 
 ### 2.2 配置并编译 PH-Probe
 
@@ -246,7 +250,7 @@ int main(void)
 ### 5.2 工作步骤
 
 1. `PH_EVMODE=EV` 或 `EVX`，`PH_API=PHASM`，`PH_BUFSIZE=4`，重新编译 probe。
-2. 确认 `enable_pmu.ko` 已加载。
+2. 确认 `ph_enable_pmu.ko` 已加载（`lsmod | grep ph_enable_pmu` 或 `make -C src/kmod check`）。
 3. `init → set_tag → set_evt（多次）→ commit → read → finalize`。
 4. 用 `etag.csv` 的 `id` 顺序对应 CSV 中的 `ev1…evN` 列；区间分析同样对起止行做差分。
 
@@ -402,7 +406,7 @@ gid, pid, cycle, nanosec, uval [, ev1, ev2, ...]
 3. **模式编译期固定**：换 `TS`/`EV`/`EVX` 或改 `PH_BUFSIZE` 后必须重编 `libph.so` / `libphmpi.so`。
 4. **`PH_BUFSIZE` 单位是 KiB**：`4` = 4 KiB；仓库默认若为 `4096` 则表示 4 MiB，与本文示例不同。
 5. **正式测量关闭调试**：`PH_DEBUG=NO`，并避免在 `ph_read` 热路径附近打印日志。
-6. **Arm 需 kmod**：`PHASM` 依赖用户态 PMU 权限；未加载 `enable_pmu.ko` 时读计数器可能失败或得到无效值。
+6. **需 kmod**：`PHASM` 依赖 `ph_enable_pmu.ko`；未加载时读计数器可能失败或得到无效值。
 7. **绑核稳定**：不支持运行中改变进程与 CPU 的绑定；MPI 场景建议显式绑核以便 `r<rank>c<cpu>.csv` 含义清晰。
 8. **旧示例命名**：`examples/` 与部分文档仍可能出现 `pfh_*` / `vt_*`；新代码统一使用 `ph_*` / `phmpi_*`。
 

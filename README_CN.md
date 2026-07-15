@@ -24,17 +24,21 @@ PerfHound 主要服务于以下三大目标：
 
 ### 2.1 准备内核模块（获取用户态 PMU 访问权限）
 
-为了在用户态低延迟地读取硬件性能计数器，需要加载对应的内核模块：
+为了在用户态低延迟地读取硬件性能计数器，需编译并加载统一命名的内核模块：
 
-- **Armv8-A 平台**：
-  进入 `src/kmod/armv8a/` 目录，编译并加载自带的内核模块：
-  ```bash
-  cd src/kmod/armv8a
-  make
-  sudo insmod ./enable_pmu.ko
-  ```
-- **x86-64 平台**：
-  需要依赖并加载 [libpfc](https://github.com/obilaniu/libpfc) 内核模块。加载后需关闭 `nmi_watchdog` 并卸载冲突的 `iTCO_wdt` 模块。
+```bash
+cd src/kmod
+make
+sudo insmod src/kmod/x86/ph_enable_pmu.ko      # x86-64
+# 或
+sudo insmod src/kmod/aarch64/ph_enable_pmu.ko  # Armv8-A
+make check   # 若模块未加载会报错退出；insmod 后再运行
+```
+
+- **x86-64**：`ph_enable_pmu.ko` 开启用户态 `rdpmc`，通过 sysfs 配置计数器；加载时会尝试关闭 `nmi_watchdog` 并卸载 `iTCO_*` 模块。
+- **Armv8-A**：`ph_enable_pmu.ko` 打开 EL0 PMU 寄存器访问权限，不再依赖外部 libpfc。
+
+卸载：`sudo rmmod ph_enable_pmu`
 
 ### 2.2 配置并编译 PH-Probe API
 
@@ -165,6 +169,6 @@ ph_data/
 
 - 不支持在运行中动态更换进程与 CPU 核心的绑定关系。
 - 暂不支持 OpenMP 线程级 profiling。
-- Armv8-A 的内核模块（`enable_pmu.ko`）在部分环境下可能无法干净地卸载。
+- Armv8-A 内核模块（`ph_enable_pmu.ko`）在部分环境下可能无法干净地卸载。
 - 留有显式的 `ph_dump` 接口，API 调用次序要求严格，顺序错误可能导致运行异常。
 - 后处理与统计分析工具（`ph_vis`, `ph_stat`）仍在完善中。

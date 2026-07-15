@@ -34,8 +34,8 @@
 
 //==================================================================================
 
-/* libpfc is currently only used for writing pmc configurations. */
-#include "libpfc.h"
+/* ph_enable_pmu sysfs is only for PMC config; hot-path reads still use rdpmc */
+#include "ph_pmu_x86.h"
 
 #define _X86_TSC_GHZ 2.49414
 
@@ -47,24 +47,22 @@
     "\n\tmov      %%rdx,   %0                    "  \
     "\n\t"
 
-/* Init fixed-function registers. */
-// This call is based on https://github.com/obilaniu/libpfc
+/* Fixed-counter init: indices 0-2 are fixed; cfg=2 enables counting in OS+user mode */
 #define _ph_init_ts                                                \
     do {                                                            \
-        PFC_CFG pfc_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};                \
-        const PFC_CNT pfc_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0};     \
-        if (pfcInit() != 0) {                                       \
-            printf("*** [PH-Probe] Failed to load pfc file.\n");   \
+        PH_PMU_CFG ph_cfgs[7] = {2, 2, 2, 0, 0, 0, 0};              \
+        const PH_PMU_CNT ph_zero_cnts[7] = {0, 0, 0, 0, 0, 0, 0};   \
+        if (ph_pmu_init() != 0) {                                   \
+            printf("*** [PH-Probe] Failed to open ph_enable_pmu sysfs.\n"); \
             fflush(stdout);                                         \
             exit(1);                                                \
         }                                                           \
-        pfcWrCfgs(0, 7, pfc_cfgs);                                  \
-        pfcWrCnts(0, 7, pfc_zero_cnts);                             \
-    } while(0);                                                     \
-//    _nspt = 1 / _X86_TSC_GHZ;                            
+        ph_pmu_wr_cfgs(0, 7, ph_cfgs);                              \
+        ph_pmu_wr_cnts(0, 7, ph_zero_cnts);                         \
+    } while(0);                            
 
 #define _ph_fini_ts     \
-    pfcFini()
+    ph_pmu_fini()
 
 #define _ph_init_cy
 
@@ -131,16 +129,16 @@
 /* Macros for reading x86_64 events */
 /* Parsing string events to hex event code */
 #define _ph_parse_event(_code, _evstr)  \
-    _code = pfcParseCfg(_evstr);        \
+    _code = ph_pmu_parse_cfg(_evstr);        \
     if(_code == 0) _code = 0xFFFFFFFF;
 
 /* Set IA32_PERFEVTSELx */
 #define _ph_config_event(_code_arr, _nevt)  \
     if ((_nevt)) {                                                  \
         do {                                                        \
-            const PFC_CNT pfc_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0};  \
-            pfcWrCfgs(3, _nevt, _code_arr);                         \
-            pfcWrCnts(3, _nevt, pfc_zeros);                         \
+            const PH_PMU_CNT ph_zeros[8] = {0, 0, 0, 0, 0, 0, 0, 0}; \
+            ph_pmu_wr_cfgs(3, _nevt, _code_arr);                      \
+            ph_pmu_wr_cnts(3, _nevt, ph_zeros);                       \
         } while(0);                                                 \
     }
 

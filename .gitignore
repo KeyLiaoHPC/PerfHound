@@ -35,3 +35,4 @@ test.sh
 *.cmd
 .tmp_versions
 .DS_Store
+*.mod
