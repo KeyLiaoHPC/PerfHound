@@ -43,6 +43,7 @@ ifeq ($(PH_API),PAPI)
 	PAPI_ROOT=$(PAPI)
 	CFLAGS += -I$(PAPI_ROOT)/include
 	LDFLAGS += -L$(PAPI_ROOT)/lib -lpapi
+	LDFLAGS_MPI += -L$(PAPI_ROOT)/lib -lpapi
 endif
 
 # === TARGETS ===

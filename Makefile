@@ -1,25 +1,16 @@
-#!/bin/sh
+# Top-level PerfHound entry (replaces unused TPBench leftover).
+.PHONY: all probe check clean
 
-include setup/Make.${SETUP}
+all: probe
 
-TP_DIR = $(PWD)
-SRC = $(TP_DIR)/src
-KERNELS = $(SRC)/kernels
-GROUPS = $(SRC)/groups
-INC = $(SRC)/include
-VPATH = $(SRC):$(KERNELS):$(KERNELS)/asm:$(KERNELS)/blas1:$(KERNELS)/simple:$(GROUPS)
+probe:
+	$(MAKE) -C src/probe libph.so
+	@mkdir -p src/probe/lib
+	cp -f src/probe/libph.so src/probe/lib/
 
-.PHONY: clean test 
-
-tpbench.x:	main.c tpmpi.c tpb_core.c cli_parser.c tpio.c tp_recs.c init.c staxpy.c striad.c sum.c triad.c \
-			update.c axpy.c copy.c scale.c cli_parser.c stream.c stream_verbose.c dot.c
-			$(CC) $(CFLAGS) -I$(INC) -o $@ $^
-
-test: test.x
-test.x: test.c init.c staxpy.c striad.c sum.c triad.c update.c \
-		axpy.c copy.c scale.c cli_parser.c
-	$(CC) -g $(CFLAGS) -I$(INC) -o $@ $^
+check:
+	$(MAKE) -C tests check
 
 clean:
-	-rm -f *.x *.o
-
+	$(MAKE) -C src/probe clean
+	$(MAKE) -C tests clean

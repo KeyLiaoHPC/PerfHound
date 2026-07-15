@@ -36,3 +36,6 @@ test.sh
 .tmp_versions
 .DS_Store
 *.mod
+tests/.mpi_probe
+tests/.papi_probe
+tests/probe-lib-ev-stamp

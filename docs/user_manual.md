@@ -54,6 +54,24 @@ Pfh-Probe has been installed in .
 
 ##### 2) 编译并加载 ph_enable_pmu 内核模块（x86-64 / Armv8-A）
 
+#### 2.2.3 运行功能测试（make check）
+
+在仓库根目录执行：
+
+```bash
+make check
+```
+
+测试框架会：
+
+1. 探测 PAPI：须能同时 `#include <papi.h>` 且链接 `-lpapi`；否则测试构建使用 `PHASM`。
+2. 探测 MPI：须能同时 `#include <mpi.h>` 且链接 `-lmpi`；否则跳过 `AM*` / `BM*`。
+3. 运行串行单元测试 `A1`–`A6`、集成测试 `B1`–`B3`；MPI 可用时再运行 `AM*` / `BM*`。
+
+每项测试的编号、名称、内容与成功/失败条件见 [`tests/README.md`](../tests/README.md)。
+
+PMU 内核模块检查仍为独立步骤：`cd src/kmod && make check`（需已 `insmod`）。
+
 统一源码树 `src/kmod/`，按架构自动选择子目录，产物均为 `ph_enable_pmu.ko`：
 
 ```bash

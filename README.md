@@ -73,7 +73,19 @@ mpicc -O2 -I./src/probe/include -L./src/probe/lib -o myapp_mpi myapp.c -lphmpi
 ```
 Before running, make sure to add the directory containing `libph.so` to the `LD_LIBRARY_PATH` environment variable.
 
-## 3. API Usage Guide
+### 2.4 Run Functional Tests
+
+From the repository root:
+
+```bash
+make check
+```
+
+This builds PH-Probe (if needed), probes PAPI (`#include <papi.h>` + `-lpapi`) and MPI
+(`#include <mpi.h>` + `-lmpi`), then runs serial unit/integration tests (`A*`, `B*`) and
+MPI tests (`AM*`, `BM*`) when MPI is available. See [`tests/README.md`](tests/README.md)
+for per-test pass/fail criteria.
+
 
 The PerfHound API has a strict calling sequence: `init` -> `set_tag` -> `set_evt` -> `commit` -> `read` -> `finalize`.
 

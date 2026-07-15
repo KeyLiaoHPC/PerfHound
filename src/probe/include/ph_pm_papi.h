@@ -139,3 +139,10 @@ static int evset = PAPI_NULL;
 
 #define _ph_read_pm_12(_arr)   \
         PAPI_read(evset, _arr);
+
+/* EV / EVX modes use the same PAPI_read path as the per-count helpers above. */
+#define _ph_read_pm_ev(_arr)   \
+        PAPI_read(evset, _arr);
+
+#define _ph_read_pm_evx(_arr)  \
+        PAPI_read(evset, _arr);
