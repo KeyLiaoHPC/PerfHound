@@ -9,7 +9,14 @@
 #include <sched.h>
 #include <string.h>
 #include <mpi.h>
-#include <pfh_mpi.h>
+#include <ph_mpi.h>
+
+#ifndef PH_DATA_ROOT
+#define PH_DATA_ROOT "./ph_data/test3_asmmpi_x86"
+#endif
+
+#define PHMPI 1
+#include "ph_events.h"
 
 #ifdef PAPI
 #include <papi.h>
@@ -72,49 +79,16 @@ int main(int argc, char** argv) {
 
     MPI_Init(NULL, NULL);
 
-    char dirname[256];
-    sprintf(dirname, "./PerfHound_res/%s_%s_test_6248_20210930/NINS=%d", mode, op, NINS);
-
-#ifdef PAPI
-    if (pfhmpi_init("../data/pfh_papi")) {
-#else
-    if (pfhmpi_init("../data/pfh")) {
-#endif
-        printf("Failed at initailizing PerfHound.\n");
+    if (phmpi_init(PH_DATA_ROOT)) {
+        printf("Failed at initializing PerfHound.\n");
         exit(1);
     }
 
-    pfhmpi_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
-    pfhmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
-    pfhmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
-
-    if (strcmp(mode, "TS") == 0) {
-        //pfhmpi_set_evt("cpu_clk_unhalted.core_clk");
-        //pfhmpi_set_evt("CPU_CLK_UNHALTED");
-        pfhmpi_set_evt("inst_retired.any_p");
-        //pfhmpi_set_evt("uops_issued.any");
-        //pfhmpi_set_evt("uops_retired.all");
-    } else if (strcmp(mode, "EVX") == 0) {
-#ifdef PAPI
-        pfhmpi_set_evt("INST_RETIRED:ANY_P");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_0");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_1");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_2");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_4");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_5");
-        pfhmpi_set_evt("UOPS_DISPATCHED_PORT:PORT_6");
-#else
-        pfhmpi_set_evt("inst_retired.any_p");
-        pfhmpi_set_evt("uops_executed_port.port_0");
-        pfhmpi_set_evt("uops_executed_port.port_1");
-        pfhmpi_set_evt("uops_executed_port.port_2");
-        pfhmpi_set_evt("uops_executed_port.port_4");
-        pfhmpi_set_evt("uops_executed_port.port_5");
-        pfhmpi_set_evt("uops_executed_port.port_6");
-#endif
-    }
-
-    pfhmpi_commit();
+    phmpi_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
+    phmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
+    phmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
+    ph_example_set_events(mode);
+    phmpi_commit();
 
     // Warm up
     MPI_Barrier(MPI_COMM_WORLD);
@@ -156,7 +130,7 @@ int main(int argc, char** argv) {
     // Measure kernel
     while ((measure_counter++) < NMEASURE) {
 
-        pfhmpi_read(1, 1, 0);
+        phmpi_read(1, 1, 0.0);
 
 
 #pragma GCC unroll 10240
@@ -168,7 +142,7 @@ int main(int argc, char** argv) {
                 : "r10", "r11", "r12", "xmm0", "xmm1", "memory"
             );
         }
-        pfhmpi_read(1, 2, 0);
+        phmpi_read(1, 2, 0.0);
         
         // triad kernel
         for (int j = 0; j < ARRLEN; ++j) {
@@ -193,7 +167,7 @@ int main(int argc, char** argv) {
     printf("Ref: %lf, actual: %lf\n", 9.7 * ARRLEN, c_sum);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    pfhmpi_finalize();
+    phmpi_finalize();
 
     MPI_Finalize();
     return 0;

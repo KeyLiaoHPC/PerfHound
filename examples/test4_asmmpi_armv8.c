@@ -10,7 +10,14 @@
 #endif
 
 #ifdef PERFHOUND
-#include <pfh_mpi.h>
+#include <ph_mpi.h>
+
+#ifndef PH_DATA_ROOT
+#define PH_DATA_ROOT "./ph_data/test4_asmmpi_armv8"
+#endif
+
+#define PHMPI 1
+#include "ph_events.h"
 #endif
 
 #ifndef NINS
@@ -63,39 +70,16 @@ int main(int argc, char** argv) {
     MPI_Init(NULL, NULL);
 
 #ifdef PERFHOUND
-    char dirname[256];
-    sprintf(dirname, "./PerfHound_res/%s_%s_test_920_20210908/NINS=%d", mode, op, NINS);
-
-    if (pfhmpi_init("../data/pfhmpi_0918")) {
-        printf("Failed at initailizing PerfHound.\n");
+    if (phmpi_init(PH_DATA_ROOT)) {
+        printf("Failed at initializing PerfHound.\n");
         exit(1);
     }
 
-    pfhmpi_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
-    pfhmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
-    pfhmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
-
-    if (strcmp(mode, "EV") == 0) {
-        pfhmpi_set_evt("CPU_CYCLES");
-        pfhmpi_set_evt("INST_RETIRED");
-        pfhmpi_set_evt("BR_RETIRED");
-        pfhmpi_set_evt("L1D_CACHE");
-    } else if (strcmp(mode, "EVX") == 0) {
-        pfhmpi_set_evt("CPU_CYCLES");
-        pfhmpi_set_evt("INST_RETIRED");
-        pfhmpi_set_evt("BR_RETIRED");
-        pfhmpi_set_evt("L1D_CACHE");
-        pfhmpi_set_evt("L1I_CACHE");
-        pfhmpi_set_evt("L2D_CACHE");
-        pfhmpi_set_evt("L1D_CACHE_REFILL");
-        pfhmpi_set_evt("L1D_TLB");
-        pfhmpi_set_evt("L1D_TLB_REFILL");
-        pfhmpi_set_evt("MEM_ACCESS");
-        pfhmpi_set_evt("STALL_FRONTEND");
-        pfhmpi_set_evt("STALL_BACKEND");
-    }
-
-    pfhmpi_commit();
+    phmpi_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
+    phmpi_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
+    phmpi_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
+    ph_example_set_events(mode);
+    phmpi_commit();
 #endif
 
 #ifdef PAPI
@@ -166,7 +150,7 @@ int main(int argc, char** argv) {
     while ((measure_counter++) < NMEASURE) {
 
 #ifdef PERFHOUND
-        pfhmpi_read(1, 1, 0);
+        phmpi_read(1, 1, 0.0);
 #endif
 
 #ifdef PAPI
@@ -185,7 +169,7 @@ int main(int argc, char** argv) {
         }
 
 #ifdef PERFHOUND
-        pfhmpi_read(1, 2, 0);
+        phmpi_read(1, 2, 0.0);
 #endif
 
 #ifdef PAPI
@@ -215,7 +199,7 @@ int main(int argc, char** argv) {
     // printf("%d\n", res);
 
 #ifdef PERFHOUND
-    pfhmpi_finalize();
+    phmpi_finalize();
 #endif
 
 #ifdef PAPI

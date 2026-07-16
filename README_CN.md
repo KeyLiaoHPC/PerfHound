@@ -158,12 +158,20 @@ ph_data/
 
 ## 5. 案例与工具
 
-你可以使用 `examples/` 目录下的代码，在自己的计算平台上复现案例，以便快速上手盘瓠：
-- `test2_asm_armv8.c` / `test1_asm_x86.c`: 串行插桩与 PMU 采样示例
-- `test4_asmmpi_armv8.c` / `test3_asmmpi_x86.c`: MPI 并行插桩示例
-- `test5_vardist_add.c`: 性能波动分布数据收集示例
+你可以使用 `examples/` 目录下的代码复现案例。详见 [`examples/README.md`](examples/README.md)。
 
-波动分析的后处理脚本和多级检测流程可参考 `src/resolution_test/` 和 `src/varstat/`。
+- `test1_asm_x86.c` / `test2_asm_armv8.c`：串行微内核插桩
+- `test3_asmmpi_x86.c` / `test4_asmmpi_armv8.c`：MPI 并行插桩（如 `NP=16`）
+- `test5_vardist_add.c`：性能波动分布
+- `stream_mpi.c`：MPI STREAM，Copy/Scale/Add/Triad 区间计时
+
+```bash
+cd examples && make all
+NP=16 ./run_mpi.sh stream_mpi.x
+python3 summarize_run.py ./ph_data/stream_mpi
+```
+
+波动分析后处理可参考 `src/resolution_test/` 与 `src/varstat/`。
 
 ## 6. 当前局限性与开发计划
 

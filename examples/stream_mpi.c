@@ -52,7 +52,21 @@
 # include <limits.h>
 # include <sys/time.h>
 # include "mpi.h"
-# include "varapi.h"
+# include <ph_mpi.h>
+
+#ifndef MODE
+# define MODE EV
+#endif
+
+#ifndef PH_DATA_ROOT
+# define PH_DATA_ROOT "./ph_data/stream_mpi"
+#endif
+
+#define _M2S(x) #x
+#define M2S(x) _M2S(x)
+
+#define PHMPI 1
+# include "ph_events.h"
 
 /*-----------------------------------------------------------------------
  * INSTRUCTIONS:
@@ -270,14 +284,26 @@ main()
 	MPI_Comm_size(MPI_COMM_WORLD, &numranks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-	/* Pfh-Probe init. */
-    //if (vt_init("/lustre/home/acct-hpc/hpckey/experiments/test_data", "st_mpi")) {
-    if (vt_init("~/experiments/test_data", "st_mpi")) {
-        exit(1);
+	/* PerfHound init. */
+    {
+        const char *mode_str = M2S(MODE);
+        if (phmpi_init(PH_DATA_ROOT)) {
+            fprintf(stderr, "Rank %d: phmpi_init failed\n", myrank);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        phmpi_set_tag(1, 0, "STREAM_Test");
+        phmpi_set_tag(1, 1, "Loop_Start");
+        phmpi_set_tag(1, 2, "Copy_Start");
+        phmpi_set_tag(1, 3, "Copy_End");
+        phmpi_set_tag(1, 4, "Scale_Start");
+        phmpi_set_tag(1, 5, "Scale_End");
+        phmpi_set_tag(1, 6, "Add_Start");
+        phmpi_set_tag(1, 7, "Add_End");
+        phmpi_set_tag(1, 8, "Triad_Start");
+        phmpi_set_tag(1, 9, "Triad_End");
+        ph_example_set_events(mode_str);
+        phmpi_commit();
     }
-	//vt_set_evt(stream_event, 3);
-	//vt_set_uev("i", &k, VT_INT);
-	vt_commit();
 
     /* --- NEW FEATURE --- distribute requested storage across MPI ranks --- */
 	//array_elements = STREAM_ARRAY_SIZE / numranks;		// don't worry about rounding vs truncation
@@ -458,7 +484,7 @@ main()
     // 
 
     scalar = SCALAR;
-    vt_read(1, 1, 0, 0, 0);
+    phmpi_read(1, 1, 0.0);
     for (k=0; k<NTIMES; k++)
 	{
 		// kernel 1: Copy
@@ -467,12 +493,12 @@ main()
 #ifdef TUNED
         tuned_STREAM_Copy();
 #else
-        vt_read(1, 2, 0, 0, 0);
+        phmpi_read(1, 2, 0.0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j];
 #endif
-        vt_read(1, 3, 0, 0, 0);
+        phmpi_read(1, 3, 0.0);
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
 		times[0][k] = t1 - t0;
@@ -483,11 +509,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Scale(scalar);
 #else
-        vt_read(1, 4, 0, 0, 0);
+        phmpi_read(1, 4, 0.0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			b[j] = scalar*c[j];
-        vt_read(1, 5, 0, 0, 0);
+        phmpi_read(1, 5, 0.0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -499,11 +525,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Add();
 #else
-        vt_read(1, 6, 0, 0, 0);
+        phmpi_read(1, 6, 0.0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			c[j] = a[j]+b[j];
-        vt_read(1, 7, 0, 0, 0);
+        phmpi_read(1, 7, 0.0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -515,11 +541,11 @@ main()
 #ifdef TUNED
         tuned_STREAM_Triad(scalar);
 #else
-        vt_read(1, 8, 0, 0, 0);
+        phmpi_read(1, 8, 0.0);
 #pragma omp parallel for
 		for (j=0; j<array_elements; j++)
 			a[j] = b[j]+scalar*c[j];
-        vt_read(1, 9, 0, 0, 0);
+        phmpi_read(1, 9, 0.0);
 #endif
 		MPI_Barrier(MPI_COMM_WORLD);
 		t1 = MPI_Wtime();
@@ -613,7 +639,7 @@ main()
 		free(TimesByRank);
 		free(AvgErrByRank);
 	}
-	vt_clean();
+	phmpi_finalize();
     MPI_Finalize();
 	return(0);
 }

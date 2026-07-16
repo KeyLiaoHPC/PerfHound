@@ -284,7 +284,7 @@ ph_init(char *path) {
     ph_set_tag(0, 1, "PH_S_main");
     ph_set_tag(0, 2, "PH_E_main");
     ph_set_tag(0, 3, "PH_S_ph_dump");
-    ph_set_tag(0, 4, "PH_S_ph_dump");
+    ph_set_tag(0, 4, "PH_E_ph_dump");
     printf("*** [PH-Probe] Directory tree initialized. \n");
 
     return 0;

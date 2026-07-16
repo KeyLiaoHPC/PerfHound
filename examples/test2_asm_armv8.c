@@ -9,7 +9,12 @@
 #endif
 
 #ifdef PERFHOUND
-#include <pfhprobe.h>
+#include <perfhound.h>
+#include "ph_events.h"
+#endif
+
+#ifndef PH_DATA_ROOT
+#define PH_DATA_ROOT "./ph_data/test2_asm_armv8"
 #endif
 
 #ifndef NINS
@@ -61,39 +66,16 @@ int main(int argc, char** argv) {
     int idx = 0, measure_counter = 0;
 
 #ifdef PERFHOUND
-    char dirname[256];
-    sprintf(dirname, "./PerfHound_res/%s_%s_test_920_20210908/NINS=%d", mode, op, NINS);
-
-    if (pfh_init(dirname)) {
-        printf("Failed at initailizing PerfHound.\n");
+    if (ph_init(PH_DATA_ROOT)) {
+        printf("Failed at initializing PerfHound.\n");
         exit(1);
     }
 
-    pfh_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
-    pfh_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
-    pfh_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
-
-    if (strcmp(mode, "EV") == 0) {
-        pfh_set_evt("CPU_CYCLES");
-        pfh_set_evt("INST_RETIRED");
-        pfh_set_evt("BR_RETIRED");
-        pfh_set_evt("L1D_CACHE");
-    } else if (strcmp(mode, "EVX") == 0) {
-        pfh_set_evt("CPU_CYCLES");
-        pfh_set_evt("INST_RETIRED");
-        pfh_set_evt("BR_RETIRED");
-        pfh_set_evt("L1D_CACHE");
-        pfh_set_evt("L1I_CACHE");
-        pfh_set_evt("L2D_CACHE");
-        pfh_set_evt("L1D_CACHE_REFILL");
-        pfh_set_evt("L1D_TLB");
-        pfh_set_evt("L1D_TLB_REFILL");
-        pfh_set_evt("MEM_ACCESS");
-        pfh_set_evt("STALL_FRONTEND");
-        pfh_set_evt("STALL_BACKEND");
-    }
-
-    pfh_commit();
+    ph_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
+    ph_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
+    ph_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
+    ph_example_set_events(mode);
+    ph_commit();
 #endif
 
 #ifdef PAPI
@@ -159,7 +141,7 @@ int main(int argc, char** argv) {
     while ((measure_counter++) < NMEASURE) {
 
 #ifdef PERFHOUND
-        pfh_read(1, 1, 0);
+        ph_read(1, 1, 0.0);
 #endif
 
 #ifdef PAPI
@@ -178,7 +160,7 @@ int main(int argc, char** argv) {
         }
 
 #ifdef PERFHOUND
-        pfh_read(1, 2, 0);
+        ph_read(1, 2, 0.0);
 #endif
 
 #ifdef PAPI
@@ -208,7 +190,7 @@ int main(int argc, char** argv) {
     // printf("%d\n", res);
 
 #ifdef PERFHOUND
-    pfh_finalize();
+    ph_finalize();
 #endif
 
 #ifdef PAPI

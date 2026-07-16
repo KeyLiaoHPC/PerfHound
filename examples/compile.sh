@@ -1,27 +1,6 @@
-#!/bin/bash -x
-#NINS=${NINS:-1000}
-NINS=$1
-MODE=${MODE:-TS}
-KNAME=${KNAME:-ADD}
-NMEASURE=${NMEASURE:-1050}
-TOOL=${TOOL:-PERFHOUND}
-ARRLEN=${ARRLEN:-16777216}
-
-LIBPFIX=${MODE,,}
-
-#gcc -O2 -fno-builtin  -o test1_asm_x86.x -DMODE=$MODE \
-#    -DNINS=$NINS -DNMEASURE=$NMEASURE -DPERFHOUND -I../pfhprobe/include \
-#    -L../pfhprobe -lpfh    \
-#    ./test1_asm_x86.c
-
-mpicc -O2 -fno-builtin  -o test3_papi_${NINS}.x -DPAPI -DMODE=$MODE -DKNAME=$KNAME \
-    -DNINS=$NINS -DNMEASURE=$NMEASURE -DARRLEN=$ARRLEN -I../pfhprobe/include \
-    -L../pfhprobe -lpfh_papi_mpi  -L$PAPI -lpapi\
-    ./test3_asmmpi_x86.c
-mpicc -O2 -fno-builtin  -o test3_pfh_${NINS}.x  -DMODE=$MODE -DKNAME=$KNAME \
-    -DNINS=$NINS -DNMEASURE=$NMEASURE -DARRLEN=$ARRLEN -I../pfhprobe/include \
-    -L../pfhprobe -lpfh_mpi  \
-    ./test3_asmmpi_x86.c
-#mpicc -O2 -fno-builtin  -o test3_asmmpi_x86.x -DMODE=$MODE \
-#    -DNINS=$NINS -DNMEASURE=$NMEASURE \
-#    ./test3_asmmpi_x86.c
+#!/bin/bash
+# Legacy wrapper — use: make test3 NINS=100 MODE=EV
+set -euo pipefail
+cd "$(dirname "$0")"
+NINS="${1:-100}"
+make test3 NINS="$NINS" MODE="${MODE:-EV}" KNAME="${KNAME:-ADD}"

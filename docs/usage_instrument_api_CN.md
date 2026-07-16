@@ -295,7 +295,7 @@ int main(void)
 }
 ```
 
-EVX 可在 `commit` 前继续追加事件（最多 12 个），例如再增加 `L1I_CACHE`、`L2D_CACHE`、`L1D_CACHE_REFILL`、`L1D_TLB`、`MEM_ACCESS`、`STALL_FRONTEND`、`STALL_BACKEND` 等（参考 `examples/test2_asm_armv8.c` 的事件列表；该示例仍使用旧名 `pfh_*`，新代码请用 `ph_*`）。
+EVX 可在 `commit` 前继续追加事件（最多 12 个），例如再增加 `L1I_CACHE`、`L2D_CACHE`、`L1D_CACHE_REFILL`、`L1D_TLB`、`MEM_ACCESS`、`STALL_FRONTEND`、`STALL_BACKEND` 等（参考 `examples/test2_asm_armv8.c` 与 `examples/ph_events.h`）。
 
 ### 5.5 MPI 计数器采样要点
 
@@ -362,7 +362,7 @@ for (int t = 0; t < NMEASURE; t++) {
 ph_finalize();
 ```
 
-`examples/test5_vardist_add.c` 展示了可变循环次数 + 缓存冲刷的波动分布采集思路（接口名为旧版 `pfh_*`，逻辑可直接映射到 `ph_*`）。
+`examples/test5_vardist_add.c` 展示了可变循环次数 + 缓存冲刷的波动分布采集思路（见 `examples/README.md`）。
 
 ### 6.4 后处理思路
 
@@ -408,7 +408,7 @@ gid, pid, cycle, nanosec, uval [, ev1, ev2, ...]
 5. **正式测量关闭调试**：`PH_DEBUG=NO`，并避免在 `ph_read` 热路径附近打印日志。
 6. **需 kmod**：`PHASM` 依赖 `ph_enable_pmu.ko`；未加载时读计数器可能失败或得到无效值。
 7. **绑核稳定**：不支持运行中改变进程与 CPU 的绑定；MPI 场景建议显式绑核以便 `r<rank>c<cpu>.csv` 含义清晰。
-8. **旧示例命名**：`examples/` 与部分文档仍可能出现 `pfh_*` / `vt_*`；新代码统一使用 `ph_*` / `phmpi_*`。
+8. **示例代码**：`examples/` 已统一为 `ph_*` / `phmpi_*`；遗留 `varapi` 样例见 README 中的 obsolete 说明。
 
 ---
 

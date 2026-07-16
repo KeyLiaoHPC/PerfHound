@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <limits.h>
 #include <time.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <sched.h>
 #include <string.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
+#include <math.h>
 
 #ifdef PAPI
 #include <papi.h>
@@ -17,6 +17,7 @@
 
 #ifdef PERFHOUND
 #include <perfhound.h>
+#include "ph_events.h"
 #endif
 
 // The number of tests(random number).
@@ -40,6 +41,84 @@
 #ifndef MODE
 #define MODE TS
 #endif
+
+#ifndef NINS_MEAN
+#define NINS_MEAN 1000
+#endif
+
+#ifndef NINS_STD
+#define NINS_STD 10
+#endif
+
+#ifndef NINS_MIN
+#define NINS_MIN 0
+#endif
+
+#ifndef NINS_MAX
+#define NINS_MAX 2000
+#endif
+
+#ifndef PH_DATA_ROOT
+#define PH_DATA_ROOT "./ph_data/test5_vardist"
+#endif
+
+static int clamp_nins(int v)
+{
+    if (v < NINS_MIN) {
+        return NINS_MIN;
+    }
+    if (v > NINS_MAX) {
+        return NINS_MAX;
+    }
+    return v;
+}
+
+static int gaussian_nins(unsigned int *state)
+{
+    double u1, u2, z;
+
+    u1 = (double)(*state = *state * 1103515245u + 12345u) / (double)UINT_MAX;
+    u2 = (double)(*state = *state * 1103515245u + 12345u) / (double)UINT_MAX;
+    if (u1 < 1e-10) {
+        u1 = 1e-10;
+    }
+    z = sqrt(-2.0 * log(u1)) * cos(2.0 * M_PI * u2);
+    return clamp_nins((int)(NINS_MEAN + NINS_STD * z + 0.5));
+}
+
+static int test5_fill_nins_list(int nins_list[], int ntests)
+{
+    uint64_t seed;
+    unsigned int state;
+    FILE *ur;
+    FILE *fp_rand;
+    int i;
+
+    ur = fopen("/dev/urandom", "r");
+    if (ur == NULL) {
+        fprintf(stderr, "Failed to open /dev/urandom.\n");
+        return 1;
+    }
+    if (fread(&seed, sizeof(seed), 1, ur) != 1) {
+        fclose(ur);
+        fprintf(stderr, "Failed to read /dev/urandom.\n");
+        return 1;
+    }
+    fclose(ur);
+
+    state = (unsigned int)(seed ^ (seed >> 32));
+    fp_rand = fopen("test5_rand_list.txt", "w");
+    if (fp_rand == NULL) {
+        fprintf(stderr, "Failed to write test5_rand_list.txt.\n");
+        return 1;
+    }
+    for (i = 0; i < ntests; i++) {
+        nins_list[i] = gaussian_nins(&state);
+        fprintf(fp_rand, "%d,", nins_list[i]);
+    }
+    fclose(fp_rand);
+    return 0;
+}
 
 #define _M2S(x) #x
 #define M2S(x) _M2S(x)
@@ -99,32 +178,16 @@ int main(int argc, char** argv) {
     int idx = 0, measure_counter = 0;
 
 #ifdef PERFHOUND
-    if (pfh_init("./data/test5_pfh_res_20220301T2002")) {
-        printf("Failed at initailizing PerfHound.\n");
+    if (ph_init(PH_DATA_ROOT)) {
+        printf("Failed at initializing PerfHound.\n");
         exit(1);
     }
 
-    pfh_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
-    pfh_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
-    pfh_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
-
-    if (strcmp(mode, "EV") == 0) {
-        pfh_set_evt("cpu_clk_unhalted.core_clk");
-        pfh_set_evt("inst_retired.any_p");
-        pfh_set_evt("uops_issued.any");
-        pfh_set_evt("uops_retired.all");
-    } else if (strcmp(mode, "EVX") == 0) {
-        pfh_set_evt("cpu_clk_unhalted.core_clk");
-        pfh_set_evt("inst_retired.any_p");
-        pfh_set_evt("uops_issued.any");
-        pfh_set_evt("uops_retired.all");
-        pfh_set_evt("uops_executed_port.port_0");
-        pfh_set_evt("uops_executed_port.port_1");
-        pfh_set_evt("uops_executed_port.port_2");
-        pfh_set_evt("uops_executed_port.port_3");
-    }
-
-    pfh_commit();
+    ph_set_tag(1, 0, M2S(STRCAT(KNAME, _Test)));
+    ph_set_tag(1, 1, M2S(STRCAT(KNAME, _Start)));
+    ph_set_tag(1, 2, M2S(STRCAT(KNAME, _End)));
+    ph_example_set_events(mode);
+    ph_commit();
 #endif
 
 #ifdef PAPI
@@ -164,54 +227,10 @@ int main(int argc, char** argv) {
     PAPI_start(EventSet);
 #endif
 
-    // Generating random number
-    // Using urandom as the random source.
     int nins_list[NTESTS];
-#ifdef GSL
-    uint64_t seed;
-    const gsl_rng_type *T;
-    gsl_rng *r;
-    FILE *fp_rand = NULL;
-    
-    fp_rand = fopen("/dev/urandom", "r");
-    if (fp_rand == NULL) {
-        printf("Failed to openrandom file.\n");
+    if (test5_fill_nins_list(nins_list, NTESTS) != 0) {
         return 1;
     }
-    fread(&seed, sizeof(uint64_t), 1, fp_rand);
-    fclose(fp_rand);
-    
-    gsl_rng_env_setup();
-    T = gsl_rng_ranlux389;
-    r = gsl_rng_alloc(T);
-    gsl_rng_set(r, seed);
-
-    fp_rand = fopen("test5_rand_list.txt", "w");
-    if (fp_rand == NULL) {
-        printf("Failed to write random number to file.\n");
-        return 1;
-    }
-    for (int i = 0; i < NTESTS; i ++) {
-        // A Gaussian distribution with mean=1000 and std=10.
-        nins_list[i] = 1 + gsl_ran_gaussian(r, 10);
-        // Lower bound and upper bound.
-        nins_list[i] = nins_list[i] > 2? 2: nins_list[i];
-        nins_list[i] = nins_list[i] < 0? 0: nins_list[i];
-        fprintf(fp_rand, "%d,", nins_list[i]);
-    }
-    fclose(fp_rand);
-
-#else
-    FILE *fp_rand = NULL;
-    fp_rand = fopen("test5_rand_list.txt", "r");
-    if (fp_rand == NULL) {
-        printf("Failed to read random number file test5_rand_list.txt.\n");
-    }
-    for (int i = 0; i < NTESTS; i ++) {
-        fscanf(fp_rand, "%d,", &nins_list[i]);
-    }
-    fclose(fp_rand);
-#endif
 
     // Array for cache flushing.
     double *a, *b, *c;
@@ -295,7 +314,7 @@ int main(int argc, char** argv) {
         // Benchmarking
         // First timing
 #ifdef PERFHOUND
-        pfh_read(1, 1, 0);
+        ph_read(1, 1, 0.0);
 #endif
 
 #ifdef PAPI
@@ -326,7 +345,7 @@ int main(int argc, char** argv) {
 #endif
         // Second timing.
 #ifdef PERFHOUND
-        pfh_read(1, 2, 0);
+        ph_read(1, 2, 0.0);
 #endif
 
 #ifdef PAPI
@@ -374,7 +393,7 @@ int main(int argc, char** argv) {
     // printf("%d\n", res);
 
 #ifdef PERFHOUND
-    pfh_finalize();
+    ph_finalize();
 #endif
 
 #ifdef PAPI

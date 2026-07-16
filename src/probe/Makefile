@@ -76,8 +76,10 @@ install:
 	mkdir -p ${PREFIX}/lib
 	mkdir -p ${PREFIX}/include
 	mkdir -p ${PREFIX}/bin
-	cp ./*.so ${PREFIX}/lib
-	cp ./include/perfhound.h ${PREFIX}/include
+	cp -f ./*.so ${PREFIX}/lib
+	@if [ "${PREFIX}" != "." ]; then \
+		cp -f ./include/perfhound.h ./include/ph_mpi.h ${PREFIX}/include/; \
+	fi
 	@echo PH-Probe has been installed in ${PREFIX}
 
 clean:

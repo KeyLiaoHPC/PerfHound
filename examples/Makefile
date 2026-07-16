@@ -1,53 +1,86 @@
-#!/bin/sh
-CC = gcc
-MPICC = mpicc
-CFLAGS = -O2 -fno-builtin -DUSE_MPI 
-# 
-#
-STREAM_FLAGS = -DSTREAM_ARRAY_SIZE=16384 -DNTIMES=10000
-VARAPI_FLAGS = -DUSE_VARAPI #-DVT_MODE_SHORT -DVT_UEV_1
-LDFLAGS = 
+#!/usr/bin/make -f
+# PerfHound examples build (current ph_* / phmpi_* API)
 
-VPATH = ../pfhprobe
+PH_ROOT   ?= ../src/probe
+ARCH      := $(shell uname -m)
+CC        ?= gcc
+MPICC     ?= mpicc
 
-.PHONY: test1 test2 test3 clean
+MODE      ?= EV
+NINS      ?= 100
+NMEASURE  ?= 205
+NTESTS    ?= 200
+NP        ?= 16
+KNAME     ?= ADD
+ARRLEN    ?= 1000
+STREAM_ARRAY_SIZE ?= 2000000
+NTIMES    ?= 10
 
-test1: test1_asm_x86.x test1_asm_x86_mpi.x
+PH_INC    := -I$(PH_ROOT)/include -I.
+PH_LIB    := -L$(PH_ROOT)/lib
+PH_RPATH  := -Wl,-rpath,$(abspath $(PH_ROOT)/lib)
+CFLAGS    := -O2 -fno-builtin -DPERFHOUND -DPH_API_PAPI -DMODE=$(MODE) \
+             -DNINS=$(NINS) -DNMEASURE=$(NMEASURE) -DNTESTS=$(NTESTS) \
+             -DKNAME=$(KNAME) $(PH_INC)
+MPI_CFLAGS := $(CFLAGS) -DARRLEN=$(ARRLEN)
+LDFLAGS   := $(PH_LIB) $(PH_RPATH)
 
-test2: test2_asm_armv8.x test1_asm_armv8_mpi.x
+.PHONY: all all-x86 clean probe run-all run-test1 run-test3 run-test5 run-test6 run-stream
 
-test1_asm_x86_ts.x: test1_asm_x86.c
-	$(CC) $(CFLAGS) -o ^@ $^ -lpfh_ts 
-test1_asm_x86_evx.x: test1_asm_x86.c
-	$(CC) $(CFLAGS) -o ^@ $^ -lpfh_evx
-test1_asm_x86_ts_mpi.x: test1_asm_x86.c
-	$(MPICC) $(CFLAGS) -o ^@ $^ -lpfh_ts 
-test1_asm_x86_evx_mpi.x: test1_asm_x86.c
-	$(MPICC) $(CFLAGS) -o ^@ $^ -lpfh_evx 
+all: probe all-x86
 
-test2_asm_armv8_ts.x: test2_asm_armv8.c
-test2_asm_armv8_evx.x: test2_asm_armv8.c
-test2_asm_armv8_ts_mpi.x: test2_asm_armv8.c
-test2_asm_armv8_evx_mpi.x: test2_asm_armv8.c
+probe:
+	$(MAKE) -C $(PH_ROOT) clean all install
 
-stream.x: stream.c 
-	$(CC) $(CFLAGS) $(LDFLAGS) -o  ^@ $^
+ifeq ($(ARCH),x86_64)
+all-x86: test1_asm_x86.x test3_asmmpi_x86.x test5_vardist_add.x test6.x stream_mpi.x
+else ifeq ($(ARCH),aarch64)
+all-x86: test2_asm_armv8.x test4_asmmpi_armv8.x test5_vardist_add.x stream_mpi.x
+else
+all-x86:
+	@echo "Unsupported architecture: $(ARCH)"
+	@exit 1
+endif
 
-stream_varapi.x: stream_varapi.o varapi.o file_op.o varapi.o
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
+test1_asm_x86.x: test1_asm_x86.c ph_events.h
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lph
 
-st_mpi_varapi.x: st_mpi_varapi.o varapi.o file_op.o varapi.o vt_mpi.o
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) -o $@ $^ 
+test2_asm_armv8.x: test2_asm_armv8.c ph_events.h
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lph
 
-st_mpi_varapi.o: stream_mpi.c
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
+test3_asmmpi_x86.x: test3_asmmpi_x86.c ph_events.h
+	$(MPICC) $(MPI_CFLAGS) -o $@ $< $(LDFLAGS) -lphmpi
 
-stream_varapi.o: stream.c 
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c -o $@ $< 
+test4_asmmpi_armv8.x: test4_asmmpi_armv8.c ph_events.h
+	$(MPICC) $(MPI_CFLAGS) -o $@ $< $(LDFLAGS) -lphmpi
 
-%.o: %.c
-	$(CC) $(CFLAGS) $(STREAM_FLAGS) $(VARAPI_FLAGS) -I$(VARAPI) -c $< 
+test5_vardist_add.x: test5_vardist_add.c ph_events.h
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lph -lm
+
+test6.x: test6.c ph_events.h
+	$(MPICC) $(MPI_CFLAGS) -o $@ $< $(LDFLAGS) -lphmpi
+
+stream_mpi.x: stream_mpi.c ph_events.h
+	$(MPICC) $(MPI_CFLAGS) -DSTREAM_ARRAY_SIZE=$(STREAM_ARRAY_SIZE) -DNTIMES=$(NTIMES) \
+		-o $@ $< $(LDFLAGS) -lphmpi -lm
 
 clean:
-	rm -rf *.o stream_varapi.x stream.x
-	rm -rf ./data
+	rm -f *.x test5_rand_list.txt
+	rm -rf ph_data
+
+run-test1: test1_asm_x86.x
+	./run_serial.sh test1_asm_x86.x
+
+run-test3: test3_asmmpi_x86.x
+	NP=$(NP) ./run_mpi.sh test3_asmmpi_x86.x
+
+run-test5: test5_vardist_add.x
+	./run_serial.sh test5_vardist_add.x
+
+run-test6: test6.x
+	NP=$(NP) ./run_mpi.sh test6.x
+
+run-stream: stream_mpi.x
+	NP=$(NP) ./run_mpi.sh stream_mpi.x
+
+run-all: run-test1 run-test3 run-test5 run-test6 run-stream

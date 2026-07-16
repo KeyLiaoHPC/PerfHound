@@ -39,7 +39,7 @@ static int evset = PAPI_NULL;
 
 #ifdef __x86_64__
 #define _ph_init_cy    \
-    phmpi_set_evt("CPU_CLK_UNHALTED");
+    phmpi_set_evt("CPU_CLK_THREAD_UNHALTED:THREAD_P");
 #elif  __aarch64__
 #define _ph_init_cy    \
     phmpi_set_evt("CPU_CYCLES");
@@ -51,7 +51,7 @@ static int evset = PAPI_NULL;
 
 #ifdef __x86_64__
 #define _ph_init_cy    \
-    ph_set_evt("CPU_CLK_UNHALTED");
+    ph_set_evt("CPU_CLK_THREAD_UNHALTED:THREAD_P");
 #elif  __aarch64__
 #define _ph_init_cy    \
     ph_set_evt("CPU_CYCLES");

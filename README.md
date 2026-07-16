@@ -168,12 +168,20 @@ For detailed descriptions of the output fields, please refer to [`docs/output_fi
 
 ## 5. Examples and Tools
 
-You can use the code in the `examples/` directory to reproduce the cases on your own computing platform, so as to quickly get started with PerfHound:
-- `test2_asm_armv8.c` / `test1_asm_x86.c`: Serial instrumentation and PMU sampling examples
-- `test4_asmmpi_armv8.c` / `test3_asmmpi_x86.c`: MPI parallel instrumentation examples
-- `test5_vardist_add.c`: Performance variation distribution data collection example
+You can use the code in the `examples/` directory to reproduce the cases on your own computing platform. See [`examples/README.md`](examples/README.md) for build, run, and expected CSV output.
 
-For post-processing scripts and multi-level detection workflows for variation analysis, please refer to `src/resolution_test/` and `src/varstat/`.
+- `test1_asm_x86.c` / `test2_asm_armv8.c`: Serial micro-kernel instrumentation
+- `test3_asmmpi_x86.c` / `test4_asmmpi_armv8.c`: MPI parallel instrumentation (e.g. `NP=16`)
+- `test5_vardist_add.c`: Performance variation distribution
+- `stream_mpi.c`: MPI STREAM with Copy/Scale/Add/Triad timing tags
+
+Quick start:
+
+```bash
+cd examples && make all
+NP=16 ./run_mpi.sh stream_mpi.x
+python3 summarize_run.py ./ph_data/stream_mpi
+```
 
 ## 6. Current Limitations and Development Plan
 
