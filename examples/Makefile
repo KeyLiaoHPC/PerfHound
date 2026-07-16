@@ -6,6 +6,12 @@ ARCH      := $(shell uname -m)
 CC        ?= gcc
 MPICC     ?= mpicc
 
+ifeq ($(ARCH),aarch64)
+PH_API    ?= PHASM
+else
+PH_API    ?= PAPI
+endif
+
 MODE      ?= EV
 NINS      ?= 100
 NMEASURE  ?= 205
@@ -19,18 +25,21 @@ NTIMES    ?= 10
 PH_INC    := -I$(PH_ROOT)/include -I.
 PH_LIB    := -L$(PH_ROOT)/lib
 PH_RPATH  := -Wl,-rpath,$(abspath $(PH_ROOT)/lib)
-CFLAGS    := -O2 -fno-builtin -DPERFHOUND -DPH_API_PAPI -DMODE=$(MODE) \
+CFLAGS    := -O2 -fno-builtin -DPERFHOUND -DMODE=$(MODE) \
              -DNINS=$(NINS) -DNMEASURE=$(NMEASURE) -DNTESTS=$(NTESTS) \
              -DKNAME=$(KNAME) $(PH_INC)
+ifeq ($(PH_API),PAPI)
+CFLAGS += -DPH_API_PAPI
+endif
 MPI_CFLAGS := $(CFLAGS) -DARRLEN=$(ARRLEN)
 LDFLAGS   := $(PH_LIB) $(PH_RPATH)
 
-.PHONY: all all-x86 clean probe run-all run-test1 run-test3 run-test5 run-test6 run-stream
+.PHONY: all all-x86 clean probe run-all run-all-arm run-test1 run-test2 run-test3 run-test4 run-test5 run-test6 run-stream
 
 all: probe all-x86
 
 probe:
-	$(MAKE) -C $(PH_ROOT) clean all install
+	$(MAKE) -C $(PH_ROOT) clean all install PH_API=$(PH_API) MPICC="$(MPICC)" CC=$(CC)
 
 ifeq ($(ARCH),x86_64)
 all-x86: test1_asm_x86.x test3_asmmpi_x86.x test5_vardist_add.x test6.x stream_mpi.x
@@ -74,13 +83,21 @@ run-test1: test1_asm_x86.x
 run-test3: test3_asmmpi_x86.x
 	NP=$(NP) ./run_mpi.sh test3_asmmpi_x86.x
 
+run-test2: test2_asm_armv8.x
+	./run_serial.sh test2_asm_armv8.x
+
+run-test4: test4_asmmpi_armv8.x
+	NP=$(NP) ./run_mpi.sh test4_asmmpi_armv8.x
+
 run-test5: test5_vardist_add.x
 	./run_serial.sh test5_vardist_add.x
-
-run-test6: test6.x
-	NP=$(NP) ./run_mpi.sh test6.x
 
 run-stream: stream_mpi.x
 	NP=$(NP) ./run_mpi.sh stream_mpi.x
 
+run-test6: test6.x
+	NP=$(NP) ./run_mpi.sh test6.x
+
 run-all: run-test1 run-test3 run-test5 run-test6 run-stream
+
+run-all-arm: run-test2 run-test4 run-test5 run-stream

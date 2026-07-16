@@ -34,10 +34,7 @@ ifeq ($(PH_DEBUG),YES)
 endif
 
 LDFLAGS = -fPIC
-LDFLAGS_MPI = -fPIC
-ifeq ($(ARCH),x86_64)
-	LDFLAGS_MPI += -lmpi
-endif
+LDFLAGS_MPI = -fPIC -lmpi
 
 ifeq ($(PH_API),PAPI)
 	PAPI_ROOT=$(PAPI)
@@ -61,16 +58,17 @@ endif
 	$(CC) $(LDFLAGS) -DPH_OPT_TS -shared -o $@ perfhound.o ph_io.o $(PH_PMU_OBJS)
 	rm -f *.o
 
-libphmpi.so: ph_mpi.o ph_io.o mpi_op.o $(PH_PMU_OBJS)
-	$(MPICC) $(CFLAGS) $(LDFLAGS) -o ph_mpi.o -c ph_mpi.c
-	$(MPICC) $(CFLAGS) $(LDFLAGS) -o ph_io.o -c ph_io.c
-	$(MPICC) $(CFLAGS) $(LDFLAGS) -o mpi_op.o -c mpi_op.c
-ifneq ($(PH_PMU_OBJS),)
-	$(MPICC) $(CFLAGS) $(LDFLAGS) -o ph_pmu_x86.o -c ph_pmu_x86.c
-	$(MPICC) $(CFLAGS) $(LDFLAGS) -o ph_evt_x86.o -c ph_evt_x86.c
-endif
-	$(MPICC) $(LDFLAGS_MPI) -DPH_OPT_TS -shared -o $@ ph_mpi.o ph_io.o mpi_op.o $(PH_PMU_OBJS)
-	rm -f *.o
+libphmpi.so: ph_mpi.o ph_io_mpi.o mpi_op.o $(PH_PMU_OBJS)
+	$(MPICC) $(LDFLAGS_MPI) -DPH_OPT_TS -shared -o $@ ph_mpi.o ph_io_mpi.o mpi_op.o $(PH_PMU_OBJS)
+
+ph_mpi.o: ph_mpi.c
+	$(MPICC) $(CFLAGS) $(LDFLAGS) -o $@ -c $<
+
+ph_io_mpi.o: ph_io.c
+	$(MPICC) $(CFLAGS) $(LDFLAGS) -o $@ -c $<
+
+mpi_op.o: mpi_op.c
+	$(MPICC) $(CFLAGS) $(LDFLAGS) -o $@ -c $<
 
 install:
 	mkdir -p ${PREFIX}/lib
@@ -83,4 +81,4 @@ install:
 	@echo PH-Probe has been installed in ${PREFIX}
 
 clean:
-	rm -rf *.o *.x *.so
+	rm -rf *.o *.x *.so ph_io_mpi.o

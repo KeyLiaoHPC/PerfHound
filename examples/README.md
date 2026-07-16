@@ -131,3 +131,15 @@ chmod +x run_all.sh run_serial.sh run_mpi.sh
 ```
 
 Variables: `MODE`, `NINS`, `NMEASURE`, `NP`, `KNAME`, `STREAM_ARRAY_SIZE`, `NTIMES`.
+
+### Arm (c920fn1) notes
+
+```bash
+source /astrum/opt/920f/HPCKit-25.1.RC1/latest/hmpi/gcc/env/setvars.sh
+cd examples
+export MPICC=$(which mpicc)
+make all PH_API=PHASM MODE=TS    # PHASM + kmod; EV mode may SIGILL in ph_commit on 920f
+make run-all-arm NP=16
+```
+
+`run_mpi.sh` auto-adds `--mca btl self,vader` on `aarch64`. Default `mpirun` without this fails with PMIX UNREACHABLE on c920fn1.
