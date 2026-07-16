@@ -83,7 +83,7 @@ sudo insmod src/kmod/aarch64/ph_enable_pmu.ko   # Armv8-A
 cd src/kmod && make check
 ```
 
-**x86-64**：模块通过 sysfs `/sys/module/ph_enable_pmu/{config,counts,masks}` 配置计数器，并尝试关闭 `nmi_watchdog`、卸载 `iTCO_wdt` / `iTCO_vendor_support`。不再依赖外部 libpfc。
+**x86-64**：模块通过 sysfs `/sys/module/ph_enable_pmu/{config,counts,masks}` 配置计数器，并尝试关闭 `nmi_watchdog`、卸载 `iTCO_wdt` / `iTCO_vendor_support`。不再依赖外部 libpfc。支持 Intel Architectural Performance Monitoring **v3–v6**（含 Ice Lake-SP / Xeon Gold 6330 等 v5 平台）。v5+ 若硬件 fixed 计数器多于 3 个，sysfs 仍只导出前 3 个（索引 0–2），GP 从索引 3 起，与 PHASM 探针 ABI 一致。
 
 **Armv8-A**：模块在每个 CPU 上打开 EL0 PMU 访问权限。
 

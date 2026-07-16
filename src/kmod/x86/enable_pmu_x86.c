@@ -5,6 +5,8 @@
  * On load: disables nmi_watchdog, tries to unload iTCO modules, enables rdpmc.
  *
  * Sysfs layout matches libpfc: indices 0-2 are fixed counters, 3+ are GP counters.
+ * Arch PerfMon v5+ may expose more than three fixed counters in hardware; sysfs
+ * still exports only the first three so the PHASM probe ABI stays unchanged.
  * Derived from libpfc (MIT, Olexa Bilaniuk); PerfHound subset only.
  */
 #include <asm/processor.h>
@@ -23,6 +25,9 @@
 
 /* Max sysfs slots for fixed + general-purpose counters combined */
 #define MAXPMC 25
+
+/* Sysfs ABI: PHASM probe expects fixed indices 0-2 and GP from index 3 */
+#define PH_PMU_SYSFS_MAX_FF 3
 
 
 /* Data Structure Typedefs */
@@ -96,6 +101,7 @@ static uint32_t   maxLeaf              = 0;
 static uint32_t   maxExtendedLeaf      = 0;
 static char       procBrandString[49]  = {0};
 static int        pmcArchVer           = 0;
+static int        pmcFfHw              = 0;
 static int        pmcFf                = 0;
 static int        pmcGp                = 0;
 static int        pmcFfBitwidth        = 0;
@@ -799,11 +805,14 @@ static int  ph_pmu_init_cpuid(void){
 	 *     Gp bitwidth                  is in EAX[23:16]
 	 *     #Ff PMCs                     is in EDX[ 4: 0] if PMArchVer > 1.
 	 *     Ff bitwidth                  is in EDX[12: 5] if PMArchVer > 1.
+	 *
+	 * SDM: Arch PerfMon v5/v6 remain compatible with the v3/v4 MSR model
+	 * (Ice Lake-SP / Xeon Gold 6330 and newer client parts report v5).
 	 */
 	
 	pmcArchVer = (leafA.a >>  0) & 0xFF;
-	if(pmcArchVer < 3 || pmcArchVer > 4){
-		printk(KERN_INFO "ph_enable_pmu: ERROR: Unsupported performance monitoring architecture version %d, only 3 or 4 supported!\n", pmcArchVer);
+	if(pmcArchVer < 3 || pmcArchVer > 6){
+		printk(KERN_INFO "ph_enable_pmu: ERROR: Unsupported performance monitoring architecture version %d, only 3-6 supported!\n", pmcArchVer);
 		return -1;
 	}
 	
@@ -817,16 +826,22 @@ static int  ph_pmu_init_cpuid(void){
 		pmcGpMask     = OV(32,0);
 	}
 	
-	pmcFf         = (leafA.d >>  0) & 0x1F;
+	pmcFfHw       = (leafA.d >>  0) & 0x1F;
+	pmcFf         = pmcFfHw;
 	pmcFfBitwidth = (leafA.d >>  5) & 0xFF;
 	pmcFfMask     = OV(pmcFfBitwidth,0);
 	
+	if(pmcFfHw > PH_PMU_SYSFS_MAX_FF){
+		printk(KERN_INFO "ph_enable_pmu: Hardware has %d fixed counters; sysfs exports %d for probe ABI.\n",
+		       pmcFfHw, PH_PMU_SYSFS_MAX_FF);
+		pmcFf = PH_PMU_SYSFS_MAX_FF;
+	}
 	
-	/* Save bounds. */
+	/* Save sysfs export bounds (fixed 0..pmcFf-1, GP pmcStartGp..pmcEndGp-1). */
 	pmcStartFf = 0;
 	pmcEndFf   = pmcFf;
-	pmcStartGp = pmcFf;
-	pmcEndGp   = pmcFf+pmcGp;
+	pmcStartGp = PH_PMU_SYSFS_MAX_FF;
+	pmcEndGp   = pmcStartGp + pmcGp;
 	
 	
 	/* Dump out this data */
@@ -837,7 +852,13 @@ static int  ph_pmu_init_cpuid(void){
 		pmcGp = pmcGp>MAXPMC       ?       MAXPMC : pmcGp;
 		pmcFf = pmcGp+pmcFf>MAXPMC ? MAXPMC-pmcGp : pmcFf;
 	}
-	printk(KERN_INFO "ph_enable_pmu: Fixed-function  PMCs: %d\tMask %016llx (%d bits)\n", pmcFf, pmcFfMask, pmcFfBitwidth);
+	if(pmcFfHw != pmcFf){
+		printk(KERN_INFO "ph_enable_pmu: Fixed-function  PMCs: %d (hw %d)\tMask %016llx (%d bits)\n",
+		       pmcFf, pmcFfHw, pmcFfMask, pmcFfBitwidth);
+	}else{
+		printk(KERN_INFO "ph_enable_pmu: Fixed-function  PMCs: %d\tMask %016llx (%d bits)\n",
+		       pmcFf, pmcFfMask, pmcFfBitwidth);
+	}
 	printk(KERN_INFO "ph_enable_pmu: General-purpose PMCs: %d\tMask %016llx (%d bits)\n", pmcGp, pmcGpMask, pmcGpBitwidth);
 	
 	
@@ -860,7 +881,7 @@ static void ph_pmu_init_counters(void* unused){
 	
 	pfcWRMSR(MSR_IA32_PERF_GLOBAL_CTRL,      0);
 	pfcWRMSR(MSR_IA32_FIXED_CTR_CTRL,        0);
-	for(i=0;i<pmcFf;i++){
+	for(i=0;i<pmcFfHw;i++){
 		pfcWRMSR(MSR_IA32_FIXED_CTR0  + i,       0);
 	}
 	for(i=0;i<pmcGp;i++){
